@@ -124,7 +124,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
     private static void SetupFloatObject(Mock<ISmalltalkHeap> mock, SmalltalkOOP floatOOP, double value)
     {
         SetupObjectFormat(mock, floatOOP, ObjectFormat.WordIndexed);
-        SetupIndexedSize(mock, floatOOP, 4);
+        SetupIndexedSize(mock, floatOOP, 2);  // 2 words (32-bit each) for IEEE 754 double
         SetupClassOOP(mock, floatOOP, FloatClassOOP);
 
         // Mock GetFloatAsDouble - this is what the primitive actually calls
@@ -142,7 +142,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var metadata = CreateFloatTestMetadata(mockHeap.Object);
 
         // Mock allocation with the FloatClassOOP from metadata
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(newFloatOOP);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(newFloatOOP);
 
         var context = CreateContext(
             SmallInt(42),
@@ -164,7 +164,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         var metadata = CreateFloatTestMetadata(mockHeap.Object);
 
         // Mock allocation with the FloatClassOOP from metadata
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(newFloatOOP);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(newFloatOOP);
 
         var context = CreateContext(
             SmallInt(-100),
@@ -218,7 +218,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         SetupFloatObject(mockHeap, float1, 2.5);
         SetupFloatObject(mockHeap, float2, 3.5);
 
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(resultFloat);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(resultFloat);
 
         var context = CreateContext(
             float1,
@@ -242,7 +242,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
 
         SetupFloatObject(mockHeap, floatOOP, 2.5);
 
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(resultFloat);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(resultFloat);
 
         var context = CreateContext(
             floatOOP,
@@ -272,7 +272,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         SetupFloatObject(mockHeap, float1, 5.5);
         SetupFloatObject(mockHeap, float2, 2.0);
 
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(resultFloat);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(resultFloat);
 
         var context = CreateContext(
             float1,
@@ -460,7 +460,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         SetupFloatObject(mockHeap, float1, 2.5);
         SetupFloatObject(mockHeap, float2, 4.0);
 
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(resultFloat);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(resultFloat);
 
         var context = CreateContext(
             float1,
@@ -490,7 +490,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
         SetupFloatObject(mockHeap, float1, 10.0);
         SetupFloatObject(mockHeap, float2, 2.5);
 
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(resultFloat);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(resultFloat);
 
         var context = CreateContext(
             float1,
@@ -608,7 +608,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
 
         SetupFloatObject(mockHeap, floatOOP, 3.75);
 
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(resultFloat);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(resultFloat);
 
         var context = CreateContext(
             floatOOP,
@@ -683,7 +683,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
 
         SetupFloatObject(mockHeap, floatOOP, 1.5);
 
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(resultFloat);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(resultFloat);
 
         var context = CreateContext(
             floatOOP,
@@ -707,7 +707,7 @@ public class FloatPrimitivesTests : PrimitiveTestBase
 
         SetupFloatObject(mockHeap, floatOOP, 8.0);
 
-        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 4)).Returns(resultFloat);
+        mockHeap.Setup(h => h.AllocateInstanceOf(FloatClassOOP, 2)).Returns(resultFloat);
 
         var context = CreateContext(
             floatOOP,

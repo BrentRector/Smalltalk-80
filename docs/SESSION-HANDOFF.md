@@ -1,15 +1,23 @@
-# Session Handoff: 32bpp Display Graphics
+# Session Handoff: 32bpp Graphics Pipeline Complete
 
-**Date**: 2026-01-01
-**Status**: Ready for Phase 1 of 32bpp implementation
-**Branch**: `claude/32bpp-display-graphics-RLW1k`
+**Date**: 2026-01-02
+**Status**: 32bpp graphics pipeline functional with anti-aliased text support
+**Branch**: `claude/review-graphics-architecture-FssRQ`
 **Priority**: Enhancement
+**Master Plan**: `docs/32-BIT-IMPLEMENTATION-PLAN.md`
 
 ---
 
 ## Quick Summary
 
-The 1bpp graphics system is fully functional with all UI polish complete. Mouse wheel scrolling works for both list panes (selection movement) and text panes (content scrolling). The System Browser opens with proper initial selection. Ready to begin 32bpp native color support implementation.
+This session completed the 32bpp graphics pipeline with full color preservation and anti-aliased text rendering. Key achievements:
+
+1. **Scroll Overlap Fix**: BitBlt32Engine now handles overlapping memory copies correctly
+2. **XOR Caret Fix**: Inverted source for XOR operations to preserve 1bpp semantics
+3. **Font Baseline Alignment**: Fixed-pitch fonts now use uniform cell width
+4. **Paint Mode (Rule 16)**: Implemented multiply blend for anti-aliased text
+5. **Color Verification**: Blue text test confirmed colors flow through entire pipeline
+6. **Window Title**: Updated to "Smalltalk-2026"
 
 ---
 
@@ -20,127 +28,110 @@ The 1bpp graphics system is fully functional with all UI polish complete. Mouse 
 - ✅ Cold start: All 6 phases succeed
 - ✅ Init expressions: 286/286 succeed (100%)
 - ✅ System Browser: Fully functional with source code display
-- ✅ Mouse wheel scrolling: List panes move selection, text panes scroll
-- ✅ Scroll limiting: Text stops when last line reaches bottom
-- ✅ Browser initial selection: Opens with first category selected
 - ✅ All 16 BitBlt combination rules working
-- ✅ 1bpp→32bpp conversion for screen display
+- ✅ **Rule 16 (Paint)**: Now handled in C# with multiply blend (was falling back to Smalltalk)
+- ✅ **32bpp font rendering**: Anti-aliased with explicit Format32bppArgb
+- ✅ **Color preservation**: Verified with blue text rendering
+- ✅ **Scroll operations**: Overlap handling prevents duplication artifacts
+- ✅ **XOR operations**: Caret/cursor displays correctly (inverted source fix)
 
 ### Recent Commits (this session)
 ```
-d4ba09b Initialize Browser with first category selected
-cc44b8b Limit scroll to stop when last line reaches bottom of pane
-941bb3b Add mouse wheel scrolling support for Smalltalk-80 panes
+8291a14 Update window title to Smalltalk-2026
+51070cb TEST: Render font glyphs in blue to verify color preservation
+ad4cb48 Fix anti-aliasing: use multiply blend and explicit 32bpp format
+cd0ecb1 Implement grayscale alpha blending for paint mode (rule 16)
+f44ed0f Fix build: revert to GDI+ (TextRenderer requires net9.0-windows)
+8e31a2e Use TextRenderer (GDI) for consistent font baseline alignment
+5ac24c7 Fix fixed-pitch font alignment with uniform cell width
+6f44b8f Fix row iteration order for vertical overlap in CopyBitsOptimized
 ```
 
 ---
 
-## Mouse Wheel Implementation Details
+## Key Technical Changes
 
-### C# Side
-- `InputWordRingBuffer.cs`: Added `TypeMouseWheel = 6 << 12` constant
-- `EnqueueMouseWheel(int deltaLines)`: Encodes as offset (delta + 2048) for signed 12-bit
-- `WinFormsDisplay.cs`: `OnMouseWheel` handler converts `e.Delta / 120` to notches
+### 1. BitBlt32Engine Overlap Handling
 
-### Smalltalk Side
-- `InputState`: Added `wheelDelta` instance variable, handles Type 6 in `run`
-- `InputSensor>>mouseWheelDelta`: Returns and resets accumulated delta
-- `ScrollController>>wheelActivity:`: Scrolls view content (positive = up)
-- `ListController>>wheelActivity:`: Moves selection up/down with auto-scroll
-- `ParagraphEditor>>controlActivity`: Handles wheel before other input
-- `ListView>>changeModelSelection:`: Added for polymorphic dispatch
-- `Browser>>on:`: Sets initial category to first in list
+**Problem**: Scrolling list panes showed duplicate entries due to overlapping source/dest regions.
 
----
-
-## Next Steps: 32bpp Native Color Support
-
-The graphics system currently operates in 1bpp mode with conversion to 32bpp only for final screen display. The next phase implements native 32bpp Forms with full color support.
-
-### Implementation Phases (from Graphics-Architecture.md Section 6)
-
-| Phase | Scope | Complexity | Status |
-|-------|-------|------------|--------|
-| **1** | Color class | Low | Not started |
-| **2** | Form depth | Medium | Not started |
-| **3** | BitBltEngine32 | High | Not started |
-| **4** | Depth dispatch | Medium | Not started |
-| **5** | Depth conversion | Medium | Not started |
-| **6** | Extended rules | Medium | Not started |
-| **7** | Widget updates | High | Not started |
-
-### Phase 1: Color Class (Recommended Start)
-
-Create new Smalltalk classes for color values:
-
-```smalltalk
-Object subclass: #Color
-    instanceVariableNames: 'rgb'
-    classVariableNames: 'Black White Transparent'
-
-Color subclass: #TranslucentColor
-    instanceVariableNames: 'alpha'
+**Solution**: Detect scroll direction and iterate rows accordingly:
+```csharp
+bool copyBottomToTop = destY > sourceY;
+if (copyBottomToTop) {
+    for (int y = height - 1; y >= 0; y--) { ... }
+} else {
+    for (int y = 0; y < height; y++) { ... }
+}
 ```
 
-Key methods needed:
-- `Color class>>r:g:b:` - Create from float RGB (0.0-1.0)
-- `Color class>>fromInteger:` - Create from 32-bit ARGB
-- `Color>>red`, `green`, `blue` - Component accessors
-- `Color>>asPixelValue` - Convert to 32-bit ARGB integer
-- `Color>>asFormColor` - Convert to 1bpp (luminance threshold)
+### 2. Paint Mode Multiply Blend
 
-### Phase 2: Form Depth
+**Problem**: Original paint mode (rule 16) used OR operations designed for 1bpp. In 32bpp, black=0x000000 so OR-ing produces wrong results.
 
-Add `depth` instance variable to Form:
-
-```smalltalk
-DisplayMedium subclass: #Form
-    instanceVariableNames: 'bits width height offset depth'
+**Solution**: Implement multiply blend which is the correct operation for anti-aliased content on white background:
+```csharp
+// BlendPaint: result = src * dest / 255 (per channel)
+// - White source (255) = transparent (dest unchanged)
+// - Black source (0) = opaque (result = 0)
+// - Gray source = proportional darkening
+int outR = (srcR * dstR) / 255;
+int outG = (srcG * dstG) / 255;
+int outB = (srcB * dstB) / 255;
 ```
 
-Only depths 1 and 32 are supported. Key changes:
-- `Form class>>extent:depth:` - Create with specific depth
-- `Form>>depth` - Returns 1 if nil (backward compatible)
-- `Form>>wordsPerRow` - Different calculation for 1bpp vs 32bpp
-- `Form>>is32bpp` - Convenience test
+### 3. XOR Source Inversion
 
-### Design Constraints
+**Problem**: In 1bpp, black=1 (all bits set). XOR with 1 inverts destination. In 32bpp, black=0x000000. XOR with 0 does nothing.
 
-**Two depths only: 1 and 32**
-- No indexed colors (2, 4, 8 bit)
-- No ColorForm
-- No color palettes
-- Simplifies implementation significantly
+**Solution**: Invert source before XOR:
+```csharp
+destPixels[offset] ^= ~sourcePixels[offset];
+```
 
-**Backward Compatibility**
-- `Form>>depth` returns 1 if nil
-- Existing Form creation defaults to depth: 1
-- Cursors and fonts remain 1bpp
-- Gradual migration path
+### 4. Fixed-Pitch Font Rendering
+
+**Problem**: Individual character measurements with MeasureString returned varying widths, causing baseline misalignment.
+
+**Solution**:
+- Use uniform cell width from representative character ('M')
+- Build xTable as `i * cellWidth` for all characters
+- Use `TextRenderingHint.AntiAlias` and `Format32bppArgb` for proper grayscale output
 
 ---
 
-## Key Documentation
+## Files Modified
 
-- **`docs/Graphics-Architecture.md`** - Complete graphics system architecture including 32bpp plan (Section 6)
-- **`docs/CLAUDE.md`** - Project status and development guidelines
-- **`Smalltalk-80 Source/Smalltalk-80.st`** - All Smalltalk source code
+| File | Changes |
+|------|---------|
+| `BitBlt32Engine.cs` | Overlap handling for all fast paths, multiply blend for rule 16 |
+| `CombinationRule.cs` | Added `Paint = 16` enum value |
+| `GraphicsPrimitives.cs` | Accept rule 16 in primitive (was failing at >15) |
+| `WinFormsFontBridge.cs` | Uniform cell width, Format32bppArgb, AntiAlias hint |
+| `Program.cs` | Window title changed to "Smalltalk-2026" |
 
 ---
 
-## Files to Modify for 32bpp
+## Remaining Work
 
-### Phase 1 (Color class)
-- `Smalltalk-80.st` - Add Color and TranslucentColor classes
+### Immediate
+1. **Change font color back to black** - Currently blue for testing
+2. **Selection highlight polish** - Yellow-on-blue looks odd with multiply blend
 
-### Phase 2 (Form depth)
-- `Smalltalk-80.st` - Modify Form class, add depth ivar and methods
+### Future (32-bit Word Migration)
+The 32-bit word migration (HeapManager `ushort[]` → `uint[]`) is still planned but not started. See `docs/32-BIT-IMPLEMENTATION-PLAN.md` for the phased approach.
 
-### Phase 3 (BitBltEngine32)
-- New file: `Core/VM/Graphics/BitBltEngine32.cs` - 32bpp BitBlt implementation
+---
 
-### Phase 4 (Depth dispatch)
-- `GraphicsPrimitives.cs` - Route primitive 96 based on source/dest depths
+## Known Issues
+
+### Race Condition on Early Mouse Movement
+**Symptom**: Interpreter crashes if mouse moves into window immediately after startup.
+**Workaround**: Wait 2-3 seconds before moving mouse.
+**Status**: Under investigation.
+
+### Anti-aliasing Subtlety
+Anti-aliased edges are present but subtle at normal font sizes (10-14px). Visible when zoomed. This is expected behavior for small fonts.
 
 ---
 
@@ -165,19 +156,18 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 
 ---
 
-## Known Issue
-
-**Race Condition on Early Mouse Movement**: Interpreter may crash if mouse moves into window immediately after startup. Wait 2-3 seconds before moving mouse. Under investigation.
-
----
-
 ## For Next Session
 
-**Start Here**:
-1. Read this handoff document
-2. Read `docs/Graphics-Architecture.md` Section 6 for detailed 32bpp plan
-3. Begin Phase 1: Implement Color class in Smalltalk-80.st
-4. Test with simple color creation and conversion methods
-5. Proceed to Phase 2: Add depth to Form class
+### If continuing graphics work:
+1. Change font color back to black in `WinFormsFontBridge.cs`
+2. Investigate selection highlight appearance
 
-**Goal**: Implement native 32bpp Form support with full Color class, enabling color graphics without runtime 1bpp→32bpp conversion.
+### If starting 32-bit word migration:
+1. Start with `docs/32-BIT-IMPLEMENTATION-PLAN.md` Phase 1.1
+2. Change `ushort[]` to `uint[]` in HeapManager
+3. Run regression tests after each phase
+
+### Key Documentation:
+- `CLAUDE.md` - Project status and development guidelines
+- `docs/32-BIT-IMPLEMENTATION-PLAN.md` - Master plan for word migration
+- `docs/Graphics-Architecture.md` - Graphics system design

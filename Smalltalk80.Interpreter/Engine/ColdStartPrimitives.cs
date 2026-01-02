@@ -222,20 +222,18 @@ public class ColdStartPrimitives : IColdStartPrimitives
 
     private SmalltalkOOP HandleWordIndexedAt(SmalltalkOOP objectOOP, int index)
     {
-        ushort wordValue = _heapManager.GetIndexedWord(objectOOP, index);
-        return SmalltalkOOP.FromSmallInteger(wordValue);
+        uint wordValue = _heapManager.GetIndexedWord(objectOOP, index);
+        return SmalltalkOOP.FromSmallInteger((int)wordValue);
     }
 
     private void HandleWordIndexedAtPut(SmalltalkOOP objectOOP, int index, SmalltalkOOP value)
     {
         if (!value.IsSmallInteger)
             throw new ArgumentException("WordIndexed objects can only store SmallInteger values");
-        
+
         int intValue = value.AsSmallInteger();
-        if (intValue < 0 || intValue > 65535)
-            throw new ArgumentOutOfRangeException(nameof(value), "Word values must be 0-65535");
-        
-        _heapManager.SetIndexedWord(objectOOP, index, (ushort)intValue);
+        // 32-bit words can store full SmallInteger range
+        _heapManager.SetIndexedWord(objectOOP, index, (uint)intValue);
     }
 
     /// <summary>

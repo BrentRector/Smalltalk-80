@@ -364,12 +364,12 @@ public class InitExpressionCompiler
 
     /// <summary>
     /// Allocates a Float object at runtime using the heap manager.
-    /// Float is WordIndexed with 4 words (IEEE 754 double precision).
+    /// Float is WordIndexed with 2 words (32-bit each = 8 bytes for IEEE 754 double).
     /// </summary>
     private SmalltalkOOP AllocateFloat(double value)
     {
-        // Allocate WordIndexed object with 4 words for IEEE 754 double
-        var floatOOP = _heapManager.AllocateObject(ObjectFormat.WordIndexed, fixedSlots: 0, indexedSize: 4);
+        // Allocate WordIndexed object with 2 words (32-bit each = 8 bytes total)
+        var floatOOP = _heapManager.AllocateObject(ObjectFormat.WordIndexed, fixedSlots: 0, indexedSize: 2);
 
         // Set Float class using hash-based lookup
         var floatClassOOP = _runtimeServices.GetClass("Float");
@@ -378,16 +378,11 @@ public class InitExpressionCompiler
             _heapManager.SetClassOOP(floatOOP, floatClassOOP);
         }
 
-        // Convert double to IEEE 754 binary representation in little-endian byte order
-        byte[] bytes = BitConverter.GetBytes(value);
-
-        // Store as 4 words (16-bit each) preserving little-endian byte order
-        for (int i = 0; i < 4; i++)
-        {
-            // Combine 2 bytes into a 16-bit word (little-endian)
-            ushort word = (ushort)(bytes[i * 2] | (bytes[i * 2 + 1] << 8));
-            _heapManager.SetIndexedWord(floatOOP, i, word);
-        }
+        // Convert double to IEEE 754 binary representation
+        // With 32-bit words, Float uses 2 words (little-endian: word 0 = low 32 bits)
+        long bits = BitConverter.DoubleToInt64Bits(value);
+        _heapManager.SetIndexedWord(floatOOP, 0, (uint)(bits & 0xFFFFFFFF));
+        _heapManager.SetIndexedWord(floatOOP, 1, (uint)((bits >> 32) & 0xFFFFFFFF));
 
         return floatOOP;
     }

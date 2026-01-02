@@ -1,8 +1,8 @@
 # Smalltalk-80 File System Design
 
-**Version:** 1.4
-**Date:** 2025-12-30
-**Status:** Implemented - Legacy classes removed
+**Version:** 1.5
+**Date:** 2026-01-01
+**Status:** Implemented - Legacy classes removed, binary I/O methods added
 
 > **Note**: This document has been updated to reflect the actual implementation.
 > See `Smalltalk-80 Source/Smalltalk-80.st` for the authoritative source code.
@@ -15,9 +15,10 @@
 4. [Microsoft Compliance](#microsoft-compliance)
 5. [Class Hierarchy](#class-hierarchy)
 6. [Class Specifications](#class-specifications)
-7. [Initialization and Cold Start](#initialization-and-cold-start)
-8. [Usage Examples](#usage-examples)
-9. [Migration from Legacy System](#migration-from-legacy-system)
+7. [Binary I/O API](#binary-io-api)
+8. [Initialization and Cold Start](#initialization-and-cold-start)
+9. [Usage Examples](#usage-examples)
+10. [Migration from Legacy System](#migration-from-legacy-system)
 
 ---
 
@@ -2769,25 +2770,26 @@ emphasis: ignored
 
 ### WindowsFileStream (Concrete)
 
-Windows implementation of FileStream.
+Windows implementation of FileStream. This is the primary class for file I/O in the simplified file system architecture, providing direct handle-based streaming without the legacy FilePage abstraction.
 
 ```smalltalk
-FileStream subclass: #WindowsFileStream
-    instanceVariableNames: 'pathName handle position mode closed'
+Object subclass: #WindowsFileStream
+    instanceVariableNames: 'pathName handle position mode closed logicalSize'
     classVariableNames: 'ReadMode WriteMode AppendMode ReadWriteMode'
     poolDictionaries: ''
     category: 'Files-Windows'!
 
 WindowsFileStream comment:
-'I am the Windows implementation of FileStream.
-I use Windows file handles for direct file I/O.
+'I am the primary class for file I/O in the simplified file system architecture.
+I provide direct handle-based streaming without the legacy FilePage abstraction.
 
 Instance Variables:
     pathName    <String> full path to the file
-    handle      <Integer> Windows file handle
-    position    <Integer> current position in file
-    mode        <Integer> access mode
+    handle      <Integer> Windows file handle (-1 if closed)
+    position    <Integer> current read/write position
+    mode        <Integer> access mode (ReadMode, WriteMode, etc.)
     closed      <Boolean> true if stream is closed
+    logicalSize <Integer> max position reached (tracks writes without OS query)
 
 Class Variables:
     ReadMode        = 1
@@ -2918,8 +2920,12 @@ position: anInteger
     position := anInteger!
 
 size
-    "Answer the file size"
+    "Answer file size. When open, return tracked logicalSize (no OS call needed).
+     When closed, query filesystem. Handle nil logicalSize for pre-existing streams."
     | attrs |
+    closed ifFalse: [
+        logicalSize == nil ifTrue: [logicalSize := self physicalFileSize].
+        ^logicalSize].
     attrs := self primGetAttributes: pathName.
     attrs isNil ifTrue: [^0].
     ^attrs at: 1! !
@@ -2945,20 +2951,102 @@ peek
     self atEnd ifTrue: [^nil].
     byte := self primReadByte: handle at: position.
     byte < 0 ifTrue: [^nil].
-    ^Character value: byte! !
+    ^Character value: byte!
+
+nextInt16
+    "Answer the next two bytes as an Integer (big-endian, 16-bit)."
+    | high low |
+    high := self next.
+    high == nil ifTrue: [^false].
+    low := self next.
+    low == nil ifTrue: [^false].
+    ^(high asInteger bitShift: 8) + low asInteger!
+
+nextInt32
+    "Answer the next four bytes as an Integer (big-endian, 32-bit)."
+    | b0 b1 b2 b3 |
+    b0 := self next. b0 == nil ifTrue: [^false].
+    b1 := self next. b1 == nil ifTrue: [^false].
+    b2 := self next. b2 == nil ifTrue: [^false].
+    b3 := self next. b3 == nil ifTrue: [^false].
+    ^((b0 asInteger bitShift: 24) + (b1 asInteger bitShift: 16)
+        + (b2 asInteger bitShift: 8) + b3 asInteger) bitAnd: 16rFFFFFFFF!
+
+nextInt16LE
+    "Answer the next two bytes as an Integer (little-endian, 16-bit)."
+    | low high |
+    low := self next.
+    low == nil ifTrue: [^false].
+    high := self next.
+    high == nil ifTrue: [^false].
+    ^(high asInteger bitShift: 8) + low asInteger!
+
+nextInt32LE
+    "Answer the next four bytes as an Integer (little-endian, 32-bit)."
+    | b0 b1 b2 b3 |
+    b0 := self next. b0 == nil ifTrue: [^false].
+    b1 := self next. b1 == nil ifTrue: [^false].
+    b2 := self next. b2 == nil ifTrue: [^false].
+    b3 := self next. b3 == nil ifTrue: [^false].
+    ^((b3 asInteger bitShift: 24) + (b2 asInteger bitShift: 16)
+        + (b1 asInteger bitShift: 8) + b0 asInteger) bitAnd: 16rFFFFFFFF!
+
+nextWord
+    "Answer the next two bytes as an Integer (big-endian).
+     For Blue Book compatibility with external file formats.
+     Use nextInt32 for 32-bit values."
+    ^self nextInt16! !
 
 "-------------------- writing --------------------"
 
 !WindowsFileStream methodsFor: 'writing'!
 
 nextPut: aCharacter
-    "Write a character"
+    "Write a character and update logical size"
     | byte |
     closed ifTrue: [self reopen].
     byte := aCharacter asciiValue.
     self primWriteByte: handle at: position value: byte.
     position := position + 1.
-    ^aCharacter! !
+    "Update logical size - handle nil for pre-existing streams"
+    logicalSize == nil
+        ifTrue: [logicalSize := position]
+        ifFalse: [logicalSize := position max: logicalSize].
+    ^aCharacter!
+
+nextInt16Put: aWord
+    "Append an Integer as two bytes (big-endian, 16-bit)."
+    self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
+    self nextPut: (Character value: (aWord bitAnd: 255)).
+    ^aWord!
+
+nextInt32Put: aWord
+    "Append an Integer as four bytes (big-endian, 32-bit)."
+    self nextPut: (Character value: ((aWord bitShift: -24) bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -16) bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
+    self nextPut: (Character value: (aWord bitAnd: 255)).
+    ^aWord!
+
+nextInt16LEPut: aWord
+    "Append an Integer as two bytes (little-endian, 16-bit)."
+    self nextPut: (Character value: (aWord bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
+    ^aWord!
+
+nextInt32LEPut: aWord
+    "Append an Integer as four bytes (little-endian, 32-bit)."
+    self nextPut: (Character value: (aWord bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -8) bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -16) bitAnd: 255)).
+    self nextPut: (Character value: ((aWord bitShift: -24) bitAnd: 255)).
+    ^aWord!
+
+nextWordPut: aWord
+    "Append an Integer as two bytes (big-endian).
+     For Blue Book compatibility with external file formats.
+     Use nextInt32Put: for 32-bit values."
+    ^self nextInt16Put: aWord! !
 
 "-------------------- file modes --------------------"
 
@@ -2985,7 +3073,9 @@ close
     closed := true!
 
 flush
-    "Flush buffered data (no-op for direct I/O)"
+    "Flush file buffers. Primitive 151."
+    closed ifTrue: [^self].
+    self primFlush: handle.
     ^self!
 
 shorten
@@ -3031,6 +3121,11 @@ primWriteByte: aHandle at: pos value: byte
     <primitive: 134>
     ^byte!
 
+primFlush: aHandle
+    "Flush file stream buffers"
+    <primitive: 151>
+    ^self primitiveFailed!
+
 primTruncate: aHandle
     "Truncate file at current position"
     <primitive: 140>
@@ -3041,6 +3136,84 @@ primGetAttributes: path
     <primitive: 154>
     ^nil! !
 ```
+
+---
+
+## Binary I/O API
+
+WindowsFileStream and ExternalStream provide explicit methods for reading and writing binary data in both big-endian and little-endian byte orders.
+
+### Method Summary
+
+| Method | Bytes | Endian | Direction | Description |
+|--------|-------|--------|-----------|-------------|
+| `nextInt16` | 2 | Big | Read | Read 16-bit integer (network/Blue Book order) |
+| `nextInt16Put:` | 2 | Big | Write | Write 16-bit integer |
+| `nextInt32` | 4 | Big | Read | Read 32-bit integer |
+| `nextInt32Put:` | 4 | Big | Write | Write 32-bit integer |
+| `nextInt16LE` | 2 | Little | Read | Read 16-bit integer (Windows native) |
+| `nextInt16LEPut:` | 2 | Little | Write | Write 16-bit integer |
+| `nextInt32LE` | 4 | Little | Read | Read 32-bit integer |
+| `nextInt32LEPut:` | 4 | Little | Write | Write 32-bit integer |
+| `nextWord` | 2 | Big | Read | Alias for `nextInt16` (Blue Book compatibility) |
+| `nextWordPut:` | 2 | Big | Write | Alias for `nextInt16Put:` (Blue Book compatibility) |
+
+### Endianness Guidelines
+
+**Big-Endian (Network Byte Order):**
+- Use for PNG files and other image formats
+- Use for network protocols
+- Use for Blue Book file formats (Form files, etc.)
+- Default for cross-platform data exchange
+
+**Little-Endian (Intel/Windows Native):**
+- Use for Windows-specific binary formats
+- Use for memory-mapped structures matching C# structs
+- Use for performance-critical cases on x86/x64
+
+### Usage Examples
+
+```smalltalk
+"Reading a PNG file (big-endian)"
+stream := WindowsFileStream readOn: 'image.png'.
+stream binary.
+signature := stream next: 8.  "PNG signature"
+chunkLength := stream nextInt32.  "Big-endian length"
+chunkType := stream next: 4.  "IHDR, IDAT, etc."
+stream close.
+
+"Reading a Windows BMP file (little-endian)"
+stream := WindowsFileStream readOn: 'image.bmp'.
+stream binary.
+signature := stream next: 2.  "BM"
+fileSize := stream nextInt32LE.  "Little-endian size"
+reserved := stream nextInt32LE.
+dataOffset := stream nextInt32LE.
+stream close.
+
+"Writing Blue Book Form file (big-endian)"
+stream := WindowsFileStream writeOn: 'test.form'.
+stream binary.
+stream nextWordPut: 1.       "File code"
+stream nextWordPut: width.   "Width in pixels"
+stream nextWordPut: height.  "Height in pixels"
+stream nextWordPut: offsetX. "X offset"
+stream nextWordPut: offsetY. "Y offset"
+"... bitmap data ..."
+stream close.
+```
+
+### Return Values
+
+All read methods return:
+- The integer value on success
+- `false` if end-of-file is reached before all bytes are read
+
+All write methods return the value written (for chaining).
+
+### SmallInteger Range
+
+**Important:** 32-bit values are masked with `16rFFFFFFFF` to ensure they fit in unsigned 32-bit range. Values exceeding SmallInteger range (30 bits signed: -2^30 to 2^30-1) will automatically promote to LargeInteger.
 
 ---
 

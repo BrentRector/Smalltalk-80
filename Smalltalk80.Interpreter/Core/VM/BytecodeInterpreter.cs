@@ -1261,8 +1261,8 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                     SmalltalkOOP value;
                     if (format == ObjectFormat.WordIndexed)
                     {
-                        ushort w = heapManager.GetIndexedWord(receiverOOP, index - 1);
-                        value = SmalltalkOOP.FromSmallInteger(w);
+                        uint w = heapManager.GetIndexedWord(receiverOOP, index - 1);
+                        value = SmalltalkOOP.FromSmallInteger((int)w);
                     }
                     else if (format == ObjectFormat.ByteIndexed)
                     {
@@ -1308,8 +1308,9 @@ internal class BytecodeInterpreter : IBytecodeInterpreter
                         if (value.IsSmallInteger)
                         {
                             int wordValue = value.AsSmallInteger();
-                            if (wordValue >= 0 && wordValue <= 65535)
-                                heapManager.SetIndexedWord(receiverOOP, index - 1, (ushort)wordValue);
+                            // 32-bit words can store any non-negative SmallInteger
+                            if (wordValue >= 0)
+                                heapManager.SetIndexedWord(receiverOOP, index - 1, (uint)wordValue);
                             else
                                 success = false;
                         }

@@ -65,6 +65,7 @@ public readonly struct FontMetrics
 
 /// <summary>
 /// Rendered glyph data for a single character.
+/// RGB-only: Each pixel is stored as one uint (0x00RRGGBB, alpha implicit).
 /// </summary>
 public readonly struct GlyphData
 {
@@ -75,10 +76,11 @@ public readonly struct GlyphData
     public int Width { get; init; }
 
     /// <summary>
-    /// Bitmap data for the glyph (1 bit per pixel).
-    /// Rows are packed into 16-bit words, LSB first.
+    /// Bitmap data for the glyph (24 bits per pixel, stored in uint).
+    /// Each uint is one pixel in 0x00RRGGBB format (alpha implicit).
+    /// Array size is Width * Height.
     /// </summary>
-    public ushort[] Bitmap { get; init; }
+    public uint[] Bitmap { get; init; }
 
     /// <summary>Height of the glyph bitmap in pixels.</summary>
     public int Height { get; init; }
@@ -112,11 +114,13 @@ public class StrikeFontData
     public int[] XTable { get; init; } = Array.Empty<int>();
 
     /// <summary>
-    /// Combined glyph bitmap (1bpp). All glyphs placed side by side.
+    /// Combined glyph bitmap (RGB-only). All glyphs placed side by side.
     /// Height is font height (ascent + descent), width is strikeLength.
-    /// Stored as 16-bit words, row by row.
+    /// Each uint is one pixel in 0x00RRGGBB format (alpha implicit).
+    /// Array size is StrikeLength * StrikeHeight.
+    /// Antialiased grayscale values are preserved for smooth rendering.
     /// </summary>
-    public ushort[] GlyphsBitmap { get; init; } = Array.Empty<ushort>();
+    public uint[] GlyphsBitmap { get; init; } = Array.Empty<uint>();
 
     /// <summary>Width of the combined glyphs form in pixels.</summary>
     public int StrikeLength { get; init; }
@@ -124,8 +128,8 @@ public class StrikeFontData
     /// <summary>Height of the combined glyphs form in pixels.</summary>
     public int StrikeHeight => Metrics.Ascent + Metrics.Descent;
 
-    /// <summary>Number of 16-bit words per row in the glyphs form.</summary>
-    public int Raster => (StrikeLength + 15) / 16;
+    /// <summary>Number of 32-bit words per row in the glyphs form. For 32bpp, equals StrikeLength.</summary>
+    public int Raster => StrikeLength;
 
     /// <summary>X offset for rendering (typically 0).</summary>
     public int XOffset { get; init; }
@@ -234,11 +238,11 @@ public interface IFontBridge
     int GetStringWidth(FontDescriptor descriptor, string text);
 
     /// <summary>
-    /// Renders a single glyph to a 1bpp bitmap.
+    /// Renders a single glyph to an RGB bitmap with antialiased grayscale.
     /// </summary>
     /// <param name="descriptor">Font descriptor.</param>
     /// <param name="character">Character to render.</param>
-    /// <returns>Glyph data with bitmap.</returns>
+    /// <returns>Glyph data with RGB bitmap (one uint per pixel, alpha implicit).</returns>
     GlyphData RenderGlyph(FontDescriptor descriptor, char character);
 
     /// <summary>

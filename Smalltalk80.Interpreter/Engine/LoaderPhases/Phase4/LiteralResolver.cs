@@ -182,13 +182,13 @@ internal class LiteralResolver(
 
     /// <summary>
     /// Allocates a Float object using ObjectGraphAllocator.
-    /// Float must be WordIndexed with 4 words (16-bit each) per Blue Book specification.
+    /// Float must be WordIndexed with 2 words (32-bit each) for IEEE 754 double precision.
     /// </summary>
     /// <param name="value">The double value to store in the Float.</param>
     /// <returns>The allocated Float object OOP.</returns>
     public SmalltalkOOP AllocateFloat(double value)
     {
-        // Use ObjectGraphAllocator's AllocateFloat which correctly creates WordIndexed Float with 4 words
+        // Use ObjectGraphAllocator's AllocateFloat which correctly creates WordIndexed Float with 2 words
         var floatOOP = _allocator.AllocateFloat(value);
 
         // Set Float class reference

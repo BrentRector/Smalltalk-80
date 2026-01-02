@@ -524,30 +524,24 @@ public class ObjectGraphAllocator
     }
 
     /// <summary>
-    /// Allocates a Float object (WordIndexed format with 4 words for IEEE 754 double).
+    /// Allocates a Float object (WordIndexed format with 2 words for IEEE 754 double).
     /// Float is variableWordSubclass in Blue Book, so must use WordIndexed format.
-    /// Stores as 4x 16-bit words to maintain proper IEEE 754 little-endian byte order.
+    /// Stores as 2x 32-bit words (8 bytes total for IEEE 754 double precision).
     /// </summary>
     public SmalltalkOOP AllocateFloat(double value)
     {
         int fixedSlots = CalculateInstanceVariableCount("Float");
 
-        // Allocate WordIndexed object with 4 words (16-bit each = 8 bytes total)
+        // Allocate WordIndexed object with 2 words (32-bit each = 8 bytes total)
         // Blue Book: Float is "variableWordSubclass" → WordIndexed format
-        // IMPORTANT: Store as 4x 16-bit words (not 2x 32-bit) to avoid byte-swapping issues
-        var floatOOP = _heapManager.AllocateObject(ObjectFormat.WordIndexed, fixedSlots, 4);
+        var floatOOP = _heapManager.AllocateObject(ObjectFormat.WordIndexed, fixedSlots, 2);
         TrackOOP(floatOOP, $"AllocateFloat({value})");
 
-        // Convert double to IEEE 754 binary representation in little-endian byte order
-        byte[] bytes = BitConverter.GetBytes(value);
-
-        // Store as 4 words (16-bit each) preserving little-endian byte order
-        for (int i = 0; i < 4; i++)
-        {
-            // Combine 2 bytes into a 16-bit word (little-endian)
-            ushort word = (ushort)(bytes[i * 2] | (bytes[i * 2 + 1] << 8));
-            _heapManager.SetIndexedWord(floatOOP, i, word);
-        }
+        // Convert double to IEEE 754 binary representation
+        // With 32-bit words, Float uses 2 words (little-endian: word 0 = low 32 bits)
+        long bits = BitConverter.DoubleToInt64Bits(value);
+        _heapManager.SetIndexedWord(floatOOP, 0, (uint)(bits & 0xFFFFFFFF));
+        _heapManager.SetIndexedWord(floatOOP, 1, (uint)((bits >> 32) & 0xFFFFFFFF));
 
         return floatOOP;
     }

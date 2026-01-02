@@ -541,4 +541,52 @@ public static class FileStreamPrimitives
             }
         }
     }
+
+    /// <summary>
+    /// Primitive 158: Write string to file stream at current position.
+    /// Much faster than writing character-by-character.
+    /// Receiver: WindowsFileStream instance.
+    /// Arguments: handle (Integer), string (String).
+    /// Returns: Integer bytes written.
+    /// </summary>
+    public class FileWriteString : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+
+            var handleOOP = context.Arguments[0];
+            var stringOOP = context.Arguments[1];
+
+            if (!handleOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+            if (stringOOP.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            int handle = handleOOP.AsSmallInteger();
+            var stream = FileHandleManager.GetStream(handle);
+            if (stream == null) return PrimitiveResult.Fail(context.Metadata!);
+
+            try
+            {
+                // Get string size (works for String, Symbol, or any byte-indexed object)
+                int count = context.HeapManager.GetIndexedSize(stringOOP);
+                if (count == 0) return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(0));
+
+                // Copy from Smalltalk String to temporary buffer
+                byte[] buffer = new byte[count];
+                for (int i = 0; i < count; i++)
+                {
+                    buffer[i] = context.HeapManager.GetIndexedByte(stringOOP, i);
+                }
+
+                // Write to file
+                stream.Write(buffer, 0, count);
+
+                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(count));
+            }
+            catch
+            {
+                return PrimitiveResult.Fail(context.Metadata!);
+            }
+        }
+    }
 }

@@ -259,10 +259,10 @@ public class ImageWriter
                 break;
 
             case ObjectFormat.WordIndexed:
-                // Indexed portion contains 16-bit words
+                // Indexed portion contains 32-bit words
                 for (int i = 0; i < indexedSize; i++)
                 {
-                    ushort w = _heap.GetIndexedWord(oop, i);
+                    uint w = _heap.GetIndexedWord(oop, i);
                     writer.Write(w);
                 }
                 break;

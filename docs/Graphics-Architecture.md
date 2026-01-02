@@ -2,6 +2,7 @@
 
 **Last Updated**: 2026-01-01
 **Status**: Phases 1-6 Complete - Full 1bpp graphics system operational
+**Master Plan**: See `docs/32-BIT-IMPLEMENTATION-PLAN.md` for 32bpp implementation roadmap
 
 ---
 
@@ -424,6 +425,10 @@ TranslucentColor>>asPixelValue
 
 Add `depth` instance variable. Only values 1 and 32 are valid.
 
+> **IMPORTANT**: The `wordsPerRow` formula below assumes **32-bit words** internally.
+> This requires migrating the HeapManager from 16-bit (`ushort[]`) to 32-bit (`uint[]`) words.
+> See `docs/Migration-to-32-bit-Words.md` for the complete migration plan.
+
 ```smalltalk
 DisplayMedium subclass: #Form
     instanceVariableNames: 'bits width height offset depth'
@@ -453,9 +458,9 @@ Form>>setExtent: extentPoint depth: bitsPerPixel
     bits := WordArray new: self wordsPerRow * height
 
 Form>>wordsPerRow
-    "Words needed per row"
-    depth = 32 ifTrue: [^width].        "1 word per pixel"
-    ^(width + 31) // 32                  "1bpp: 32 pixels per word"
+    "Words needed per row (assumes 32-bit internal words)"
+    depth = 32 ifTrue: [^width].        "1 word per pixel (32-bit ARGB)"
+    ^(width + 31) // 32                  "1bpp: 32 pixels per 32-bit word"
 
 Form>>depth
     "Default 1 for backward compatibility with existing Forms"
@@ -571,3 +576,6 @@ Phase 6: Extended rules ──────────────────�
 6. [Squeak ColorForm](http://bildungsgueter.de/Smalltalk/Pages/MVCTutorial/Pages/ColorForm.htm) - Indexed color forms
 7. [Pharo Documentation](https://pharo.org/documentation.html) - Modern Smalltalk reference
 8. [Cuis Smalltalk](https://cuis.st) - Minimalist Smalltalk with vector graphics
+9. `docs/32-BIT-IMPLEMENTATION-PLAN.md` - **Master plan** for 32-bit migration and 32bpp graphics
+10. `docs/Migration-to-32-bit-Words.md` - 32-bit word migration technical reference
+11. `docs/Form-File-Format.md` - Original 1bpp Form file format specification

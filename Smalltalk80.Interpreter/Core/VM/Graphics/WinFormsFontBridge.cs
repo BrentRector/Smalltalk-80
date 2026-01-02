@@ -8,7 +8,8 @@ namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 
 /// <summary>
 /// GDI+/WinForms implementation of IFontBridge.
-/// Uses System.Drawing for font operations with deterministic settings.
+/// Uses System.Drawing for font operations with antialiased rendering.
+/// 32bpp-everywhere: Fonts are rendered to 32bpp bitmaps with antialiasing preserved.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public class WinFormsFontBridge : IFontBridge, IDisposable
@@ -171,7 +172,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
         using (var g = System.Drawing.Graphics.FromImage(bitmap))
         {
-            ConfigureGraphicsForDeterminism(g);
+            // Use anti-aliased rendering for smooth fonts
+            ConfigureGraphicsForAntialiasing(g);
 
             // Clear to white (background)
             g.Clear(Color.White);
@@ -185,8 +187,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             g.DrawString(character.ToString(), font, Brushes.Black, 0, 0, format);
         }
 
-        // Convert to 1bpp
-        var bitmapData = ConvertTo1Bpp(bitmap, height);
+        // Convert to 32bpp pixels (preserving anti-aliased grayscale)
+        var bitmapData = ConvertBitmapTo32bppPixels(bitmap, width, height);
 
         return new GlyphData
         {
@@ -219,69 +221,60 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
         int charCount = maxAscii - minAscii + 1;
         int fontHeight = metrics.Ascent + metrics.Descent;
 
-        // First pass: measure all character widths and compute total width
+        var font = GetOrCreateFont(descriptor);
+
+        // For fixed-pitch fonts, use uniform cell width from a representative character
+        // This ensures proper alignment - all characters placed at exact cell boundaries
+        int cellWidth = GetCellWidth(font);
+
+        // Build xTable with uniform cell widths (fixed-pitch font)
         int[] widths = new int[charCount];
-        int totalWidth = 0;
-
-        for (int i = 0; i < charCount; i++)
-        {
-            char c = (char)(minAscii + i);
-            int w = GetCharWidth(descriptor, c);
-            if (w <= 0) w = 1; // Ensure at least 1 pixel width
-            widths[i] = w;
-            totalWidth += w;
-        }
-
-        // Ensure totalWidth is reasonable
-        if (totalWidth <= 0) totalWidth = charCount;
-
-        // Build xTable (includes sentinel at end)
-        // Smalltalk widthOf: can access xTable at: (maxAscii + 1) + 2, so we need charCount + 2 entries
         int[] xTable = new int[charCount + 2];
-        int x = 0;
         for (int i = 0; i < charCount; i++)
         {
-            xTable[i] = x;
-            x += widths[i];
+            widths[i] = cellWidth;
+            xTable[i] = i * cellWidth;
         }
-        xTable[charCount] = x; // Sentinel
-        xTable[charCount + 1] = x; // Extra sentinel for edge case
+        xTable[charCount] = charCount * cellWidth;
+        xTable[charCount + 1] = charCount * cellWidth;
 
-        int strikeLength = x;
-        int raster = (strikeLength + 15) / 16;
+        int strikeLength = charCount * cellWidth;
 
-        // Create the combined glyphs bitmap
-        using var glyphsBitmap = new Bitmap(strikeLength, fontHeight);
+        // Create the combined glyphs bitmap with explicit 32bpp format for anti-aliasing
+        using var glyphsBitmap = new Bitmap(strikeLength, fontHeight, PixelFormat.Format32bppArgb);
         glyphsBitmap.SetResolution(FixedDpi, FixedDpi);
 
         using (var g = System.Drawing.Graphics.FromImage(glyphsBitmap))
         {
-            ConfigureGraphicsForDeterminism(g);
+            // Use AntiAlias (not GridFit) for smoother edges with grayscale pixels
+            g.TextRenderingHint = TextRenderingHint.AntiAlias;
             g.Clear(Color.White);
 
-            var font = GetOrCreateFont(descriptor);
-            var format = new StringFormat(StringFormat.GenericTypographic)
+            // GenericTypographic format with no extra spacing
+            using var format = new StringFormat(StringFormat.GenericTypographic)
             {
-                FormatFlags = StringFormatFlags.NoClip
+                FormatFlags = StringFormatFlags.NoClip | StringFormatFlags.FitBlackBox,
+                Alignment = StringAlignment.Near,
+                LineAlignment = StringAlignment.Near
             };
 
-            // Render each character at its position
+            // Draw each character at its exact cell position
+            // TEST: Using blue to verify 32bpp color preservation through pipeline
+            using var blueBrush = new SolidBrush(Color.Blue);
             for (int i = 0; i < charCount; i++)
             {
                 char c = (char)(minAscii + i);
-
-                // Render left-arrow for underscore (Smalltalk-80 assignment operator)
-                // Original Xerox systems displayed '_' as '←' in their fonts
-                if (c == '_') c = '←';  // U+2190 LEFTWARDS ARROW
-
-                g.DrawString(c.ToString(), font, Brushes.Black, xTable[i], 0, format);
+                // Skip control characters (0-31) - they render as boxes or nothing
+                if (c < 32) continue;
+                // Replace underscore with left arrow (Smalltalk convention)
+                if (c == '_') c = '←';
+                g.DrawString(c.ToString(), font, blueBrush, i * cellWidth, 0, format);
             }
         }
 
-        // Convert entire bitmap to 1bpp packed into 16-bit words
-        ushort[] glyphsData = ConvertBitmapTo1BppWords(glyphsBitmap, strikeLength, fontHeight);
+        // Convert entire bitmap to 32bpp pixels
+        uint[] glyphsData = ConvertBitmapTo32bppPixels(glyphsBitmap, strikeLength, fontHeight);
 
-        // Build the StrikeFontData
         var strikeFontData = new StrikeFontData
         {
             Name = $"{descriptor.FamilyName}-{descriptor.SizePixels}",
@@ -318,7 +311,28 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
     }
 
     /// <summary>
+    /// Gets the fixed-pitch cell width for a monospace font.
+    /// Uses GDI+ MeasureString with GenericTypographic for accurate width.
+    /// </summary>
+    private int GetCellWidth(Font font)
+    {
+        using var bitmap = new Bitmap(1, 1);
+        bitmap.SetResolution(FixedDpi, FixedDpi);
+        using var g = System.Drawing.Graphics.FromImage(bitmap);
+
+        using var format = new StringFormat(StringFormat.GenericTypographic)
+        {
+            FormatFlags = StringFormatFlags.MeasureTrailingSpaces
+        };
+
+        // Measure 'M' - a representative full-width character
+        var size = g.MeasureString("M", font, PointF.Empty, format);
+        return (int)Math.Ceiling(size.Width);
+    }
+
+    /// <summary>
     /// Configures Graphics for deterministic rendering (no antialiasing, fixed DPI).
+    /// Used for measurement and legacy compatibility.
     /// </summary>
     private static void ConfigureGraphicsForDeterminism(System.Drawing.Graphics g)
     {
@@ -330,70 +344,30 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
     }
 
     /// <summary>
-    /// Converts a bitmap to 1bpp data stored in 16-bit words.
-    /// Uses LockBits for 1000x faster performance than GetPixel().
+    /// Configures Graphics for antialiased rendering.
+    /// 32bpp-everywhere: Enables smooth font rendering with grayscale antialiasing.
     /// </summary>
-    private static ushort[] ConvertTo1Bpp(Bitmap bitmap, int height)
+    private static void ConfigureGraphicsForAntialiasing(System.Drawing.Graphics g)
     {
-        int width = bitmap.Width;
-        int wordsPerRow = (width + 15) / 16;
-        ushort[] result = new ushort[wordsPerRow * height];
-
-        // Use LockBits for fast pixel access (1000x faster than GetPixel)
-        BitmapData bmpData = bitmap.LockBits(
-            new Rectangle(0, 0, width, height),
-            ImageLockMode.ReadOnly,
-            bitmap.PixelFormat);
-
-        try
-        {
-            unsafe
-            {
-                byte* ptr = (byte*)bmpData.Scan0;
-                int bytesPerPixel = Image.GetPixelFormatSize(bitmap.PixelFormat) / 8;
-                int stride = bmpData.Stride;
-
-                for (int y = 0; y < height; y++)
-                {
-                    byte* row = ptr + (y * stride);
-                    for (int x = 0; x < width; x++)
-                    {
-                        byte* pixel = row + (x * bytesPerPixel);
-                        // Get RGB values (works for 24bpp and 32bpp formats)
-                        int b = pixel[0];
-                        int g = pixel[1];
-                        int r = pixel[2];
-
-                        // Threshold: if brightness < 128, it's "on" (black)
-                        bool isOn = (r + g + b) / 3 < 128;
-                        if (isOn)
-                        {
-                            int wordIndex = y * wordsPerRow + x / 16;
-                            int bitIndex = 15 - (x % 16); // MSB first within word
-                            result[wordIndex] |= (ushort)(1 << bitIndex);
-                        }
-                    }
-                }
-            }
-        }
-        finally
-        {
-            bitmap.UnlockBits(bmpData);
-        }
-
-        return result;
+        // Use grayscale antialiasing (not ClearType) for platform-independent rendering
+        g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+        g.SmoothingMode = SmoothingMode.HighQuality;
+        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+        g.CompositingQuality = CompositingQuality.HighQuality;
     }
 
     /// <summary>
-    /// Converts a bitmap to 1bpp words for the entire glyphs form.
-    /// Uses LockBits for 1000x faster performance than GetPixel().
+    /// Converts a bitmap to RGB pixels (one uint per pixel, no alpha).
+    /// Preserves anti-aliased grayscale values for smooth font rendering.
+    /// Standard RGB: 0x000000=black, 0xFFFFFF=white.
     /// </summary>
-    private static ushort[] ConvertBitmapTo1BppWords(Bitmap bitmap, int width, int height)
+    private static uint[] ConvertBitmapTo32bppPixels(Bitmap bitmap, int width, int height)
     {
-        int wordsPerRow = (width + 15) / 16;
-        ushort[] result = new ushort[wordsPerRow * height];
+        // Standard RGB: one uint per pixel (24 bits used)
+        uint[] result = new uint[width * height];
 
-        // Use LockBits for fast pixel access (1000x faster than GetPixel)
+        // Use LockBits for fast pixel access
         BitmapData bmpData = bitmap.LockBits(
             new Rectangle(0, 0, width, height),
             ImageLockMode.ReadOnly,
@@ -414,18 +388,14 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
                     {
                         byte* pixel = row + (x * bytesPerPixel);
                         // Get RGB values (works for 24bpp and 32bpp formats)
-                        int b = pixel[0];
-                        int g = pixel[1];
-                        int r = pixel[2];
+                        byte b = pixel[0];
+                        byte g = pixel[1];
+                        byte r = pixel[2];
 
-                        // Threshold: if brightness < 128, it's "on" (black)
-                        bool isOn = (r + g + b) / 3 < 128;
-                        if (isOn)
-                        {
-                            int wordIndex = y * wordsPerRow + x / 16;
-                            int bitIndex = 15 - (x % 16); // MSB first within word
-                            result[wordIndex] |= (ushort)(1 << bitIndex);
-                        }
+                        // Standard RGB format (no inversion)
+                        // Preserves anti-aliased grayscale for smooth font edges
+                        uint rgb = ((uint)r << 16) | ((uint)g << 8) | b;
+                        result[y * width + x] = rgb;
                     }
                 }
             }
