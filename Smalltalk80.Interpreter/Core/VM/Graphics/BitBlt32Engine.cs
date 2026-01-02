@@ -207,8 +207,8 @@ public static class BitBlt32Engine
     }
 
     /// <summary>
-    /// Fast path for OR operations (Rule 7) without halftone.
-    /// Used for paint mode text drawing.
+    /// Fast path for OR/Form under operations (Rule 7) without halftone.
+    /// Uses AND for 1bpp visual semantics: black wins, white is transparent.
     /// </summary>
     private static void OrBitsOptimized(
         Span<uint> destPixels, int destWidth, int destX, int destY,
@@ -229,7 +229,8 @@ public static class BitBlt32Engine
             {
                 for (int x = 0; x < width; x++)
                 {
-                    destPixels[destOffset + x] |= sourcePixels[sourceOffset + x];
+                    // Use AND for 1bpp semantics: black (0) wins, white (0xFFFFFF) is transparent
+                    destPixels[destOffset + x] &= sourcePixels[sourceOffset + x];
                 }
             }
         }
@@ -417,7 +418,7 @@ public static class BitBlt32Engine
             CombinationRule.AndInverted => ~source & dest, // 4: (NOT src) AND dst
             CombinationRule.Noop => dest,                  // 5: dst (no change)
             CombinationRule.Xor => source ^ dest,          // 6: src XOR dst
-            CombinationRule.Or => source | dest,           // 7: src OR dst
+            CombinationRule.Or => source & dest,           // 7: Form under - use AND for 1bpp visual semantics
             CombinationRule.Nor => ~(source | dest),       // 8: NOT (src OR dst)
             CombinationRule.Equiv => ~(source ^ dest),     // 9: NOT (src XOR dst)
             CombinationRule.Invert => ~dest,               // 10: NOT dst
