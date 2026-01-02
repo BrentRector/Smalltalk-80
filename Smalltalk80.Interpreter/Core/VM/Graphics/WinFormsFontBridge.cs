@@ -262,10 +262,12 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             g.Clear(Color.White);
 
             var font = GetOrCreateFont(descriptor);
-            var format = new StringFormat(StringFormat.GenericTypographic)
-            {
-                FormatFlags = StringFormatFlags.NoClip
-            };
+
+            // Use default format for drawing (not GenericTypographic) to ensure
+            // consistent baseline alignment across all characters.
+            // GenericTypographic gives tight per-character bounds which causes
+            // baseline misalignment when drawing characters individually.
+            var format = StringFormat.GenericDefault;
 
             // Render each character at its position
             for (int i = 0; i < charCount; i++)
