@@ -426,8 +426,51 @@ public static class BitBlt32Engine
             CombinationRule.OrInverted => ~source | dest,  // 13: (NOT src) OR dst
             CombinationRule.Nand => ~(source & dest),      // 14: NOT (src AND dst)
             CombinationRule.Set => 0xFFFFFFFF,             // 15: Always 1 (opaque white)
+            CombinationRule.Paint => BlendPaint(source, dest), // 16: Grayscale alpha blend
             _ => dest // Default to noop for unknown rules
         };
+    }
+
+    /// <summary>
+    /// Paint mode (rule 16): Alpha blend source onto destination.
+    /// Treats white (0xFFFFFF) as transparent, darker colors as more opaque.
+    /// Derives alpha from the minimum RGB channel (darkest component).
+    /// Preserves source colors while enabling anti-aliased rendering.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint BlendPaint(uint source, uint dest)
+    {
+        // Extract RGB components
+        int srcR = (int)((source >> 16) & 0xFF);
+        int srcG = (int)((source >> 8) & 0xFF);
+        int srcB = (int)(source & 0xFF);
+
+        // Derive alpha from "distance from white"
+        // Using min channel: white(255,255,255)=0 alpha, black(0,0,0)=255 alpha
+        // This preserves colored pixels: red(255,0,0) has alpha=255 (fully opaque)
+        int minChannel = Math.Min(srcR, Math.Min(srcG, srcB));
+        int alpha = 255 - minChannel;
+
+        // Fast path: fully transparent (white source)
+        if (alpha == 0)
+            return dest;
+
+        // Fast path: fully opaque (source has a 0 in some channel)
+        if (alpha == 255)
+            return source;
+
+        // Extract destination RGB
+        int dstR = (int)((dest >> 16) & 0xFF);
+        int dstG = (int)((dest >> 8) & 0xFF);
+        int dstB = (int)(dest & 0xFF);
+
+        // Alpha blend: result = src * alpha/255 + dst * (255-alpha)/255
+        int invAlpha = 255 - alpha;
+        int outR = (srcR * alpha + dstR * invAlpha) / 255;
+        int outG = (srcG * alpha + dstG * invAlpha) / 255;
+        int outB = (srcB * alpha + dstB * invAlpha) / 255;
+
+        return ((uint)outR << 16) | ((uint)outG << 8) | (uint)outB;
     }
 
     /// <summary>

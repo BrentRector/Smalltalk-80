@@ -52,5 +52,12 @@ public enum CombinationRule : byte
     Nand = 14,
 
     /// <summary>Rule 15: Always 1 (set destination).</summary>
-    Set = 15
+    Set = 15,
+
+    /// <summary>
+    /// Rule 16: Paint mode with grayscale alpha blending.
+    /// For 32bpp: white (0xFFFFFF) = transparent, black (0x000000) = opaque.
+    /// Used for anti-aliased text rendering.
+    /// </summary>
+    Paint = 16
 }

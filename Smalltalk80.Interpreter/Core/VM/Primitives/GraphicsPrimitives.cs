@@ -65,8 +65,9 @@ public static class GraphicsOperations
             int clipHeight = clipHeightOOP.AsSmallInteger();
 
             // Rules 0-15 are standard BitBlt rules
-            // Rule 16+ require Smalltalk handling (paintBits)
-            if (combinationRule < 0 || combinationRule > 15)
+            // Rule 16 is "paint" mode - for 32bpp we implement grayscale alpha blending
+            // Rule 17+ require Smalltalk handling
+            if (combinationRule < 0 || combinationRule > 16)
                 return PrimitiveResult.Fail(context.Metadata!);
 
             // OPTIMIZATION: Use direct heap span access - no extract/writeback copies
