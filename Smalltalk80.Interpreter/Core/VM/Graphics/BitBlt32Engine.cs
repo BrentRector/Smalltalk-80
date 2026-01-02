@@ -207,8 +207,7 @@ public static class BitBlt32Engine
     }
 
     /// <summary>
-    /// Fast path for OR/Form under operations (Rule 7) without halftone.
-    /// Uses AND for 1bpp visual semantics: black wins, white is transparent.
+    /// Fast path for OR operations (Rule 7) without halftone.
     /// </summary>
     private static void OrBitsOptimized(
         Span<uint> destPixels, int destWidth, int destX, int destY,
@@ -229,16 +228,14 @@ public static class BitBlt32Engine
             {
                 for (int x = 0; x < width; x++)
                 {
-                    // Use AND for 1bpp semantics: black (0) wins, white (0xFFFFFF) is transparent
-                    destPixels[destOffset + x] &= sourcePixels[sourceOffset + x];
+                    destPixels[destOffset + x] |= sourcePixels[sourceOffset + x];
                 }
             }
         }
     }
 
     /// <summary>
-    /// Fast path for AND/Form and operations (Rule 1) without halftone.
-    /// Uses OR for 1bpp visual semantics: black=keep dest, white=clear to white.
+    /// Fast path for AND operations (Rule 1) without halftone.
     /// </summary>
     private static void AndBitsOptimized(
         Span<uint> destPixels, int destWidth, int destX, int destY,
@@ -259,8 +256,7 @@ public static class BitBlt32Engine
             {
                 for (int x = 0; x < width; x++)
                 {
-                    // Use OR for 1bpp semantics: black (0) keeps dest, white (0xFFFFFF) clears to white
-                    destPixels[destOffset + x] |= sourcePixels[sourceOffset + x];
+                    destPixels[destOffset + x] &= sourcePixels[sourceOffset + x];
                 }
             }
         }
@@ -412,14 +408,14 @@ public static class BitBlt32Engine
     {
         return rule switch
         {
-            CombinationRule.Clear => 0,                    // 0: Always 0 (transparent black)
-            CombinationRule.And => source | dest,          // 1: Form and - use OR for 1bpp visual semantics
+            CombinationRule.Clear => 0,                    // 0: Always 0 (black)
+            CombinationRule.And => source & dest,          // 1: src AND dst
             CombinationRule.AndReverse => source & ~dest,  // 2: src AND (NOT dst)
             CombinationRule.Copy => source,                // 3: src
-            CombinationRule.AndInverted => ~source | dest, // 4: Form erase - use OR for 1bpp visual semantics
+            CombinationRule.AndInverted => ~source & dest, // 4: (NOT src) AND dst
             CombinationRule.Noop => dest,                  // 5: dst (no change)
             CombinationRule.Xor => source ^ dest,          // 6: src XOR dst
-            CombinationRule.Or => source & dest,           // 7: Form under - use AND for 1bpp visual semantics
+            CombinationRule.Or => source | dest,           // 7: src OR dst
             CombinationRule.Nor => ~(source | dest),       // 8: NOT (src OR dst)
             CombinationRule.Equiv => ~(source ^ dest),     // 9: NOT (src XOR dst)
             CombinationRule.Invert => ~dest,               // 10: NOT dst
