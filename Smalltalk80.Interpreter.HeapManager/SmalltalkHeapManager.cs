@@ -432,6 +432,20 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         return byteArray ?? ReadOnlySpan<byte>.Empty;
     }
 
+    public Span<uint> GetWordSpan(SmalltalkOOP objectOOP)
+    {
+        if (objectOOP.IsSmallInteger)
+            return Span<uint>.Empty;
+
+        var entry = _tableManager.GetObjectTableEntry(objectOOP);
+
+        if (entry.FormatExplicit != ObjectFormat.WordIndexed)
+            return Span<uint>.Empty;
+
+        var wordArray = entry.AsWordArray();
+        return wordArray ?? Span<uint>.Empty;
+    }
+
     public uint GetIndexedWord(SmalltalkOOP objectOOP, int index)
     {
         if (objectOOP.IsSmallInteger)

@@ -127,6 +127,15 @@ public interface ISmalltalkHeap
     ReadOnlySpan<byte> GetByteSpan(SmalltalkOOP objectOOP);
 
     /// <summary>
+    /// Gets the underlying word array as a Span for WordIndexed objects.
+    /// OPTIMIZATION: Zero-copy direct access for BitBlt operations on Display/Forms.
+    /// Allows in-place modification without extract/writeback overhead.
+    /// </summary>
+    /// <param name="objectOOP">WordIndexed object (WordArray, Form bits)</param>
+    /// <returns>Span over the word content, or empty span if not WordIndexed</returns>
+    Span<uint> GetWordSpan(SmalltalkOOP objectOOP);
+
+    /// <summary>
     /// Gets indexed word from WordIndexed objects (WordArrays, Bitmaps).
     /// Validates format is WordIndexed and index is within range.
     /// Words are 32-bit unsigned integers.

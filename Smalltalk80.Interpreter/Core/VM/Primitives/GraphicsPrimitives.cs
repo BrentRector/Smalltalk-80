@@ -69,42 +69,31 @@ public static class GraphicsOperations
             if (combinationRule < 0 || combinationRule > 15)
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            // Extract 32bpp Form data
-            var (destPixels, destWidth, destHeight) = ExtractFormData32(heap, destForm);
-            if (destPixels.Length == 0)
+            // OPTIMIZATION: Use direct heap span access - no extract/writeback copies
+            if (!GetFormSpanDirect32(heap, destForm, out var destPixels, out var destWidth, out var destHeight))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            ReadOnlySpan<uint> sourcePixels = default;
+            Span<uint> sourcePixelsSpan = default;
             int sourceWidth = 0, sourceHeight = 0;
 
             if (sourceForm != nil && !sourceForm.IsSmallInteger)
             {
-                var (srcPixels, srcW, srcH) = ExtractFormData32(heap, sourceForm);
-                if (srcPixels.Length > 0)
-                {
-                    sourcePixels = srcPixels.Span;
-                    sourceWidth = srcW;
-                    sourceHeight = srcH;
-                }
+                GetFormSpanDirect32(heap, sourceForm, out sourcePixelsSpan, out sourceWidth, out sourceHeight);
             }
+            ReadOnlySpan<uint> sourcePixels = sourcePixelsSpan;
 
-            ReadOnlySpan<uint> halftonePixels = default;
+            Span<uint> halftonePixelsSpan = default;
             int halftoneWidth = 0, halftoneHeight = 0;
 
             if (halftoneForm != nil && !halftoneForm.IsSmallInteger)
             {
-                var (htPixels, htW, htH) = ExtractFormData32(heap, halftoneForm);
-                if (htPixels.Length > 0)
-                {
-                    halftonePixels = htPixels.Span;
-                    halftoneWidth = htW;
-                    halftoneHeight = htH;
-                }
+                GetFormSpanDirect32(heap, halftoneForm, out halftonePixelsSpan, out halftoneWidth, out halftoneHeight);
             }
+            ReadOnlySpan<uint> halftonePixels = halftonePixelsSpan;
 
-            // Perform 32bpp BitBlt
+            // Perform 32bpp BitBlt directly on heap memory - no copy needed!
             BitBlt32Engine.CopyBits(
-                destPixels.Span,
+                destPixels,
                 destWidth, destHeight,
                 destX, destY,
                 sourcePixels,
@@ -116,8 +105,7 @@ public static class GraphicsOperations
                 halftoneWidth, halftoneHeight,
                 (CombinationRule)combinationRule);
 
-            // Write modified dest pixels back to heap
-            WriteFormData32(heap, destForm, destPixels.Span);
+            // No writeback needed - we modified heap directly!
 
             // Invalidate Display region if destination is Display
             InvalidateDisplayIfNeeded(context, destForm, destX, destY, width, height,
@@ -310,38 +298,27 @@ public static class GraphicsOperations
             int clipWidth = clipWidthOOP.AsSmallInteger();
             int clipHeight = clipHeightOOP.AsSmallInteger();
 
-            // Extract 32bpp Form data
-            var (destPixels, destWidth, destHeight) = ExtractFormData32(heap, destFormOOP);
-            if (destPixels.Length == 0)
+            // OPTIMIZATION: Use direct heap span access - no extract/writeback copies
+            if (!GetFormSpanDirect32(heap, destFormOOP, out var destPixels, out var destWidth, out var destHeight))
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            ReadOnlySpan<uint> sourcePixels = default;
+            Span<uint> sourcePixelsSpan = default;
             int sourceWidth = 0, sourceHeight = 0;
 
             if (sourceFormOOP != nil && !sourceFormOOP.IsSmallInteger)
             {
-                var (srcPixels, srcW, srcH) = ExtractFormData32(heap, sourceFormOOP);
-                if (srcPixels.Length > 0)
-                {
-                    sourcePixels = srcPixels.Span;
-                    sourceWidth = srcW;
-                    sourceHeight = srcH;
-                }
+                GetFormSpanDirect32(heap, sourceFormOOP, out sourcePixelsSpan, out sourceWidth, out sourceHeight);
             }
+            ReadOnlySpan<uint> sourcePixels = sourcePixelsSpan;
 
-            ReadOnlySpan<uint> halftonePixels = default;
+            Span<uint> halftonePixelsSpan = default;
             int halftoneWidth = 0, halftoneHeight = 0;
 
             if (halftoneFormOOP != nil && !halftoneFormOOP.IsSmallInteger)
             {
-                var (htPixels, htW, htH) = ExtractFormData32(heap, halftoneFormOOP);
-                if (htPixels.Length > 0)
-                {
-                    halftonePixels = htPixels.Span;
-                    halftoneWidth = htW;
-                    halftoneHeight = htH;
-                }
+                GetFormSpanDirect32(heap, halftoneFormOOP, out halftonePixelsSpan, out halftoneWidth, out halftoneHeight);
             }
+            ReadOnlySpan<uint> halftonePixels = halftonePixelsSpan;
 
             // Map combination rule 16 (paint) to Or
             var rule = combinationRule == 16 ? CombinationRule.Or : (CombinationRule)combinationRule;
@@ -353,7 +330,7 @@ public static class GraphicsOperations
             int py = Math.Abs(xDelta);
 
             // Draw starting point
-            DrawPixel32(destPixels.Span, destWidth, destHeight, destX, destY,
+            DrawPixel32(destPixels, destWidth, destHeight, destX, destY,
                 sourcePixels, sourceWidth, sourceHeight, sourceX, sourceY,
                 width, height, clipX, clipY, clipWidth, clipHeight,
                 halftonePixels, halftoneWidth, halftoneHeight, rule);
@@ -371,7 +348,7 @@ public static class GraphicsOperations
                         destY += dy;
                         P += py;
                     }
-                    DrawPixel32(destPixels.Span, destWidth, destHeight, destX, destY,
+                    DrawPixel32(destPixels, destWidth, destHeight, destX, destY,
                         sourcePixels, sourceWidth, sourceHeight, sourceX, sourceY,
                         width, height, clipX, clipY, clipWidth, clipHeight,
                         halftonePixels, halftoneWidth, halftoneHeight, rule);
@@ -390,15 +367,14 @@ public static class GraphicsOperations
                         destX += dx;
                         P += px;
                     }
-                    DrawPixel32(destPixels.Span, destWidth, destHeight, destX, destY,
+                    DrawPixel32(destPixels, destWidth, destHeight, destX, destY,
                         sourcePixels, sourceWidth, sourceHeight, sourceX, sourceY,
                         width, height, clipX, clipY, clipWidth, clipHeight,
                         halftonePixels, halftoneWidth, halftoneHeight, rule);
                 }
             }
 
-            // Write modified dest pixels back
-            WriteFormData32(heap, destFormOOP, destPixels.Span);
+            // No writeback needed - we modified heap directly!
 
             // Invalidate Display region
             int startX = destXOOP.AsSmallInteger();
@@ -436,7 +412,44 @@ public static class GraphicsOperations
     // ============================================================================
 
     /// <summary>
-    /// Extract 32bpp pixel data from a Form object.
+    /// Get direct span access to 32bpp Form pixel data in heap memory.
+    /// OPTIMIZATION: Zero-copy access - operates directly on heap backing store.
+    /// Eliminates the extract/writeback overhead for every BitBlt operation.
+    /// Uses out parameters since Span is a ref struct and can't be in tuples.
+    /// </summary>
+    private static bool GetFormSpanDirect32(
+        ISmalltalkHeap heap, SmalltalkOOP formOOP,
+        out Span<uint> pixels, out int width, out int height)
+    {
+        pixels = Span<uint>.Empty;
+        width = 0;
+        height = 0;
+
+        var nil = heap.GetNil();
+        if (formOOP == nil || formOOP.IsSmallInteger)
+            return false;
+
+        SmalltalkOOP bitsOOP = heap.GetInstanceVariable(formOOP, 0);
+        SmalltalkOOP widthOOP = heap.GetInstanceVariable(formOOP, 1);
+        SmalltalkOOP heightOOP = heap.GetInstanceVariable(formOOP, 2);
+
+        if (!widthOOP.IsSmallInteger || !heightOOP.IsSmallInteger)
+            return false;
+
+        width = widthOOP.AsSmallInteger();
+        height = heightOOP.AsSmallInteger();
+
+        if (bitsOOP == nil || bitsOOP.IsSmallInteger)
+            return false;
+
+        // Get direct span into heap memory - no copy!
+        pixels = heap.GetWordSpan(bitsOOP);
+        return pixels.Length > 0;
+    }
+
+    /// <summary>
+    /// Extract 32bpp pixel data from a Form object (creates a copy).
+    /// LEGACY: Use GetFormSpanDirect32 for better performance.
     /// 32bpp architecture: each pixel is one uint in the WordArray.
     /// </summary>
     private static (Memory<uint> pixels, int width, int height) ExtractFormData32(

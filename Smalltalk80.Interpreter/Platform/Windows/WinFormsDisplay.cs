@@ -515,13 +515,15 @@ public class WinFormsDisplay : Form, IDisplay
 
         if (format == ObjectFormat.WordIndexed)
         {
+            // OPTIMIZATION: Use direct span access for bulk copy instead of element-by-element
             // 32bpp: each word is one pixel (RGB only)
             // Using Format32bppRgb so high byte is ignored as padding
             // Standard RGB: 0x000000=black, 0xFFFFFF=white
-            int copySize = Math.Min(size, _displayBuffer.Length);
-            for (int i = 0; i < copySize; i++)
+            var heapSpan = _heap.GetWordSpan(bitsOOP);
+            if (heapSpan.Length > 0)
             {
-                _displayBuffer[i] = _heap.GetIndexedWord(bitsOOP, i);
+                int copySize = Math.Min(heapSpan.Length, _displayBuffer.Length);
+                heapSpan.Slice(0, copySize).CopyTo(_displayBuffer.AsSpan(0, copySize));
             }
         }
     }
