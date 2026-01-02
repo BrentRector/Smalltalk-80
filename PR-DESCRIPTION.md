@@ -1,77 +1,99 @@
-# Performance optimizations for method lookup and symbol interning
+# PR: Complete 32bpp Graphics Pipeline with Anti-Aliased Text
 
 ## Summary
 
-This PR implements a series of performance optimizations targeting the interpreter's most frequently executed code paths: method lookup and symbol interning. These optimizations collectively deliver significant speedups across all Smalltalk benchmarks.
+This PR completes the 32bpp graphics pipeline, enabling full color support and anti-aliased text rendering in the Smalltalk-2026 interpreter. The work includes fixes for scroll artifacts, XOR caret display, font baseline alignment, and implementing proper paint mode blending for anti-aliased content.
 
-## Key Optimizations
+## Key Changes
 
-### 1. Method Lookup Cache (commits 8f62be47, e46e213c, 4b8a1885, 222d2247)
-- Added method lookup cache to avoid repeated hierarchy walks
-- Cache populates all intermediate classes during hierarchy traversal
-- Checks cache at each hierarchy step for sibling class reuse
-- Connected to Primitive 89 (flushCache) for proper invalidation
+### 1. BitBlt32Engine Overlap Handling
+- **Problem**: Scrolling list panes showed duplicate entries
+- **Solution**: Detect `destY > sourceY` to determine copy direction (top-to-bottom vs bottom-to-top)
+- **Files**: `BitBlt32Engine.cs`
 
-### 2. Hash-Based Method Dictionary Lookup (commits f51cdc7a, 1917894f)
-- Replaced O(n) linear scan with hash-based dictionary lookup
-- Refactored to use RuntimeDictionaryService for consistent dictionary operations
-- Direct Symbol OOP comparison eliminates string matching overhead
+### 2. Paint Mode (Rule 16) - Multiply Blend
+- **Problem**: Original paint mode used OR operations designed for 1bpp where black=1. In 32bpp, black=0x000000, so OR produces wrong results and destroys anti-aliasing
+- **Solution**: Implement multiply blend (`src * dest / 255` per channel) which correctly handles anti-aliased text on white background
+- **Files**: `BitBlt32Engine.cs`, `CombinationRule.cs`, `GraphicsPrimitives.cs`
 
-### 3. IEquatable<SmalltalkOOP> Implementation (commit cb0cef1f)
-- Added IEquatable interface to SmalltalkOOP struct
-- Improves Dictionary<SmalltalkOOP, T> performance by avoiding boxing
+### 3. XOR Caret Fix
+- **Problem**: Caret/cursor was invisible because XOR with black (0x000000) does nothing
+- **Solution**: Invert source before XOR (`~source ^ dest`) to preserve 1bpp semantics
+- **Files**: `BitBlt32Engine.cs`
 
-### 4. Symbol Interning Optimization (commits c82c03e1, fa189b0c, 8dd87044, 08cbbabf)
-- Added GetByteSpan() method for zero-copy byte access
-- Fixed InternSymbol to use proper bucket-based USTable lookup
-- Changed from O(n) linear scan of ~8000 symbols to O(1) bucket access + O(2-3) symbols per bucket
-- Consolidated to single implementation in RuntimeHeapAccessor
+### 4. Fixed-Pitch Font Alignment
+- **Problem**: Individual character measurements returned varying widths, causing baseline misalignment (especially visible with lowercase 'a')
+- **Solution**: Use uniform cell width from representative character ('M'), build linear xTable
+- **Files**: `WinFormsFontBridge.cs`
 
-### 5. Point Creation Optimization (commit 2047e658)
-- Cached class and field constants for Point creation primitive
-- Reduces per-call overhead for frequently-created Point objects
+### 5. 32bpp Font Rendering
+- Explicit `Format32bppArgb` bitmap creation
+- `TextRenderingHint.AntiAlias` for grayscale output
+- Color preservation verified with blue text test
 
-### 6. Float Primitives Optimization (commits eda31b2c, 97c62873)
-- Zero-allocation bit conversion for Float operations
-- Added GetFloatAsDouble/SetFloatFromDouble heap methods
-
-## Benchmark Results
-
-| Benchmark | Baseline | Optimized | Speedup |
-|-----------|----------|-----------|---------|
-| **Point x accessor (10x)** | 210.9 μs | 11.0 μs | **19x** |
-| **Point creation 3@4 (10x)** | 2437 μs | 141 μs | **17x** |
-| **Float conversion (20x)** | 3750 μs | 310 μs | **12x** |
-| **Float addition (20x)** | 3600 μs | 320 μs | **11x** |
-| String at: (20x) | 470 μs | 171 μs | 2.7x |
-| String at:put: (20x) | 517 μs | 188 μs | 2.7x |
-| Set basicAt: (20x) | 749 μs | 203 μs | 3.7x |
-| Set basicAtPut: (20x) | 718 μs | 187 μs | 3.8x |
-| String replace chars | 310 μs | 10 μs | 31x |
-| Find implementors of #next | 500 ms | 187 ms | 2.7x |
-| Create inspector view | 154.7 ms | 65.6 ms | 2.4x |
-| Print class hierarchy | 118.7 ms | 54.7 ms | 2.2x |
-| Decompile InputSensor | 2047 ms | 1094 ms | 1.9x |
-| Compile dummy method | 840 ms | 547 ms | 1.5x |
-| Activate and return (32K) | 828 ms | 516 ms | 1.6x |
+### 6. Window Title Update
+- Changed from "Smalltalk-80" to "Smalltalk-2026"
 
 ## Technical Details
 
-### USTable Structure
-The Universal Symbol Table is an Array of Arrays (buckets) for collision chaining:
-- Each bucket contains symbols with the same hash % tableSize
-- Lookup uses Smalltalk's String>>hash algorithm (SymbolHasher.ComputeHash)
-- Previous implementation incorrectly treated slots as direct Symbol references
+### Multiply Blend Algorithm
+```csharp
+// Rule 16: Anti-aliased text blending
+// White (0xFFFFFF) = transparent, Black (0x000000) = opaque
+private static uint BlendPaint(uint source, uint dest)
+{
+    if (source == WhitePixel) return dest;      // Fast path: transparent
+    if (source == BlackPixel) return BlackPixel; // Fast path: opaque
 
-### Method Cache Architecture
-- Global cache keyed by (class OOP, selector OOP) → CompiledMethod OOP
-- Populates cache entries for all classes in the hierarchy during lookup
-- Invalidated via Primitive 89 when methods are added/removed
+    // Multiply blend: result = src * dst / 255
+    int outR = (srcR * dstR) / 255;
+    int outG = (srcG * dstG) / 255;
+    int outB = (srcB * dstB) / 255;
+    return (outR << 16) | (outG << 8) | outB;
+}
+```
 
-## Test Plan
+### Why Multiply Blend?
+For anti-aliased black text on white background:
+- White source (255) → result = dest × 255/255 = dest (transparent)
+- Black source (0) → result = dest × 0/255 = 0 (black)
+- Gray source (128) → result = dest × 128/255 ≈ dest/2 (darkened)
 
-- [x] All 385 C# unit tests pass
-- [x] BlockContext regression test passes (120/120 tests, returns 1191)
-- [x] Init expressions all succeed (286/286)
-- [x] System Browser functional with source code display
-- [x] Benchmark suite completes without errors
+This correctly applies anti-aliased edges while preserving colored text.
+
+## Files Changed
+
+| File | Lines | Description |
+|------|-------|-------------|
+| `BitBlt32Engine.cs` | +124/-61 | Overlap handling, multiply blend, XOR fix |
+| `CombinationRule.cs` | +9/-1 | Added `Paint = 16` enum |
+| `WinFormsFontBridge.cs` | +87/-87 | Uniform cell width, 32bpp format |
+| `GraphicsPrimitives.cs` | +5/-1 | Accept rule 16 |
+| `Program.cs` | +1/-1 | Window title |
+| `CLAUDE.md` | Documentation | Phase 6 section |
+| `SESSION-HANDOFF.md` | Documentation | Current status |
+
+## Testing
+
+- ✅ Build: 0 errors, 0 warnings
+- ✅ System Browser: Opens and displays source code correctly
+- ✅ Scrolling: No duplicate entries in list panes
+- ✅ Caret: Visible when editing text
+- ✅ Color preservation: Blue text renders correctly (test mode)
+- ✅ Font alignment: All characters on same baseline
+
+## Screenshots
+
+The blue text in the screenshot confirms the 32bpp pipeline preserves colors end-to-end:
+- Font rendered in blue by GDI+ → stored in 32bpp Form → BitBlt with paint mode → displayed in blue
+
+## Remaining Work
+
+1. Change font color back to black (currently blue for testing)
+2. Polish selection highlight appearance (multiply blend with inverted selection looks unusual)
+
+## Related Documentation
+
+- `docs/SESSION-HANDOFF.md` - Detailed technical notes for next session
+- `docs/Graphics-Architecture.md` - Graphics system design
+- `docs/32-BIT-IMPLEMENTATION-PLAN.md` - Future word migration plan
