@@ -533,8 +533,8 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     }
 
     /// <summary>
-    /// Bulk copy indexed words from heap object to destination span as little-endian bytes.
-    /// Each word (32-bit) is stored as 4 bytes in native little-endian format.
+    /// Bulk copy indexed words from heap object to destination span as big-endian bytes.
+    /// Each word (32-bit) is stored as 4 bytes in big-endian format for MSB-first pixel ordering.
     /// Much faster than element-by-element access.
     /// </summary>
     public void CopyIndexedWords(SmalltalkOOP objectOOP, Span<byte> destination, int startIndex = 0)
@@ -556,14 +556,14 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         int maxWords = destination.Length / 4;  // 4 bytes per 32-bit word
         int copyWords = Math.Min(maxWords, availableWords);
 
-        // Copy words as little-endian bytes (native format)
+        // Copy words as big-endian bytes (MSB first for bitmap pixel ordering)
         for (int i = 0; i < copyWords; i++)
         {
             uint word = wordArray[startIndex + i];
-            destination[i * 4] = (byte)(word & 0xFF);
-            destination[i * 4 + 1] = (byte)((word >> 8) & 0xFF);
-            destination[i * 4 + 2] = (byte)((word >> 16) & 0xFF);
-            destination[i * 4 + 3] = (byte)(word >> 24);
+            destination[i * 4] = (byte)(word >> 24);
+            destination[i * 4 + 1] = (byte)((word >> 16) & 0xFF);
+            destination[i * 4 + 2] = (byte)((word >> 8) & 0xFF);
+            destination[i * 4 + 3] = (byte)(word & 0xFF);
         }
     }
 
@@ -596,8 +596,8 @@ public class SmalltalkHeapManager : ISmalltalkHeap
     }
 
     /// <summary>
-    /// Bulk copy bytes to indexed words in heap object, converting from little-endian format.
-    /// Each 4 bytes in source represents one 32-bit word in native little-endian format.
+    /// Bulk copy bytes to indexed words in heap object, converting from big-endian format.
+    /// Each 4 bytes in source represents one 32-bit word in big-endian format.
     /// Much faster than element-by-element access.
     /// </summary>
     public void SetIndexedWords(SmalltalkOOP objectOOP, ReadOnlySpan<byte> source, int startIndex = 0)
@@ -619,15 +619,15 @@ public class SmalltalkHeapManager : ISmalltalkHeap
         int availableWords = Math.Max(0, wordArray.Length - startIndex);
         int copyWords = Math.Min(sourceWords, availableWords);
 
-        // Copy little-endian bytes to 32-bit words (native format)
+        // Copy big-endian bytes to 32-bit words
         for (int i = 0; i < copyWords; i++)
         {
             if ((i * 4 + 3) < source.Length)
             {
-                uint word = (uint)source[i * 4] |
-                           ((uint)source[i * 4 + 1] << 8) |
-                           ((uint)source[i * 4 + 2] << 16) |
-                           ((uint)source[i * 4 + 3] << 24);
+                uint word = ((uint)source[i * 4] << 24) |
+                           ((uint)source[i * 4 + 1] << 16) |
+                           ((uint)source[i * 4 + 2] << 8) |
+                           (uint)source[i * 4 + 3];
                 wordArray[startIndex + i] = word;
             }
         }
