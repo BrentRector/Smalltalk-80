@@ -240,14 +240,14 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
         int strikeLength = charCount * cellWidth;
 
-        // Create the combined glyphs bitmap
-        using var glyphsBitmap = new Bitmap(strikeLength, fontHeight);
+        // Create the combined glyphs bitmap with explicit 32bpp format for anti-aliasing
+        using var glyphsBitmap = new Bitmap(strikeLength, fontHeight, PixelFormat.Format32bppArgb);
         glyphsBitmap.SetResolution(FixedDpi, FixedDpi);
 
         using (var g = System.Drawing.Graphics.FromImage(glyphsBitmap))
         {
-            // Use consistent rendering settings for all characters
-            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
+            // Use AntiAlias (not GridFit) for smoother edges with grayscale pixels
+            g.TextRenderingHint = TextRenderingHint.AntiAlias;
             g.Clear(Color.White);
 
             // GenericTypographic format with no extra spacing
