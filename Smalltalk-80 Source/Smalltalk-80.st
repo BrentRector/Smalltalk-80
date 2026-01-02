@@ -2018,12 +2018,31 @@ nextPut: aCharacter
     ^aCharacter!
 
 nextPutAll: aCollection
-    "Write all characters from collection"
+    "Write all characters from collection.
+     Uses bulk write primitive for Strings, falls back to character-by-character for others."
+    | count |
+    closed ifTrue: [self reopen].
+    (aCollection isKindOf: String)
+        ifTrue: [
+            count _ self primWriteString: handle string: aCollection.
+            count ifNotNil: [
+                position _ position + count.
+                logicalSize == nil
+                    ifTrue: [logicalSize _ position]
+                    ifFalse: [logicalSize _ position max: logicalSize].
+                ^aCollection]].
+    "Fall back to character-by-character for non-strings or if primitive failed"
     aCollection do: [:each |
         (each isKindOf: Character)
             ifTrue: [self nextPut: each]
             ifFalse: [self nextPut: (Character value: each)]].
     ^aCollection!
+
+primWriteString: aHandle string: aString
+    "Write string to file in one operation. Primitive 158.
+     Returns number of bytes written, or nil if primitive not available."
+    <primitive: 158>
+    ^nil!
 
 cr
     "Write carriage return"

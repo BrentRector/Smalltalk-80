@@ -292,6 +292,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(136, new FileStreamPrimitives.FileWrite());
         registry.Register(151, new FileStreamPrimitives.FileFlush());
         registry.Register(156, new FileStreamPrimitives.SetSnapshotFile());
+        registry.Register(158, new FileStreamPrimitives.FileWriteString());
 
         // Directory primitives (create, remove, list, enumerate)
         registry.Register(127, new DirectoryPrimitives.CreateDirectory());
