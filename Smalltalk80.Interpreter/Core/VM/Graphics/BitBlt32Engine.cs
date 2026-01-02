@@ -156,6 +156,9 @@ public static class BitBlt32Engine
         ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
         CombinationRule rule, bool isNilSource)
     {
+        // DEBUG: Trace first pixel of fill operations
+        bool debugFirstPixel = isNilSource && halftonePixels.Length > 0 && width == 800 && height == 600;
+
         for (int y = 0; y < height; y++)
         {
             int destRow = destY + y;
@@ -213,8 +216,20 @@ public static class BitBlt32Engine
                 // Apply combination rule
                 uint resultPixel = ApplyRule(sourcePixel, destPixel, rule);
 
+                // DEBUG: Trace first pixel
+                if (debugFirstPixel && x == 0 && y == 0)
+                {
+                    Console.WriteLine($"[BitBlt32] First pixel: destIndex={destIndex}, src={sourcePixel:X8}, dest={destPixel:X8}, result={resultPixel:X8}");
+                }
+
                 // Set destination pixel
                 destPixels[destIndex] = resultPixel;
+
+                // DEBUG: Verify write
+                if (debugFirstPixel && x == 0 && y == 0)
+                {
+                    Console.WriteLine($"[BitBlt32] After write: destPixels[{destIndex}]={destPixels[destIndex]:X8}");
+                }
             }
         }
     }
