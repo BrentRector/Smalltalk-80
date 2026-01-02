@@ -222,7 +222,7 @@ hash
 
 hasValidComponents
 	"Answer whether all path components are valid file names"
-	components isNil ifTrue: [^false].
+	components ifNil: [^false].
 	components isEmpty ifTrue: [^true].
 	^components allSatisfy: [:comp |
 		comp notNil and: [comp notEmpty]]!
@@ -240,7 +240,7 @@ validateComponents
 
 setComponents: anArray
 	"Set the path components. Validates that array is not nil."
-	anArray isNil ifTrue: [
+	anArray ifNil: [
 		self error: 'Path components cannot be nil'].
 	components _ anArray! !
 
@@ -421,7 +421,7 @@ asString
         stream nextPutAll: uncServer.
         stream nextPut: Separator; nextPutAll: uncShare]
     ifFalse: [
-        driveLetter notNil ifTrue: [
+        driveLetter ifNotNil: [
             stream nextPut: driveLetter; nextPut: $:]].
     components do: [:comp |
         stream nextPut: Separator; nextPutAll: comp].
@@ -581,7 +581,7 @@ parent
 	"Answer the parent Directory"
 	| parentPath |
 	parentPath _ self path parent.
-	parentPath isNil ifTrue: [^nil].
+	parentPath ifNil: [^nil].
 	^self fileSystem directoryClass on: parentPath asString!
 
 path
@@ -614,7 +614,7 @@ isValidName
 
 hasValidPath
 	"Answer whether the path is valid (non-nil, non-empty)"
-	pathName isNil ifTrue: [^false].
+	pathName ifNil: [^false].
 	pathName isEmpty ifTrue: [^false].
 	^true!
 
@@ -697,7 +697,7 @@ linkTargetExists
 	| target |
 	self isLink ifFalse: [^true].
 	target _ self resolvedTarget.
-	target isNil ifTrue: [^false].
+	target ifNil: [^false].
 	^(self fileSystem pathFromString: target) file exists!
 
 isBrokenLink
@@ -716,7 +716,7 @@ printOn: aStream
 
 initPathName: aString
 	"Initialize the path. Validates that path is not nil."
-	aString isNil ifTrue: [
+	aString ifNil: [
 		self error: 'Cannot create ', self class name, ' with nil path'].
 	pathName _ aString! !
 
@@ -1002,7 +1002,7 @@ checkName: aName fixErrors: fixFlag
 	"Validate aName as a file name. If fixFlag is true, return a corrected name.
 	 If fixFlag is false and name is invalid, signal an error."
 	| fs |
-	aName isNil ifTrue: [
+	aName ifNil: [
 		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is nil']].
 	aName isEmpty ifTrue: [
 		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is empty']].
@@ -1116,7 +1116,7 @@ resolveTargetType
 	"Determine and cache whether target is a file or directory"
 	| resolved node |
 	resolved _ self resolvedTarget.
-	resolved isNil ifTrue: [
+	resolved ifNil: [
 		targetType _ #unknown.
 		^self].
 	node _ self fileSystem pathFromString: resolved.
@@ -1153,7 +1153,7 @@ targetExists
 	"Answer whether the target file/directory exists"
 	| resolved |
 	resolved _ self resolvedTarget.
-	resolved isNil ifTrue: [^false].
+	resolved ifNil: [^false].
 	^(self fileSystem fileClass on: resolved) exists
 		or: [(self fileSystem directoryClass on: resolved) exists]!
 
@@ -1175,7 +1175,7 @@ resolvedNode
 	"Answer a File or Directory for the resolved target"
 	| resolved |
 	resolved _ self resolvedTarget.
-	resolved isNil ifTrue: [^nil].
+	resolved ifNil: [^nil].
 	self targetType == #directory
 		ifTrue: [^self fileSystem directoryClass on: resolved]
 		ifFalse: [^self fileSystem fileClass on: resolved]! !
@@ -1316,7 +1316,7 @@ illegalCharacters
 
 isValidFileName: aName
 	"Answer whether aName is a valid file name"
-	aName isNil ifTrue: [^false].
+	aName ifNil: [^false].
 	aName isEmpty ifTrue: [^false].
 	aName size > self maxFileNameLength ifTrue: [^false].
 	self reservedNames do: [:reserved |
@@ -1332,7 +1332,7 @@ reservedNames
 sanitizeFileName: aName
 	"Answer a valid file name based on aName by replacing illegal characters"
 	| result isReserved |
-	aName isNil ifTrue: [^'untitled'].
+	aName ifNil: [^'untitled'].
 	aName isEmpty ifTrue: [^'untitled'].
 	result _ aName collect: [:ch |
 		(self illegalCharacters includes: ch)
@@ -1349,7 +1349,7 @@ sanitizeFileName: aName
 checkName: aName fixErrors: fixFlag
 	"Validate aName as a file name. If fixFlag is true, return a corrected name.
 	 If fixFlag is false and name is invalid, signal an error."
-	aName isNil ifTrue: [
+	aName ifNil: [
 		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is nil']].
 	aName isEmpty ifTrue: [
 		fixFlag ifTrue: [^'untitled'] ifFalse: [self error: 'File name is empty']].
@@ -1471,7 +1471,7 @@ initialize
 
 default
 	"Answer the singleton instance"
-	Default isNil ifTrue: [Default _ self new].
+	Default ifNil: [Default _ self new].
 	^Default! !
 
 !WindowsFileSystem methodsFor: 'concrete class factories'!
@@ -1616,7 +1616,7 @@ isSymbolicLink: aPathString
 	"Answer whether path is a symbolic link (not a junction)"
 	| attrs tag |
 	attrs _ self primGetFileAttributes: aPathString.
-	attrs isNil ifTrue: [^false].
+	attrs ifNil: [^false].
 	"Check for reparse point attribute (0x400)"
 	(attrs bitAnd: 16r400) = 0 ifTrue: [^false].
 	"Get reparse tag to distinguish symlink from junction"
@@ -1627,7 +1627,7 @@ isJunction: aPathString
 	"Answer whether path is a junction point"
 	| attrs tag |
 	attrs _ self primGetFileAttributes: aPathString.
-	attrs isNil ifTrue: [^false].
+	attrs ifNil: [^false].
 	"Check for reparse point attribute (0x400) and directory (0x10)"
 	((attrs bitAnd: 16r400) = 0 or: [(attrs bitAnd: 16r10) = 0]) ifTrue: [^false].
 	"Get reparse tag to distinguish junction from symlink"
@@ -1802,7 +1802,7 @@ setHandle: aHandle
 close
     "Close the file handle if open"
     closed ifTrue: [^self].
-    handle notNil ifTrue: [
+    handle ifNotNil: [
         self primClose: handle.
         handle _ nil].
     closed _ true!
@@ -1812,7 +1812,7 @@ reopen
     | savedPos |
     closed ifFalse: [^self].
     savedPos _ position.
-    mode isNil ifTrue: [mode _ ReadWriteMode].
+    mode ifNil: [mode _ ReadWriteMode].
     self open: mode.
     self position: savedPos! !
 
@@ -1860,7 +1860,7 @@ size
         logicalSize == nil ifTrue: [logicalSize _ self physicalFileSize].
         ^logicalSize].
     attrs _ self primGetAttributes: pathName.
-    attrs isNil ifTrue: [^0].
+    attrs ifNil: [^0].
     ^attrs at: 1!
 
 atEnd
@@ -1873,7 +1873,7 @@ closed
 
 writing
     "Test if opened for writing"
-    mode isNil ifTrue: [^false].
+    mode ifNil: [^false].
     ^(mode bitAnd: WriteMode) > 0! !
 
 !WindowsFileStream methodsFor: 'positioning'!
@@ -1909,7 +1909,7 @@ next: count
     index _ 1.
     [index <= count] whileTrue: [
         char _ self next.
-        char isNil ifTrue: [^string copyFrom: 1 to: index - 1].
+        char ifNil: [^string copyFrom: 1 to: index - 1].
         string at: index put: char.
         index _ index + 1].
     ^string!
@@ -1930,7 +1930,7 @@ nextChunk
     prevWasBang _ false.
     [self atEnd] whileFalse: [
         char _ self next.
-        char isNil ifTrue: [^result contents].
+        char ifNil: [^result contents].
         char == $!
             ifTrue: [
                 prevWasBang
@@ -1956,44 +1956,44 @@ nextInt16
     "Answer the next two bytes from the receiver as an Integer (big-endian, 16-bit)."
     | high low |
     high _ self next.
-    high == nil ifTrue: [^false].
+    high ifNil: [^false].
     low _ self next.
-    low == nil ifTrue: [^false].
+    low ifNil: [^false].
     ^(high asInteger bitShift: 8) + low asInteger!
 
 nextInt32
     "Answer the next four bytes from the receiver as an Integer (big-endian, 32-bit)."
     | b0 b1 b2 b3 |
     b0 _ self next.
-    b0 == nil ifTrue: [^false].
+    b0 ifNil: [^false].
     b1 _ self next.
-    b1 == nil ifTrue: [^false].
+    b1 ifNil: [^false].
     b2 _ self next.
-    b2 == nil ifTrue: [^false].
+    b2 ifNil: [^false].
     b3 _ self next.
-    b3 == nil ifTrue: [^false].
+    b3 ifNil: [^false].
     ^((b0 asInteger bitShift: 24) + (b1 asInteger bitShift: 16) + (b2 asInteger bitShift: 8) + b3 asInteger) bitAnd: 16rFFFFFFFF!
 
 nextInt16LE
     "Answer the next two bytes from the receiver as an Integer (little-endian, 16-bit)."
     | low high |
     low _ self next.
-    low == nil ifTrue: [^false].
+    low ifNil: [^false].
     high _ self next.
-    high == nil ifTrue: [^false].
+    high ifNil: [^false].
     ^(high asInteger bitShift: 8) + low asInteger!
 
 nextInt32LE
     "Answer the next four bytes from the receiver as an Integer (little-endian, 32-bit)."
     | b0 b1 b2 b3 |
     b0 _ self next.
-    b0 == nil ifTrue: [^false].
+    b0 ifNil: [^false].
     b1 _ self next.
-    b1 == nil ifTrue: [^false].
+    b1 ifNil: [^false].
     b2 _ self next.
-    b2 == nil ifTrue: [^false].
+    b2 ifNil: [^false].
     b3 _ self next.
-    b3 == nil ifTrue: [^false].
+    b3 ifNil: [^false].
     ^((b3 asInteger bitShift: 24) + (b2 asInteger bitShift: 16) + (b1 asInteger bitShift: 8) + b0 asInteger) bitAnd: 16rFFFFFFFF!
 
 nextWord
@@ -2114,7 +2114,7 @@ do: aBlock
     | char |
     [self atEnd] whileFalse: [
         char _ self next.
-        char notNil ifTrue: [aBlock value: char]]! !
+        char ifNotNil: [aBlock value: char]]! !
 
 !WindowsFileStream methodsFor: 'mode setting'!
 
@@ -2189,7 +2189,7 @@ open: modeValue
                   shareMode: shareMode
                   createMode: createMode.
 
-    handle isNil ifTrue: [self error: 'Cannot open file: ', pathName].
+    handle ifNil: [self error: 'Cannot open file: ', pathName].
     handle < 0 ifTrue: [self error: 'Cannot open file: ', pathName].
     closed _ false.
     position _ 0.
@@ -2202,7 +2202,7 @@ physicalFileSize
     "Query filesystem for actual file size. Used only at open time."
     | attrs |
     attrs _ self primGetAttributes: pathName.
-    attrs isNil ifTrue: [^0].
+    attrs ifNil: [^0].
     ^attrs at: 1! !
 
 !WindowsFileStream methodsFor: 'fileIn/Out'!
@@ -2347,7 +2347,7 @@ size
     "Return file size"
     | attrs |
     attrs _ self primGetAttributes: pathName.
-    attrs isNil ifTrue: [^0].
+    attrs ifNil: [^0].
     ^attrs at: 1! !
 
 !WindowsFile methodsFor: 'operations'!
@@ -2477,7 +2477,7 @@ removeExternalReference: anObject
 
 releaseExternalReferences
     "Release all external references"
-    ExternalReferences isNil ifTrue: [^self].
+    ExternalReferences ifNil: [^self].
     [ExternalReferences isEmpty] whileFalse: [
         ExternalReferences removeLast release]!
 
@@ -5111,7 +5111,7 @@ readOutput: aStream intoDict: aDict andCollection: aColl
 	aStream upTo: leftBracket.
 	[aStream atEnd] whileFalse:
 		[label _ aStream upTo: rightBracket.
-		 aColl notNil ifTrue: [aColl add: label].
+		 aColl ifNotNil: [aColl add: label].
 		 aStream next: 2; upTo: tab.
 		 value _ Number readFrom: (ReadStream on: (aStream upTo: space)).
 		 aDict at: label put: value.
@@ -5312,11 +5312,11 @@ trueAction: aBlock
 selectFalse
 	"Take the action, if one, associated with selecting no or false."	
 	actionTaken _ true.
-	falseAction notNil ifTrue: [falseAction value]!
+	falseAction ifNotNil: [falseAction value]!
 selectTrue
 	"Take the action, if one, associated with selecting yes or true."	
 	actionTaken _ true.
-	trueAction notNil ifTrue: [trueAction value]! !
+	trueAction ifNotNil: [trueAction value]! !
 
 !BinaryChoice methodsFor: 'accessing'!
 actionTaken
@@ -6004,7 +6004,7 @@ magnifyOnScreen
 	| smallRect smallForm scaleFactor tempRect |
 	scaleFactor _ 8 @ 8.
 	smallRect _ Rectangle fromUser.
-	smallRect isNil ifTrue: [^self].
+	smallRect ifNil: [^self].
 	smallForm _ Form fromDisplay: smallRect.
 	tempRect _ self locateMagnifiedView: smallForm scale: scaleFactor.
 	"show magnified form size until mouse is depressed"
@@ -6023,7 +6023,7 @@ magnifyWithSmall
 
 	| smallRect smallForm  |
 	smallRect _ Rectangle fromUser.
-	smallRect isNil ifTrue: [^self].
+	smallRect ifNil: [^self].
 	smallForm _ Form fromDisplay: smallRect.
 	BitEditor openOnForm: smallForm 
 
@@ -6690,7 +6690,7 @@ category
 	^ category!
 category: selection
 	category _ selection.
-	selection isNil ifTrue: [self textMode: nil].
+	selection ifNil: [self textMode: nil].
 	self newClassList: className!
 categoryList
 	^ organization categories!
@@ -6813,7 +6813,7 @@ browseClassVariables
 	association _ self selectedClass
 		showVariableMenu: [:class | class classPool associations asSortedCollection]
 		collect: [:association | association key].
-	association notNil ifTrue:
+	association ifNotNil:
 		[BrowserView
 			openListBrowserOn: (self selectedClass allCallsOn: association)
 			label: 'Users of ' , association key
@@ -6824,7 +6824,7 @@ browseFieldReferences
 	| name |
 	name _ self selectedClass showVariableMenu: [:class | class instVarNames]
 				collect: [:name | name].
-	name notNil ifTrue:
+	name ifNotNil:
 		[BrowserView
 			openListBrowserOn: (self selectedClass allAccessesTo: name)
 			label: name
@@ -7826,7 +7826,7 @@ contents: newText notifying: requestor
 	selectionIndex = 0 ifTrue: [^false].
 	oldChange _ list at: selectionIndex.
 	newChange _ oldChange accept: newText notifying: requestor.
-	newChange isNil ifTrue: [^false].
+	newChange ifNil: [^false].
 	list at: selectionIndex put: newChange.
 	changes at: (changes indexOf: oldChange) put: newChange.
 	self contents: newText.
@@ -8118,8 +8118,8 @@ updateList
 	| oldChange newIndex |
 	selectionIndex > 0 ifTrue: [oldChange _ list at: selectionIndex].
 	filter _ nil.
-	filterList do: [:aSymbol | aSymbol notNil ifTrue: [self addFilter: aSymbol]].
-	filter isNil ifTrue: [filter _ [:change | true]].
+	filterList do: [:aSymbol | aSymbol ifNotNil: [self addFilter: aSymbol]].
+	filter ifNil: [filter _ [:change | true]].
 	list _ changes select: [:change | filter value: change].
 	newIndex _
 		oldChange == nil
@@ -8508,8 +8508,8 @@ scanChangedMessages: changedMessages do: aBlock
 	changedMessages do:
 		[:aString |
 		super scan: (ReadStream on: aString).
-		(className _ self nextClass) notNil ifTrue:
-			[(selector _ self nextSelector) notNil ifTrue:
+		(className _ self nextClass) ifNotNil:
+			[(selector _ self nextSelector) ifNotNil:
 				[change _ MethodDefinitionChange new className: className; selector: selector.
 				(className includes: Character space)
 					ifTrue: [class _ (Smalltalk at: (className copyUpTo: Character space) asSymbol) class]
@@ -8545,12 +8545,12 @@ scanMethodsClass: class category: category do: aBlock
 		whileFalse:
 			[method _ method contents.
 			selector _ Parser new parseSelector: method.
-			selector notNil ifTrue:
+			selector ifNotNil:
 				[aBlock value: ((MethodDefinitionChange file: file position: position) className: class; selector: selector; category: category)]]!
 scanSpecialDo: aBlock
 	"Scan a chunk of file beginning with a !!.  For now, the only thing I understand is method definitions."
 	| class category |
-	(class _ self nextClass) notNil ifTrue:
+	(class _ self nextClass) ifNotNil:
 		[(tokenType == #keyword and: [token = 'methodsFor:']) ifTrue:
 			[self scanToken.
 			tokenType == #string ifTrue:
@@ -9653,7 +9653,7 @@ scanCharactersFrom: startIndex to: stopIndex in: sourceString rightX: rightX sto
 	[lastIndex <= stopIndex]
 		whileTrue: 
 			[ascii _ (sourceString at: lastIndex) asciiValue.
-			(stopConditions at: ascii + 1) ~~ nil ifTrue: [^stops at: ascii + 1].
+			(stopConditions at: ascii + 1) ifNotNil: [^stops at: ascii + 1].
 			sourceX _ xTable at: ascii + 1.
 			nextDestX _ destX + (width _ (xTable at: ascii + 2) - sourceX).
 			nextDestX > rightX ifTrue: [^stops at: CrossedX].
@@ -11642,7 +11642,7 @@ changeFromString: aString
 		newCategories at: i put: anArray first asSymbol.
 		(anArray copyFrom: 2 to: anArray size) asSortedCollection do:
 			[:elem |
-			(oldElements remove: elem ifAbsent: [nil]) notNil ifTrue:
+			(oldElements remove: elem ifAbsent: [nil]) ifNotNil:
 				[newElements nextPut: elem.
 				currentStop _ currentStop+1]].
 		newStops at: i put: currentStop].
@@ -13902,7 +13902,7 @@ controlToNextLevel
 
 	| aView |
 	aView _ view subViewWantingControl.
-	aView ~~ nil ifTrue: [aView controller startUp]!
+	aView ifNotNil: [aView controller startUp]!
 isControlActive
 	"Answer whether the receiver wants control.  The default is to take control
 	if the cursor is inside the view and the blue button is not pressed.  Pressing
@@ -15005,7 +15005,7 @@ readFrom: aStream
 			[month _ WriteStream on: (String new: 10).
 			[aStream peek isLetter] whileTrue: [month nextPut: aStream next].
 			month _ month contents.
-			day isNil ifTrue:		"name/number..."
+			day ifNil:		"name/number..."
 				[[aStream peek isAlphaNumeric] whileFalse: [aStream skip: 1].
 				day _ Integer readFrom: aStream]]
 		ifFalse:		"number/number..."
@@ -17779,7 +17779,7 @@ explainClass: symbol
 			[classes _ WriteStream on: Array new.
 			Smalltalk allBehaviorsDo: [:each |
 					(each sharedPools detect: [:pool | pool == reply] ifNone: [])
-					~~ nil ifTrue: [classes nextPut: each]].
+					ifNotNil: [classes nextPut: each]].
 			"Perhaps not print whole list of classes if too long. (unlikely)"
 			^'"is a pool variable from the pool ' , (Smalltalk keyAtValue: reply),
 			', which is used by the following classes ' , classes contents printString , '"', NewLine,
@@ -17828,7 +17828,7 @@ explainDelimitor: string
 				[^'"An instance of class Character.  This one is the character ', (String with: string last), '."'].
 			(string first = $:) ifTrue:
 				[str _ (string copyFrom: 2 to: string size).
-				(self explainTemp: str) ~~ nil ifTrue:
+				(self explainTemp: str) ifNotNil:
 					[^'"An argument to this block will be bound to the temporary variable ',
 						str, '."']]].
 	^ nil!
@@ -17846,7 +17846,7 @@ explainGlobal: symbol
 			[classes _ Set new.
 			Smalltalk allBehaviorsDo: [:each | (each sharedPools detect: [:pool | pool == reply]
 					ifNone: [])
-					~~ nil ifTrue: [classes add: each]].
+					ifNotNil: [classes add: each]].
 			classes _ classes printString.
 			^'"is a global variable.  ' , symbol , ' is a Dictionary.  It is a pool which is used by the following classes' , (classes copyFrom: 4 to: classes size) , '"'].
 	^'"is a global variable.  ' , symbol , ' is ' , reply printString , '"'!
@@ -18625,7 +18625,7 @@ nextPut: aByte
 	writeLimit < dmax
 		ifTrue: [writeLimit _ dmax]
 		ifFalse: 
-			[self nextPage isNil ifTrue: [^self error: 'cannot write!!!!!!'].
+			[self nextPage ifNil: [^self error: 'cannot write!!!!!!'].
 			position = readLimit ifTrue: [writeLimit _ dmax]].
 	^collection at: (position _ position + 1) put: aByte!
 nextPutAll: aCollection 
@@ -18651,7 +18651,7 @@ nextPutAll: aCollection
 	howManyWritten < collectionSize.
 	] whileTrue:
 		[
-		self nextPage isNil ifTrue: [^self error: 'cannot write!!!!!!'].
+		self nextPage ifNil: [^self error: 'cannot write!!!!!!'].
 		position = readLimit ifTrue: [writeLimit _ dmax].
 		].
 	position > writeLimit ifTrue: [writeLimit _ dmax].
@@ -18686,7 +18686,7 @@ position: pos
 reset
 	"set position to beginning of File"
 
-	(self read: 1) isNil ifTrue: [self error: 'reset']!
+	(self read: 1) ifNil: [self error: 'reset']!
 setToEnd
 	"set position to end of File.  logically: self position: self size"
 
@@ -18762,7 +18762,7 @@ read: pageNumber
 			p pageNumber = pageNumber ifFalse: ["read it or create it"
 				p _ page readOrAddPageNumber: pageNumber"already have next page, e.g. at end of AltoFile"]]
 		ifFalse: [p _ page readPageNumber: pageNumber].
-	p isNil ifTrue: [^nil].
+	p ifNil: [^nil].
 	(page _ p) asFileStream: self! !
 
 !FileStream methodsFor: 'nonhomogeneous positioning'!
@@ -19066,7 +19066,7 @@ setAction: aBoolean
 selectAction
 	"Evaluate the receiver's assigned action block, if any, with the answer as the
 	block argument."
-	actionBlock notNil ifTrue: [actionBlock value: contents]! !
+	actionBlock ifNotNil: [actionBlock value: contents]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 FillInTheBlank class
@@ -19935,7 +19935,7 @@ fill: aRectangle rule: anInteger mask: aForm
 	according to the rule anInteger."
 
 	"Defensive nil check for debugging scroll issues"
-	aRectangle isNil ifTrue: [self error: 'fill:rule:mask: received nil rectangle'].
+	aRectangle ifNil: [self error: 'fill:rule:mask: received nil rectangle'].
 
 	"Make up a BitBlt table and copy the bits"
 	(BitBlt
@@ -20702,13 +20702,13 @@ initialize
 release
 
 	super release.
-	toolMenu notNil ifTrue: [toolMenu view release].
+	toolMenu ifNotNil: [toolMenu view release].
 	toolMenu _ form _ nil! !
 
 !FormEditor methodsFor: 'basic control sequence'!
 controlInitialize
 
-	toolMenu notNil ifTrue:		"check for Galley compatibility"
+	toolMenu ifNotNil:		"check for Galley compatibility"
 		[toolMenu view
 			align: toolMenu view displayBox topCenter
 			with: view displayBox bottomCenter+(0@1).
@@ -20721,7 +20721,7 @@ controlInitialize
 controlTerminate
 
 	view updateDisplay.
-	toolMenu notNil ifTrue:		"check for Galley compatibility"
+	toolMenu ifNotNil:		"check for Galley compatibility"
 		[underToolMenu displayAt: toolMenu view displayBox origin.
 		underToolMenu _ nil].! !
 
@@ -20860,7 +20860,7 @@ fileInForm
 				ifTrue: [trying _ false]
 				ifFalse: [trying _ BinaryChoice message: 'File name illegal, or file not found, or file not valid form file.
 Try again?']].
-	newForm ~~ nil ifTrue: [form _ newForm].
+	newForm ifNotNil: [form _ newForm].
 	tool _ previousTool.!
 fileOutForm
 	"Ask the user for a file name and then save the current source form (form)
@@ -20903,7 +20903,7 @@ magnify
 	| smallRect smallForm scaleFactor tempRect |
 	scaleFactor _ 8@8.
 	smallRect _ (Rectangle fromUser: grid) intersect: view insetDisplayBox.
-	smallRect isNil ifTrue: [^self].
+	smallRect ifNil: [^self].
 	smallForm _ Form fromDisplay: smallRect.
 
 	"Do this computation here in order to be able to save the existing display screen."
@@ -22577,7 +22577,7 @@ evaluateText: aText from: aController ifFail: failBlock
 !Inspector methodsFor: 'updating'!
 update
 	"Reshow contents, assuming selected value may have changed"
-	field ~~ nil ifTrue: [self changed: #text]! !
+	field ifNotNil: [self changed: #text]! !
 
 !Inspector methodsFor: 'menu commands'!
 inspectField
@@ -25411,7 +25411,7 @@ emitForValue: stack on: strm
 			[self perform: (MacroEmitters at: special) with: stack with: strm with: true.
 			pc _ 0]
 		ifFalse: 
-			[receiver ~~ nil ifTrue: [receiver emitForValue: stack on: strm].
+			[receiver ifNotNil: [receiver emitForValue: stack on: strm].
 			arguments do: [:argument | argument emitForValue: stack on: strm].
 			selector
 				emit: stack
@@ -26480,10 +26480,10 @@ getSource
 sourceFileAndPosition: aBlock
 	"Get the source code for this method from information currently in the system."
 	| class method fileIndex pos |
-	(class _ self classObject) isNil ifTrue: [^nil].
+	(class _ self classObject) ifNil: [^nil].
 	(class includesSelector: selector) ifFalse: [^nil].
 	method _ class compiledMethodAt: selector.
-	SourceFiles isNil ifTrue: [^nil].
+	SourceFiles ifNil: [^nil].
 	(fileIndex _ method fileIndex) > SourceFiles size ifTrue: [^nil].
 	"The following code should be in CompiledMethod ..."
 	pos _ (method at: method size) bitAnd: 63.
@@ -31336,7 +31336,7 @@ initPattern: aString notifying: req return: aBlock
 makeNewSymbol: aString startingAt: start
 	| editor index menu sym oldText newText oldStream oldKey |
 	Symbol hasInterned: aString ifTrue: [:symbol | ^ symbol].
-	(editor _ self editor) isNil ifTrue: [^ aString asSymbol].
+	(editor _ self editor) ifNil: [^ aString asSymbol].
 	editor selectFrom: start to: self endOfLastToken.
 	Cursor normal show.
 	index _ (menu _ ActionMenu
@@ -33168,7 +33168,7 @@ Project comment: 'Each screen is a manifestation of a project.  Each project man
 
 !Project methodsFor: 'initialize-release'!
 release
-	projectWindows isNil ifFalse: [projectWindows release].
+	projectWindows ifNotNil: [projectWindows release].
 	^super release! !
 
 !Project methodsFor: 'controlling'!
@@ -33443,7 +33443,7 @@ translateBy: aPoint
 displayOn: aDisplayMedium
 	"Display the border and insideRegion of the receiver."
 
-	insideColor ~~ nil ifTrue: [aDisplayMedium fill: self inside mask: insideColor].
+	insideColor ifNotNil: [aDisplayMedium fill: self inside mask: insideColor].
 	borderWidth ~~ 0 & (insideColor ~~ nil)
 		ifTrue: 
 			[aDisplayMedium fill: self region mask: borderColor.
@@ -34884,7 +34884,7 @@ scrollAbsolute
 				0@((sensor cursorPoint y - marker center y min:
 					scrollBar inside bottom - marker bottom) max: scrollBar inside top - marker top).
 			(oldMarker areasOutside: marker), (marker areasOutside: oldMarker) do:
-				[:region | region isNil ifFalse: [Display fill: region rule: Form reverse mask: Form gray]]].
+				[:region | region ifNotNil: [Display fill: region rule: Form reverse mask: Form gray]]].
 			self scrollView.
 			scrollBar display.
 			self moveMarker]!
@@ -35019,7 +35019,7 @@ list: anArray
 !SelectionInListView methodsFor: 'adaptor'!
 changeModelSelection: anInteger
 
-	changeMsg ~~ nil ifTrue:
+	changeMsg ifNotNil:
 		[model perform: changeMsg with:
 			(anInteger = 0 ifTrue: [nil] ifFalse: [itemList at: anInteger])]!
 getList 
@@ -36447,7 +36447,7 @@ controlInitialize
 controlTerminate
 	status == #closed
 		ifTrue: 
-			[view ~~ nil ifTrue: [view release].
+			[view ifNotNil: [view release].
 			ScheduledControllers unschedule: self.
 			^self].
 	status == #inactive
@@ -36688,7 +36688,7 @@ collapse
 		ifFalse:
 			[savedSubViews _ subViews.
 			self resetSubViews.
-			labelText isNil ifTrue: [self label: 'No Label'].
+			labelText ifNil: [self label: 'No Label'].
 			self window: (self inverseDisplayTransform: self labelDisplayBox region).
 			labelFrame borderWidthLeft: 2 right: 2 top: 2 bottom: 2]!
 erase
@@ -36797,7 +36797,7 @@ clippingBox
 
 !StandardSystemView methodsFor: 'private'!
 reverseLabel
-	labelText isNil ifFalse: [Display reverse: self labelDisplayBox inside]! !
+	labelText ifNotNil: [Display reverse: self labelDisplayBox inside]! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 StandardSystemView class
@@ -39288,9 +39288,9 @@ initialize
 	 Files are opened from the current working directory."
 	SourceFiles _ Array new: 2.
 	sourcesFile _ WindowsFileStream readOn: 'Smalltalk-80.sources'.
-	sourcesFile notNil ifTrue: [SourceFiles at: 1 put: sourcesFile].
+	sourcesFile ifNotNil: [SourceFiles at: 1 put: sourcesFile].
 	changesFile _ WindowsFileStream readWriteOn: 'Smalltalk-80.changes'.
-	changesFile notNil ifTrue: [SourceFiles at: 2 put: changesFile]
+	changesFile ifNotNil: [SourceFiles at: 2 put: changesFile]
 	"SystemDictionary initialize"! !
 
 SystemDictionary initialize!
@@ -39468,7 +39468,7 @@ new: obj class: class length: length trace: traceBlock write: writeBlock
 					ifTrue: [self error: 'double write!!']].
 	objpos_ file position. 
 	file skip: length+2*2.
-	traceBlock notNil ifTrue: [self trace: class.  traceBlock value].
+	traceBlock ifNotNil: [self trace: class.  traceBlock value].
 	endpos_ file position.  file position: objpos.
 	self writeBitField: length+2.  self writePointerField: class.  writeBlock value.
 	file position: endpos!
@@ -41677,7 +41677,7 @@ release
 	model _ nil.
 	controller release.
 	controller _ nil.
-	subViews ~~ nil ifTrue: [subViews do: [:aView | aView release]].
+	subViews ifNotNil: [subViews do: [:aView | aView release]].
 	subViews _ nil.
 	superView _ nil.! !
 
