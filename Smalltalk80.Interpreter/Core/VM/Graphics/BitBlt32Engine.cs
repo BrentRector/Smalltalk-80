@@ -215,8 +215,11 @@ public static class BitBlt32Engine
         ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
         int width, int height)
     {
-        for (int y = 0; y < height; y++)
+        bool copyBottomToTop = destY > sourceY;
+
+        for (int yi = 0; yi < height; yi++)
         {
+            int y = copyBottomToTop ? (height - 1 - yi) : yi;
             int destOffset = (destY + y) * destWidth + destX;
             int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
 
@@ -241,8 +244,11 @@ public static class BitBlt32Engine
         ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
         int width, int height)
     {
-        for (int y = 0; y < height; y++)
+        bool copyBottomToTop = destY > sourceY;
+
+        for (int yi = 0; yi < height; yi++)
         {
+            int y = copyBottomToTop ? (height - 1 - yi) : yi;
             int destOffset = (destY + y) * destWidth + destX;
             int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
 
@@ -269,8 +275,11 @@ public static class BitBlt32Engine
         ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
         int width, int height)
     {
-        for (int y = 0; y < height; y++)
+        bool copyBottomToTop = destY > sourceY;
+
+        for (int yi = 0; yi < height; yi++)
         {
+            int y = copyBottomToTop ? (height - 1 - yi) : yi;
             int destOffset = (destY + y) * destWidth + destX;
             int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
 
