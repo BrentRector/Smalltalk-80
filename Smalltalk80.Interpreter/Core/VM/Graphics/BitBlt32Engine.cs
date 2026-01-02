@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 
@@ -146,65 +147,32 @@ public static class BitBlt32Engine
 
     /// <summary>
     /// Fast path for simple copy operations (Rule 3) without halftone.
-    /// Uses row-by-row span copying for maximum performance.
-    /// Handles overlapping source/destination (same Form scrolling) correctly.
+    /// Uses Buffer.MemoryCopy which handles overlapping regions correctly (memmove semantics).
     /// </summary>
-    private static void CopyBitsOptimized(
+    private static unsafe void CopyBitsOptimized(
         Span<uint> destPixels, int destWidth, int destX, int destY,
         ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
         int width, int height)
     {
-        // Detect if regions might overlap (same bitmap being scrolled)
-        // This happens when source and dest are the same Form's bits array
-        bool mightOverlap = destWidth == sourceWidth && destPixels.Length == sourcePixels.Length;
-
-        // Determine copy direction to handle overlapping regions correctly
-        // If dest is below source (scrolling content up), copy bottom-to-top
-        // If dest is above source (scrolling content down), copy top-to-bottom
-        bool copyBottomToTop = mightOverlap && (destY > sourceY || (destY == sourceY && destX > sourceX));
-
-        if (copyBottomToTop)
+        fixed (uint* destPtr = destPixels)
+        fixed (uint* sourcePtr = sourcePixels)
         {
-            // Copy bottom-to-top to avoid overwriting source before it's read
-            for (int y = height - 1; y >= 0; y--)
-            {
-                int destOffset = (destY + y) * destWidth + destX;
-                int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
-
-                if (destOffset >= 0 && sourceOffset >= 0 &&
-                    destOffset + width <= destPixels.Length &&
-                    sourceOffset + width <= sourcePixels.Length)
-                {
-                    // For same-row overlap, copy pixel-by-pixel right-to-left
-                    if (mightOverlap && destY + y == sourceY + y && destX > sourceX)
-                    {
-                        for (int x = width - 1; x >= 0; x--)
-                        {
-                            destPixels[destOffset + x] = sourcePixels[sourceOffset + x];
-                        }
-                    }
-                    else
-                    {
-                        sourcePixels.Slice(sourceOffset, width)
-                                   .CopyTo(destPixels.Slice(destOffset, width));
-                    }
-                }
-            }
-        }
-        else
-        {
-            // Copy top-to-bottom (standard case, no overlap or dest above source)
             for (int y = 0; y < height; y++)
             {
                 int destOffset = (destY + y) * destWidth + destX;
                 int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
 
+                // Validate bounds
                 if (destOffset >= 0 && sourceOffset >= 0 &&
                     destOffset + width <= destPixels.Length &&
                     sourceOffset + width <= sourcePixels.Length)
                 {
-                    sourcePixels.Slice(sourceOffset, width)
-                               .CopyTo(destPixels.Slice(destOffset, width));
+                    // Buffer.MemoryCopy handles overlapping regions correctly (memmove semantics)
+                    Buffer.MemoryCopy(
+                        sourcePtr + sourceOffset,
+                        destPtr + destOffset,
+                        (long)width * sizeof(uint),
+                        (long)width * sizeof(uint));
                 }
             }
         }
