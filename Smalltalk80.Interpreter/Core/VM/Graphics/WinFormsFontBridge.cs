@@ -221,30 +221,24 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
         int charCount = maxAscii - minAscii + 1;
         int fontHeight = metrics.Ascent + metrics.Descent;
 
-        // Measure each character width
+        var font = GetOrCreateFont(descriptor);
+
+        // For fixed-pitch fonts, use uniform cell width from a representative character
+        // This ensures proper alignment - all characters placed at exact cell boundaries
+        int cellWidth = GetCellWidth(font);
+
+        // Build xTable with uniform cell widths (fixed-pitch font)
         int[] widths = new int[charCount];
-        int totalWidth = 0;
-        for (int i = 0; i < charCount; i++)
-        {
-            int w = GetCharWidth(descriptor, (char)(minAscii + i));
-            if (w <= 0) w = 1;
-            widths[i] = w;
-            totalWidth += w;
-        }
-        if (totalWidth <= 0) totalWidth = charCount;
-
-        // Build xTable from measured widths
         int[] xTable = new int[charCount + 2];
-        int x = 0;
         for (int i = 0; i < charCount; i++)
         {
-            xTable[i] = x;
-            x += widths[i];
+            widths[i] = cellWidth;
+            xTable[i] = i * cellWidth;
         }
-        xTable[charCount] = x;
-        xTable[charCount + 1] = x;
+        xTable[charCount] = charCount * cellWidth;
+        xTable[charCount + 1] = charCount * cellWidth;
 
-        int strikeLength = x;
+        int strikeLength = charCount * cellWidth;
 
         // Create the combined glyphs bitmap
         using var glyphsBitmap = new Bitmap(strikeLength, fontHeight);
@@ -255,20 +249,21 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             ConfigureGraphicsForAntialiasing(g);
             g.Clear(Color.White);
 
-            var font = GetOrCreateFont(descriptor);
-
-            // GenericTypographic for tight positioning
-            var format = new StringFormat(StringFormat.GenericTypographic)
+            // Use GenericDefault for consistent baseline across all characters
+            var format = new StringFormat(StringFormat.GenericDefault)
             {
                 FormatFlags = StringFormatFlags.NoClip
             };
 
-            // Draw each character at its exact xTable position
+            // Draw each character at its exact cell position
             for (int i = 0; i < charCount; i++)
             {
                 char c = (char)(minAscii + i);
+                // Skip control characters (0-31) - they render as boxes or nothing
+                if (c < 32) continue;
+                // Replace underscore with left arrow (Smalltalk convention)
                 if (c == '_') c = '←';
-                g.DrawString(c.ToString(), font, Brushes.Black, xTable[i], 0, format);
+                g.DrawString(c.ToString(), font, Brushes.Black, i * cellWidth, 0, format);
             }
         }
 
@@ -308,6 +303,28 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             Dpi = FixedDpi,
             HintingEnabled = false
         };
+    }
+
+    /// <summary>
+    /// Gets the fixed-pitch cell width for a monospace font.
+    /// Uses a representative character to determine the uniform cell width.
+    /// </summary>
+    private int GetCellWidth(Font font)
+    {
+        using var measureBitmap = new Bitmap(1, 1);
+        measureBitmap.SetResolution(FixedDpi, FixedDpi);
+        using var g = System.Drawing.Graphics.FromImage(measureBitmap);
+        ConfigureGraphicsForDeterminism(g);
+
+        // Use GenericDefault format for consistent cell width measurement
+        var format = new StringFormat(StringFormat.GenericDefault)
+        {
+            FormatFlags = StringFormatFlags.MeasureTrailingSpaces | StringFormatFlags.NoClip
+        };
+
+        // Measure 'M' - a representative full-width character
+        var size = g.MeasureString("M", font, PointF.Empty, format);
+        return (int)Math.Ceiling(size.Width);
     }
 
     /// <summary>
