@@ -156,6 +156,12 @@ public static class BitBlt32Engine
         ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
         CombinationRule rule, bool isNilSource)
     {
+        // DEBUG: Unconditional trace to verify this function is called
+        if (isNilSource && width == 800 && height == 600)
+        {
+            Console.WriteLine($"[BitBlt32] CopyBitsGeneral ENTERED: destW={destWidth}, area=({destX},{destY},{width},{height}), htLen={halftonePixels.Length}, rule={rule}");
+        }
+
         // DEBUG: Trace first pixel of fill operations
         bool debugFirstPixel = isNilSource && halftonePixels.Length > 0 && width == 800 && height == 600;
 
