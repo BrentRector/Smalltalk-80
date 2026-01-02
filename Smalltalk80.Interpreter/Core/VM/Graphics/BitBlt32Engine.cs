@@ -291,6 +291,7 @@ public static class BitBlt32Engine
 
     /// <summary>
     /// General implementation handling all rules, halftone patterns, and nil source.
+    /// Handles overlapping regions by iterating in the correct direction.
     /// </summary>
     private static void CopyBitsGeneral(
         Span<uint> destPixels, int destWidth, int destX, int destY,
@@ -299,13 +300,21 @@ public static class BitBlt32Engine
         ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
         CombinationRule rule, bool isNilSource)
     {
-        for (int y = 0; y < height; y++)
+        // Use safe copy direction based on coordinates for overlapping regions
+        bool copyBottomToTop = destY > sourceY;
+        bool copyRightToLeft = (destY == sourceY) && (destX > sourceX);
+
+        for (int yi = 0; yi < height; yi++)
         {
+            // Iterate in correct Y direction to handle vertical overlap
+            int y = copyBottomToTop ? (height - 1 - yi) : yi;
             int destRow = destY + y;
             int sourceRow = sourceY + y;
 
-            for (int x = 0; x < width; x++)
+            for (int xi = 0; xi < width; xi++)
             {
+                // Iterate in correct X direction to handle horizontal overlap
+                int x = copyRightToLeft ? (width - 1 - xi) : xi;
                 int destCol = destX + x;
                 int sourceCol = sourceX + x;
 
