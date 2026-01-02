@@ -1,7 +1,7 @@
-# Session Handoff: 32-bit Word Migration & 32bpp Graphics
+# Session Handoff: 32bpp Graphics Pipeline Complete
 
-**Date**: 2026-01-01
-**Status**: Architecture planning complete, ready for implementation
+**Date**: 2026-01-02
+**Status**: 32bpp graphics pipeline functional with anti-aliased text support
 **Branch**: `claude/review-graphics-architecture-FssRQ`
 **Priority**: Enhancement
 **Master Plan**: `docs/32-BIT-IMPLEMENTATION-PLAN.md`
@@ -10,12 +10,14 @@
 
 ## Quick Summary
 
-Completed comprehensive architecture review for 32bpp graphics support. Created consolidated implementation plan with 4 milestones:
+This session completed the 32bpp graphics pipeline with full color preservation and anti-aliased text rendering. Key achievements:
 
-1. **MILESTONE 1**: 32-bit Word Migration (Phases 1.1-1.7)
-2. **MILESTONE 2**: 32bpp Graphics (Phases 2.1-2.5)
-3. **MILESTONE 3**: PNG I/O (Phases 3.1-3.4) - can run parallel with M2
-4. **MILESTONE 4**: Integration (Phase 4.1)
+1. **Scroll Overlap Fix**: BitBlt32Engine now handles overlapping memory copies correctly
+2. **XOR Caret Fix**: Inverted source for XOR operations to preserve 1bpp semantics
+3. **Font Baseline Alignment**: Fixed-pitch fonts now use uniform cell width
+4. **Paint Mode (Rule 16)**: Implemented multiply blend for anti-aliased text
+5. **Color Verification**: Blue text test confirmed colors flow through entire pipeline
+6. **Window Title**: Updated to "Smalltalk-2026"
 
 ---
 
@@ -27,125 +29,109 @@ Completed comprehensive architecture review for 32bpp graphics support. Created 
 - ✅ Init expressions: 286/286 succeed (100%)
 - ✅ System Browser: Fully functional with source code display
 - ✅ All 16 BitBlt combination rules working
-- ✅ 1bpp→32bpp conversion for screen display
-- ✅ **Color class**: Already implemented in Smalltalk-80.st (lines 31693-31939)
-- ✅ **TranslucentColor class**: Already implemented with alpha support
+- ✅ **Rule 16 (Paint)**: Now handled in C# with multiply blend (was falling back to Smalltalk)
+- ✅ **32bpp font rendering**: Anti-aliased with explicit Format32bppArgb
+- ✅ **Color preservation**: Verified with blue text rendering
+- ✅ **Scroll operations**: Overlap handling prevents duplication artifacts
+- ✅ **XOR operations**: Caret/cursor displays correctly (inverted source fix)
 
 ### Recent Commits (this session)
 ```
-990c890 Add 32bpp Form file format specification
-e849c29 Add 32-bit word migration planning document
+8291a14 Update window title to Smalltalk-2026
+51070cb TEST: Render font glyphs in blue to verify color preservation
+ad4cb48 Fix anti-aliasing: use multiply blend and explicit 32bpp format
+cd0ecb1 Implement grayscale alpha blending for paint mode (rule 16)
+f44ed0f Fix build: revert to GDI+ (TextRenderer requires net9.0-windows)
+8e31a2e Use TextRenderer (GDI) for consistent font baseline alignment
+5ac24c7 Fix fixed-pitch font alignment with uniform cell width
+6f44b8f Fix row iteration order for vertical overlap in CopyBitsOptimized
 ```
 
 ---
 
-## Key Discovery: 32-bit Word Migration Required
+## Key Technical Changes
 
-The original Smalltalk-80 used 16-bit words (matching Xerox Alto hardware). Our interpreter currently uses `ushort[]` for WordIndexed objects. Moving to 32-bit words is needed because:
+### 1. BitBlt32Engine Overlap Handling
 
-1. **OOP/SmallInteger alignment**: Interpreter already uses 32-bit for OOPs
-2. **32bpp natural fit**: One 32-bit word = one ARGB pixel
-3. **Modern efficiency**: 32-bit operations are native on modern CPUs
+**Problem**: Scrolling list panes showed duplicate entries due to overlapping source/dest regions.
 
-### Migration Strategy
-
-| Layer | Word Size | Purpose |
-|-------|-----------|---------|
-| **Internal (runtime)** | 32-bit | Efficient storage, natural for 32bpp |
-| **External (files)** | 16-bit | Backward compatibility with Form files |
-| **Conversion** | At I/O boundary | Transform when reading/writing files |
-
-See `docs/Migration-to-32-bit-Words.md` for complete 7-phase migration plan.
-
----
-
-## Implementation Status
-
-### Phase 1: Color Class - ✅ COMPLETE
-
-Already implemented in `Smalltalk-80.st`:
-
-| Class | Lines | Features |
-|-------|-------|----------|
-| **Color** | 31693-31860 | RGB (10-bit/component), named colors, asPixelValue, asFormColor |
-| **TranslucentColor** | 31861-31938 | Alpha support, r:g:b:alpha:, fromInteger: |
-| **Initialization** | 31939 | `Color initialize` init expression |
-
-### Phase 2: Form Depth - NOT STARTED
-
-Form class still has original definition:
-```smalltalk
-DisplayMedium subclass: #Form
-    instanceVariableNames: 'bits width height offset'  "Missing 'depth'"
+**Solution**: Detect scroll direction and iterate rows accordingly:
+```csharp
+bool copyBottomToTop = destY > sourceY;
+if (copyBottomToTop) {
+    for (int y = height - 1; y >= 0; y--) { ... }
+} else {
+    for (int y = 0; y < height; y++) { ... }
+}
 ```
 
-### Remaining Phases
+### 2. Paint Mode Multiply Blend
 
-| Phase | Scope | Status |
-|-------|-------|--------|
-| **Word Migration** | HeapManager 16→32 bit | Planned (see migration doc) |
-| **Form depth** | Add depth ivar to Form | Not started |
-| **BitBltEngine32** | 32bpp BitBlt engine | Not started |
-| **Depth dispatch** | Primitive 96 routing | Not started |
-| **PNG I/O** | Pure Smalltalk PNG reader/writer | Designed (primitive-ready) |
+**Problem**: Original paint mode (rule 16) used OR operations designed for 1bpp. In 32bpp, black=0x000000 so OR-ing produces wrong results.
 
----
+**Solution**: Implement multiply blend which is the correct operation for anti-aliased content on white background:
+```csharp
+// BlendPaint: result = src * dest / 255 (per channel)
+// - White source (255) = transparent (dest unchanged)
+// - Black source (0) = opaque (result = 0)
+// - Gray source = proportional darkening
+int outR = (srcR * dstR) / 255;
+int outG = (srcG * dstG) / 255;
+int outB = (srcB * dstB) / 255;
+```
 
-## Key Documentation
+### 3. XOR Source Inversion
 
-| Document | Purpose |
-|----------|---------|
-| **`docs/32-BIT-IMPLEMENTATION-PLAN.md`** | **MASTER PLAN** - Consolidated phased implementation |
-| **`docs/Migration-to-32-bit-Words.md`** | Detailed word migration technical reference |
-| **`docs/Graphics-Architecture.md`** | Graphics system architecture and 32bpp design |
-| **`docs/Form-File-Format.md`** | Original 1bpp Form file format |
-| **`CLAUDE.md`** | Project status and development guidelines |
+**Problem**: In 1bpp, black=1 (all bits set). XOR with 1 inverts destination. In 32bpp, black=0x000000. XOR with 0 does nothing.
 
----
+**Solution**: Invert source before XOR:
+```csharp
+destPixels[offset] ^= ~sourcePixels[offset];
+```
 
-## Form File Formats
+### 4. Fixed-Pitch Font Rendering
 
-### Design Decision: Pure Smalltalk PNG Implementation
+**Problem**: Individual character measurements with MeasureString returned varying widths, causing baseline misalignment.
 
-Use **PNG for all image depths**, implemented entirely in Smalltalk:
-
-| Depth | PNG Type | Compression |
-|-------|----------|-------------|
-| 1bpp | 1-bit indexed | ~90% for line art |
-| 32bpp | RGBA | ~70% for photos |
-
-**Implementation:**
-- `PNGReader` / `PNGWriter` - Main entry points
-- `DeflateStream` - RFC 1951 compression/decompression
-- `CRC32` - Checksum calculation
-
-**Benefits:**
-- No external library dependencies
-- Portable across any Smalltalk VM
-- External tools (GIMP, Photoshop) work with all images
-- One-time migration of legacy .form files
-
-**Design Principle:** Clean method boundaries enable adding C# primitives later for performance-critical operations (e.g., Deflate compression).
-
-**Legacy .form support:** Read-only for migration, then deprecate.
+**Solution**:
+- Use uniform cell width from representative character ('M')
+- Build xTable as `i * cellWidth` for all characters
+- Use `TextRenderingHint.AntiAlias` and `Format32bppArgb` for proper grayscale output
 
 ---
 
-## Open Questions (Need Decisions)
+## Files Modified
 
-### Word Size
-1. Should WordArray>>at:put: validate 32-bit range?
-2. Impact on LargePositiveInteger word storage?
+| File | Changes |
+|------|---------|
+| `BitBlt32Engine.cs` | Overlap handling for all fast paths, multiply blend for rule 16 |
+| `CombinationRule.cs` | Added `Paint = 16` enum value |
+| `GraphicsPrimitives.cs` | Accept rule 16 in primitive (was failing at >15) |
+| `WinFormsFontBridge.cs` | Uniform cell width, Format32bppArgb, AntiAlias hint |
+| `Program.cs` | Window title changed to "Smalltalk-2026" |
 
-### PNG Implementation
-3. Deflate priority: Start with stored blocks (no compression), or implement Huffman immediately?
-4. Adam7 interlacing: Support on read, or non-interlaced only?
-5. Form offset preservation: Store in tEXt chunk, or ignore on PNG export?
+---
 
-### 32bpp Graphics
-6. Premultiplied alpha for blending?
-7. Mixed-depth BitBlt combination rules?
-8. Cursor depth (32bpp or stay 1bpp)?
+## Remaining Work
+
+### Immediate
+1. **Change font color back to black** - Currently blue for testing
+2. **Selection highlight polish** - Yellow-on-blue looks odd with multiply blend
+
+### Future (32-bit Word Migration)
+The 32-bit word migration (HeapManager `ushort[]` → `uint[]`) is still planned but not started. See `docs/32-BIT-IMPLEMENTATION-PLAN.md` for the phased approach.
+
+---
+
+## Known Issues
+
+### Race Condition on Early Mouse Movement
+**Symptom**: Interpreter crashes if mouse moves into window immediately after startup.
+**Workaround**: Wait 2-3 seconds before moving mouse.
+**Status**: Under investigation.
+
+### Anti-aliasing Subtlety
+Anti-aliased edges are present but subtle at normal font sizes (10-14px). Visible when zoomed. This is expected behavior for small fonts.
 
 ---
 
@@ -170,21 +156,18 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 
 ---
 
-## Known Issue
-
-**Race Condition on Early Mouse Movement**: Interpreter may crash if mouse moves into window immediately after startup. Wait 2-3 seconds before moving mouse. Under investigation.
-
----
-
 ## For Next Session
 
-**Start here**: `docs/32-BIT-IMPLEMENTATION-PLAN.md`
+### If continuing graphics work:
+1. Change font color back to black in `WinFormsFontBridge.cs`
+2. Investigate selection highlight appearance
 
-**Recommended first step**: Phase 1.1 (HeapManager Foundation)
-- Change `ushort[]` to `uint[]` in HeapManager
-- Update interface signatures
-- Run regression tests
+### If starting 32-bit word migration:
+1. Start with `docs/32-BIT-IMPLEMENTATION-PLAN.md` Phase 1.1
+2. Change `ushort[]` to `uint[]` in HeapManager
+3. Run regression tests after each phase
 
-**After MILESTONE 1**: Phases 2.x and 3.x can proceed in parallel.
-
-**Goal**: Complete MILESTONE 1 (32-bit words) first, then implement 32bpp graphics and PNG I/O.
+### Key Documentation:
+- `CLAUDE.md` - Project status and development guidelines
+- `docs/32-BIT-IMPLEMENTATION-PLAN.md` - Master plan for word migration
+- `docs/Graphics-Architecture.md` - Graphics system design

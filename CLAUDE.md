@@ -1,6 +1,6 @@
 # Claude Development Guidelines
 
-**Last Updated**: 2026-01-01
+**Last Updated**: 2026-01-02
 
 ## Project Status
 
@@ -183,6 +183,37 @@ Mouse wheel scrolling support with platform-appropriate behavior:
 
 See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, `docs/SYSTEM-STARTUP-IMPLEMENTATION-PLAN.md`, and `docs/SOURCE-LOOKUP-ANALYSIS.md` for complete documentation.
 
+**Phase 6: 32bpp Graphics Pipeline** ✅ **COMPLETE**
+
+Full 32bpp color support with anti-aliased text rendering:
+
+- ✅ **BitBlt32Engine Overlap Handling**: Fixed scroll duplication by detecting `destY > sourceY` for copy direction
+- ✅ **XOR Caret Fix**: Inverted source in XOR operations (`~source ^ dest`) to preserve 1bpp semantics in 32bpp
+- ✅ **Fixed-Pitch Font Alignment**: Uniform cell width for all characters using `GetCellWidth()` method
+- ✅ **Paint Mode (Rule 16)**: Implemented multiply blend (`src * dest / 255`) for anti-aliased text
+- ✅ **32bpp Font Rendering**: Explicit `Format32bppArgb` bitmap with `TextRenderingHint.AntiAlias`
+- ✅ **Color Preservation**: Verified end-to-end with blue text test (colors flow through entire pipeline)
+- ✅ **Window Title**: Updated to "Smalltalk-2026"
+
+**Key Algorithm - Multiply Blend for Paint Mode**:
+```csharp
+// Rule 16: Anti-aliased text blending (white=transparent, black=opaque)
+// result = src * dest / 255 (per channel)
+// - Gray source (128,128,128) on white dest = gray (128,128,128)
+// - Gray source on blue dest (0,0,255) = dark blue (0,0,128)
+```
+
+**Key Files**:
+- `BitBlt32Engine.cs` - Overlap handling for scroll, multiply blend for paint mode
+- `WinFormsFontBridge.cs` - 32bpp font bitmap creation with anti-aliasing
+- `GraphicsPrimitives.cs` - Accept rule 16 in primitive (was failing to Smalltalk fallback)
+- `CombinationRule.cs` - Added `Paint = 16` enum value
+
+**Remaining Work**:
+- Font is currently rendered in blue for testing - change back to black for production
+- Anti-aliasing visible in zoomed view but subtle at normal size
+- Selection highlight appearance needs polish (multiply blend with inverted selection)
+
 ## Architecture Documentation
 
 **See `docs/Architecture/` for complete architecture documentation:**
@@ -195,7 +226,7 @@ See `docs/PROGRAM-REFACTORING-PLAN.md`, `docs/WINDOW-SIZING-ARCHITECTURE.md`, `d
 
 ## 32-bit Migration & Graphics Documentation Map
 
-**Upcoming work**: Migrating from 16-bit to 32-bit words and implementing 32bpp color graphics.
+**Status**: 32bpp graphics pipeline complete. 32-bit word migration planned but not yet started.
 
 ### Document Hierarchy
 
