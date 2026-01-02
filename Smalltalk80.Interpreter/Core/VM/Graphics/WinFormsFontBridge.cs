@@ -221,48 +221,33 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
         int charCount = maxAscii - minAscii + 1;
         int fontHeight = metrics.Ascent + metrics.Descent;
 
-        // For fixed-pitch fonts: measure one character to get the fixed cell width
-        int fixedWidth = GetCharWidth(descriptor, 'M');
-        if (fixedWidth <= 0) fixedWidth = GetCharWidth(descriptor, 'W');
-        if (fixedWidth <= 0) fixedWidth = descriptor.SizePixels;
-
-        // Build width table (all same for fixed-pitch)
+        // Measure all character widths
         int[] widths = new int[charCount];
-        Array.Fill(widths, fixedWidth);
+        int totalWidth = 0;
 
-        // Build xTable with fixed intervals
-        int[] xTable = new int[charCount + 2];
-        for (int i = 0; i <= charCount + 1; i++)
-        {
-            xTable[i] = i * fixedWidth;
-        }
-
-        int strikeLength = charCount * fixedWidth;
-
-        // Build the complete character string
-        // Replace control characters (0-31) and DEL (127) with open box (U+2395)
-        // so we can see if anything tries to draw them
-        const char OpenBox = '\u2395';  // ⎕ APL FUNCTIONAL SYMBOL QUAD
-        var charArray = new char[charCount];
         for (int i = 0; i < charCount; i++)
         {
-            int code = minAscii + i;
-            char c;
-            if (code < 32 || code == 127)
-            {
-                c = OpenBox;  // Visible placeholder for control characters
-            }
-            else if (code == '_')
-            {
-                c = '←';  // Smalltalk-80 assignment operator
-            }
-            else
-            {
-                c = (char)code;
-            }
-            charArray[i] = c;
+            char c = (char)(minAscii + i);
+            int w = GetCharWidth(descriptor, c);
+            if (w <= 0) w = 1;
+            widths[i] = w;
+            totalWidth += w;
         }
-        string allChars = new string(charArray);
+
+        if (totalWidth <= 0) totalWidth = charCount;
+
+        // Build xTable
+        int[] xTable = new int[charCount + 2];
+        int x = 0;
+        for (int i = 0; i < charCount; i++)
+        {
+            xTable[i] = x;
+            x += widths[i];
+        }
+        xTable[charCount] = x;
+        xTable[charCount + 1] = x;
+
+        int strikeLength = x;
 
         // Create the combined glyphs bitmap
         using var glyphsBitmap = new Bitmap(strikeLength, fontHeight);
@@ -274,11 +259,17 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             g.Clear(Color.White);
 
             var font = GetOrCreateFont(descriptor);
-
-            // Draw entire string at once - GDI+ handles baseline alignment consistently
-            // GenericDefault ensures proper em-square based positioning
             var format = StringFormat.GenericDefault;
-            g.DrawString(allChars, font, Brushes.Black, 0, 0, format);
+
+            // Draw each character individually at its xTable position
+            // This ensures each glyph lands exactly where Smalltalk expects it
+            for (int i = 0; i < charCount; i++)
+            {
+                char c = (char)(minAscii + i);
+                if (c == '_') c = '←';  // Smalltalk-80 assignment operator
+
+                g.DrawString(c.ToString(), font, Brushes.Black, xTable[i], 0, format);
+            }
         }
 
         // Convert entire bitmap to 32bpp pixels
