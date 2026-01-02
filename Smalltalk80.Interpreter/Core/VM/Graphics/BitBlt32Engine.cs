@@ -147,32 +147,62 @@ public static class BitBlt32Engine
 
     /// <summary>
     /// Fast path for simple copy operations (Rule 3) without halftone.
-    /// Uses Buffer.MemoryCopy which handles overlapping regions correctly (memmove semantics).
+    /// Uses Buffer.MemoryCopy for each row (handles horizontal overlap).
+    /// Iterates rows in correct order for vertical overlap (same-bitmap scrolling).
     /// </summary>
     private static unsafe void CopyBitsOptimized(
         Span<uint> destPixels, int destWidth, int destX, int destY,
         ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
         int width, int height)
     {
+        // Detect if this might be a same-bitmap scroll operation
+        bool mightOverlap = destWidth == sourceWidth && destPixels.Length == sourcePixels.Length;
+
+        // For vertical overlap: if dest is below source, copy bottom-to-top
+        // This prevents overwriting source rows before they're copied
+        bool copyBottomToTop = mightOverlap && destY > sourceY;
+
         fixed (uint* destPtr = destPixels)
         fixed (uint* sourcePtr = sourcePixels)
         {
-            for (int y = 0; y < height; y++)
+            if (copyBottomToTop)
             {
-                int destOffset = (destY + y) * destWidth + destX;
-                int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
-
-                // Validate bounds
-                if (destOffset >= 0 && sourceOffset >= 0 &&
-                    destOffset + width <= destPixels.Length &&
-                    sourceOffset + width <= sourcePixels.Length)
+                // Copy bottom-to-top for downward scrolling (dest below source)
+                for (int y = height - 1; y >= 0; y--)
                 {
-                    // Buffer.MemoryCopy handles overlapping regions correctly (memmove semantics)
-                    Buffer.MemoryCopy(
-                        sourcePtr + sourceOffset,
-                        destPtr + destOffset,
-                        (long)width * sizeof(uint),
-                        (long)width * sizeof(uint));
+                    int destOffset = (destY + y) * destWidth + destX;
+                    int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
+
+                    if (destOffset >= 0 && sourceOffset >= 0 &&
+                        destOffset + width <= destPixels.Length &&
+                        sourceOffset + width <= sourcePixels.Length)
+                    {
+                        Buffer.MemoryCopy(
+                            sourcePtr + sourceOffset,
+                            destPtr + destOffset,
+                            (long)width * sizeof(uint),
+                            (long)width * sizeof(uint));
+                    }
+                }
+            }
+            else
+            {
+                // Copy top-to-bottom for upward scrolling or non-overlapping
+                for (int y = 0; y < height; y++)
+                {
+                    int destOffset = (destY + y) * destWidth + destX;
+                    int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
+
+                    if (destOffset >= 0 && sourceOffset >= 0 &&
+                        destOffset + width <= destPixels.Length &&
+                        sourceOffset + width <= sourcePixels.Length)
+                    {
+                        Buffer.MemoryCopy(
+                            sourcePtr + sourceOffset,
+                            destPtr + destOffset,
+                            (long)width * sizeof(uint),
+                            (long)width * sizeof(uint));
+                    }
                 }
             }
         }
