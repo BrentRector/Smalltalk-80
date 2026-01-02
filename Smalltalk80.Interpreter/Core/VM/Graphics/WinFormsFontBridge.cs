@@ -346,13 +346,13 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
     }
 
     /// <summary>
-    /// Converts a bitmap to 32bpp pixels (one uint per pixel).
+    /// Converts a bitmap to RGB pixels (one uint per pixel, no alpha).
     /// Preserves antialiased grayscale values for smooth font rendering.
-    /// 32bpp-everywhere: Each pixel becomes 0xAARRGGBB with full alpha.
+    /// RGB-only: Each pixel becomes 0x00RRGGBB (alpha is implicit).
     /// </summary>
     private static uint[] ConvertBitmapTo32bppPixels(Bitmap bitmap, int width, int height)
     {
-        // 32bpp: one uint per pixel
+        // RGB-only: one uint per pixel (24 bits used, alpha implicit)
         uint[] result = new uint[width * height];
 
         // Use LockBits for fast pixel access
@@ -380,10 +380,10 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
                         byte g = pixel[1];
                         byte r = pixel[2];
 
-                        // Preserve grayscale values with full alpha (0xFF)
-                        // This keeps antialiased edges as gray pixels
-                        uint argb = 0xFF000000u | ((uint)r << 16) | ((uint)g << 8) | b;
-                        result[y * width + x] = argb;
+                        // RGB-only format (alpha is implicit, treated as opaque during rendering)
+                        // Preserves antialiased grayscale values for smooth font edges
+                        uint rgb = ((uint)r << 16) | ((uint)g << 8) | b;
+                        result[y * width + x] = rgb;
                     }
                 }
             }

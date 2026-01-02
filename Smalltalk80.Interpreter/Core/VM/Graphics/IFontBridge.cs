@@ -65,7 +65,7 @@ public readonly struct FontMetrics
 
 /// <summary>
 /// Rendered glyph data for a single character.
-/// 32bpp-everywhere: Each pixel is stored as one uint (0xAARRGGBB).
+/// RGB-only: Each pixel is stored as one uint (0x00RRGGBB, alpha implicit).
 /// </summary>
 public readonly struct GlyphData
 {
@@ -76,8 +76,8 @@ public readonly struct GlyphData
     public int Width { get; init; }
 
     /// <summary>
-    /// Bitmap data for the glyph (32 bits per pixel).
-    /// Each uint is one pixel in 0xAARRGGBB format.
+    /// Bitmap data for the glyph (24 bits per pixel, stored in uint).
+    /// Each uint is one pixel in 0x00RRGGBB format (alpha implicit).
     /// Array size is Width * Height.
     /// </summary>
     public uint[] Bitmap { get; init; }
@@ -114,9 +114,9 @@ public class StrikeFontData
     public int[] XTable { get; init; } = Array.Empty<int>();
 
     /// <summary>
-    /// Combined glyph bitmap (32bpp). All glyphs placed side by side.
+    /// Combined glyph bitmap (RGB-only). All glyphs placed side by side.
     /// Height is font height (ascent + descent), width is strikeLength.
-    /// Each uint is one pixel in 0xAARRGGBB format.
+    /// Each uint is one pixel in 0x00RRGGBB format (alpha implicit).
     /// Array size is StrikeLength * StrikeHeight.
     /// Antialiased grayscale values are preserved for smooth rendering.
     /// </summary>
@@ -238,11 +238,11 @@ public interface IFontBridge
     int GetStringWidth(FontDescriptor descriptor, string text);
 
     /// <summary>
-    /// Renders a single glyph to a 32bpp bitmap with antialiased grayscale.
+    /// Renders a single glyph to an RGB bitmap with antialiased grayscale.
     /// </summary>
     /// <param name="descriptor">Font descriptor.</param>
     /// <param name="character">Character to render.</param>
-    /// <returns>Glyph data with 32bpp bitmap (one uint per pixel).</returns>
+    /// <returns>Glyph data with RGB bitmap (one uint per pixel, alpha implicit).</returns>
     GlyphData RenderGlyph(FontDescriptor descriptor, char character);
 
     /// <summary>

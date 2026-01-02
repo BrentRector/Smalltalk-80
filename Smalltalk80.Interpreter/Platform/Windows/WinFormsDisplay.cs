@@ -20,10 +20,10 @@ namespace Smalltalk80.Interpreter.Platform.Windows;
 /// Thread-safe: Display updates can occur from Smalltalk thread, rendering occurs on UI thread.
 ///
 /// Architecture (32bpp-everywhere):
-/// - Internal display buffer is 32bpp (matches Smalltalk Form format directly)
-/// - Each pixel is one uint (0xAARRGGBB format)
-/// - Direct transfer to Windows without bit conversion
-/// - Monochrome mode: Black=0xFF000000, White=0xFFFFFFFF
+/// - Internal display buffer is 32bpp ARGB for Windows rendering
+/// - Smalltalk Forms store RGB-only (24 bits, alpha implicit)
+/// - Alpha (0xFF) is added when copying from Smalltalk heap to display buffer
+/// - Monochrome: Black=0x000000 (RGB), White=0xFFFFFF (RGB)
 ///
 /// Input Architecture:
 /// - UI thread (WinForms): Enqueues input words to ring buffer, updates current state
@@ -515,11 +515,13 @@ public class WinFormsDisplay : Form, IDisplay
 
         if (format == ObjectFormat.WordIndexed)
         {
-            // 32bpp: each word is one pixel, direct copy
+            // 32bpp: each word is one pixel (RGB only, alpha implicit)
+            // Add opaque alpha (0xFF000000) since Smalltalk stores RGB-only values
             int copySize = Math.Min(size, _displayBuffer.Length);
             for (int i = 0; i < copySize; i++)
             {
-                _displayBuffer[i] = _heap.GetIndexedWord(bitsOOP, i);
+                uint rgb = _heap.GetIndexedWord(bitsOOP, i);
+                _displayBuffer[i] = 0xFF000000 | rgb;  // Make opaque
             }
         }
     }

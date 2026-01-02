@@ -8,22 +8,22 @@ namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 /// halftone patterns, and all 16 combination rules.
 ///
 /// Key differences from 1bpp BitBltEngine:
-/// - Each pixel is one uint (0xAARRGGBB format)
+/// - Each pixel is one uint (RGB format, alpha implicit)
 /// - Direct array indexing (no bit packing/unpacking)
 /// - Stride = width (pixels per row, not bytes)
-/// - Combination rules operate on full 32-bit values
+/// - Combination rules operate on 24-bit RGB values
 ///
-/// Monochrome mode uses:
-/// - Black: 0xFF000000 (fully opaque black)
-/// - White: 0xFFFFFFFF (fully opaque white)
+/// RGB-only mode (alpha is implicit, treated as opaque):
+/// - Black: 0x000000 (RGB)
+/// - White: 0xFFFFFF (RGB)
 /// </summary>
 public static class BitBlt32Engine
 {
-    /// <summary>Black pixel in 32bpp ARGB format.</summary>
-    public const uint BlackPixel = 0xFF000000;
+    /// <summary>Black pixel in RGB format (alpha implicit).</summary>
+    public const uint BlackPixel = 0x000000;
 
-    /// <summary>White pixel in 32bpp ARGB format.</summary>
-    public const uint WhitePixel = 0xFFFFFFFF;
+    /// <summary>White pixel in RGB format (alpha implicit).</summary>
+    public const uint WhitePixel = 0xFFFFFF;
 
     /// <summary>
     /// Perform a 32bpp BitBlt operation copying from source to destination.

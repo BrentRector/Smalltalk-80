@@ -129,7 +129,7 @@ public class FontObjectBuilder
 
     /// <summary>
     /// Creates a Form object containing the glyph bitmap data.
-    /// 32bpp-everywhere: Each pixel is one word (0xAARRGGBB format).
+    /// RGB-only: Each pixel is one word (0x00RRGGBB format, alpha implicit).
     /// Antialiased grayscale values are preserved for smooth font rendering.
     /// </summary>
     private SmalltalkOOP CreateGlyphsForm(StrikeFontData fontData)

@@ -20443,10 +20443,12 @@ Form class
 !Form class methodsFor: 'class initialization'!
 initialize
 	"Initialize Form class constants and halftone masks.
-	 32bpp architecture: BlackPixel = 0xFF000000, WhitePixel = 0xFFFFFFFF"
+	 32bpp architecture uses RGB only (24 bits, no alpha channel).
+	 Alpha is treated as implicitly opaque (0xFF) during rendering.
+	 This keeps pixel values within SmallInteger range."
 
-	BlackPixel _ 16rFF000000.
-	WhitePixel _ 16rFFFFFFFF.
+	BlackPixel _ 0.          "RGB 0x000000"
+	WhitePixel _ 16rFFFFFF.  "RGB 0xFFFFFF = 16777215"
 	self initializeMasks.
 	OneBitForm _ Form new extent: 1 @ 1
 
@@ -31952,9 +31954,10 @@ hash
 
 !Color methodsFor: 'converting'!
 asPixelValue
-	"Answer the 32-bit ARGB pixel value (alpha = 255 for opaque)"
-	^16rFF000000 +
-	 ((self red * 255) rounded bitShift: 16) +
+	"Answer the 24-bit RGB pixel value.
+	 Alpha is implicit (treated as opaque during rendering).
+	 This keeps values within SmallInteger range."
+	^((self red * 255) rounded bitShift: 16) +
 	 ((self green * 255) rounded bitShift: 8) +
 	 (self blue * 255) rounded!
 
@@ -32096,7 +32099,14 @@ alpha
 
 !TranslucentColor methodsFor: 'converting'!
 asPixelValue
-	"Answer the 32-bit ARGB pixel value including alpha"
+	"Answer the 24-bit RGB pixel value.
+	 Note: Alpha is currently ignored to keep values in SmallInteger range.
+	 Use asPixelValueWithAlpha when alpha channel support is added."
+	^super asPixelValue!
+
+asPixelValueWithAlpha
+	"Answer the 32-bit ARGB pixel value including alpha.
+	 WARNING: This may exceed SmallInteger range. Reserved for future use."
 	^((alpha * 255) rounded bitShift: 24) +
 	 ((self red * 255) rounded bitShift: 16) +
 	 ((self green * 255) rounded bitShift: 8) +
