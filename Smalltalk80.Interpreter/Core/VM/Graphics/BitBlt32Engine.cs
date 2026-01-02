@@ -158,15 +158,10 @@ public static class BitBlt32Engine
         fixed (uint* destPtr = destPixels)
         fixed (uint* sourcePtr = sourcePixels)
         {
-            // Check if source and dest memory regions overlap
-            // This happens during same-Form scrolling operations
-            uint* destEnd = destPtr + destPixels.Length;
-            uint* sourceEnd = sourcePtr + sourcePixels.Length;
-            bool regionsOverlap = !(destEnd <= sourcePtr || sourceEnd <= destPtr);
-
-            // For vertical overlap: if dest is below source, copy bottom-to-top
-            // This prevents overwriting source rows before they're copied
-            bool copyBottomToTop = regionsOverlap && destY > sourceY;
+            // Always use safe copy direction based on Y coordinates
+            // This handles overlapping regions (same-Form scrolling) correctly
+            // with negligible performance impact for non-overlapping cases
+            bool copyBottomToTop = destY > sourceY;
 
             if (copyBottomToTop)
             {
