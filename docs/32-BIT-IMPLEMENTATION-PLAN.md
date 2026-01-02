@@ -1,7 +1,7 @@
 # 32-bit Word Migration & 32bpp Graphics Implementation Plan
 
 **Created**: 2026-01-01
-**Status**: MILESTONE 1 COMPLETE
+**Status**: MILESTONE 1 COMPLETE, MILESTONE 2 REDESIGNED
 **Branch**: `claude/review-graphics-architecture-FssRQ`
 
 ---
@@ -9,9 +9,22 @@
 ## Executive Summary
 
 This document provides a consolidated, phased implementation plan for:
-1. **32-bit Word Migration** - Change internal word storage from 16-bit to 32-bit
-2. **32bpp Graphics** - Add full-color Form support with alpha blending
+1. **32-bit Word Migration** - Change internal word storage from 16-bit to 32-bit ✅ COMPLETE
+2. **32bpp Graphics** - All bitmaps are 32bpp internally (REDESIGNED - see below)
 3. **PNG I/O** - Pure Smalltalk image file support
+
+### MILESTONE 2 REDESIGN (2026-01-02)
+
+**Milestone 2 has been redesigned.** See `docs/32BPP-EVERYWHERE-ARCHITECTURE.md` for the new plan.
+
+**Key change**: Instead of adding 32bpp as an optional depth alongside 1bpp, **all bitmaps (including Display) are now 32bpp internally**. Smalltalk operates in "monochrome mode" using black (0xFF000000) and white (0xFFFFFFFF) pixels with 32bpp halftone patterns.
+
+**Benefits**:
+- Single BitBlt engine (not two parallel engines)
+- Direct 32bpp transfer to display (no conversion)
+- GPU-ready architecture
+- Simpler code paths
+
 
 ### Dependencies
 
