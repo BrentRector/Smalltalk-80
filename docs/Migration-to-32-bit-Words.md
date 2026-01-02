@@ -196,9 +196,7 @@ var floatOop = ctx.HeapManager.AllocateInstanceOf(ctx.Metadata!.FloatClassOOP, 2
 
 **Files to modify:**
 - `Smalltalk80.Interpreter/Core/VM/Graphics/WinFormsFontBridge.cs`
-- `Smalltalk80.Interpreter/Core/VM/Graphics/GdiBitmapFontBridge.cs`
-- `Smalltalk80.Interpreter/Core/VM/Graphics/FontBridgeFactory.cs`
-- `Smalltalk80.Interpreter/Core/VM/Graphics/NullFontBridge.cs`
+- `Smalltalk80.Interpreter/Core/VM/Graphics/FontBridgeFactory.cs` (contains NullFontBridge)
 
 **Changes (apply to all):**
 
