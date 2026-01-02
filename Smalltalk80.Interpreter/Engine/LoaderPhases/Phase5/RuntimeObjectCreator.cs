@@ -235,8 +235,12 @@ public class RuntimeObjectCreator(
         var displayBitmapOOP = context.Allocator.AllocateObject("DisplayBitmap", ObjectFormat.WordIndexed, totalWords);
         var displayBitmapClassOOP = GlobalRegistry.LookupClassOOP("DisplayBitmap");
         context.Allocator.SetClassOOP(displayBitmapOOP, displayBitmapClassOOP);
-        // Bitmap starts with zeros which is white/paper in inverted RGB scheme
-        // (inverted RGB: 0=white/paper, 0xFFFFFF=black/ink - matches 1bpp bit semantics)
+
+        // Initialize Display bitmap to white (standard RGB: 0xFFFFFF = white)
+        for (int i = 0; i < totalWords; i++)
+        {
+            context.HeapManager.SetIndexedWord(displayBitmapOOP, i, 0x00FFFFFF);
+        }
 
         GlobalRegistry.Register("DisplayBitmap", displayBitmapOOP);
 

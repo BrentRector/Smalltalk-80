@@ -13,19 +13,21 @@ namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 /// - Stride = width (pixels per row, not bytes)
 /// - Combination rules operate on 24-bit RGB values
 ///
-/// INVERTED RGB mode (matches 1bpp bit semantics):
-/// - Black/Ink: 0xFFFFFF (all bits set, like 1bpp black=1)
-/// - White/Paper: 0x000000 (no bits set, like 1bpp white=0)
-/// This makes all 16 combination rules work correctly with bitwise operations.
-/// Display code XORs with 0xFFFFFF to convert to standard RGB for WinForms.
+/// Standard RGB mode:
+/// - Black: 0x000000 (RGB)
+/// - White: 0xFFFFFF (RGB)
+///
+/// Note: BitBlt combination rules have inverted visual semantics compared to 1bpp.
+/// Callers should use appropriate rules for 32bpp (e.g., AND instead of OR for
+/// drawing black content on white backgrounds).
 /// </summary>
 public static class BitBlt32Engine
 {
-    /// <summary>Black/ink pixel (all bits set, matches 1bpp ink=1).</summary>
-    public const uint BlackPixel = 0xFFFFFF;
+    /// <summary>Black pixel in standard RGB.</summary>
+    public const uint BlackPixel = 0x000000;
 
-    /// <summary>White/paper pixel (no bits set, matches 1bpp paper=0).</summary>
-    public const uint WhitePixel = 0x000000;
+    /// <summary>White pixel in standard RGB.</summary>
+    public const uint WhitePixel = 0xFFFFFF;
 
     /// <summary>
     /// Perform a 32bpp BitBlt operation copying from source to destination.

@@ -517,14 +517,11 @@ public class WinFormsDisplay : Form, IDisplay
         {
             // 32bpp: each word is one pixel (RGB only)
             // Using Format32bppRgb so high byte is ignored as padding
-            // INVERT pixels: In Smalltalk 1bpp, 0=white/paper, 1=black/ink
-            // We use inverted RGB internally: 0x000000=white, 0xFFFFFF=black
-            // This makes bitwise combination rules work correctly
-            // XOR with 0xFFFFFF converts to standard RGB for WinForms display
+            // Standard RGB: 0x000000=black, 0xFFFFFF=white
             int copySize = Math.Min(size, _displayBuffer.Length);
             for (int i = 0; i < copySize; i++)
             {
-                _displayBuffer[i] = _heap.GetIndexedWord(bitsOOP, i) ^ 0x00FFFFFF;
+                _displayBuffer[i] = _heap.GetIndexedWord(bitsOOP, i);
             }
         }
     }

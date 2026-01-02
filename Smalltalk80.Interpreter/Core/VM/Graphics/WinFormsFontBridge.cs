@@ -172,14 +172,13 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
         using (var g = System.Drawing.Graphics.FromImage(bitmap))
         {
-            // Use 1-bit rendering (no antialiasing) to match Smalltalk-80 StrikeFont format
-            // This ensures all pixels are pure black or white for correct BitBlt combination rules
-            ConfigureGraphicsForDeterminism(g);
+            // Use anti-aliased rendering for smooth fonts
+            ConfigureGraphicsForAntialiasing(g);
 
-            // Clear to white (background = paper)
+            // Clear to white (background)
             g.Clear(Color.White);
 
-            // Draw character in black (ink) at baseline
+            // Draw character in black at baseline
             var format = new StringFormat(StringFormat.GenericTypographic)
             {
                 FormatFlags = StringFormatFlags.NoClip
@@ -188,7 +187,7 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
             g.DrawString(character.ToString(), font, Brushes.Black, 0, 0, format);
         }
 
-        // Convert to 32bpp pixels (pure black/white only)
+        // Convert to 32bpp pixels (preserving anti-aliased grayscale)
         var bitmapData = ConvertBitmapTo32bppPixels(bitmap, width, height);
 
         return new GlyphData
@@ -258,8 +257,8 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
         using (var g = System.Drawing.Graphics.FromImage(glyphsBitmap))
         {
-            // Use 1-bit rendering (no antialiasing) to match Smalltalk-80 StrikeFont format
-            ConfigureGraphicsForDeterminism(g);
+            // Use anti-aliased rendering for smooth fonts
+            ConfigureGraphicsForAntialiasing(g);
             g.Clear(Color.White);
 
             var font = GetOrCreateFont(descriptor);
@@ -348,13 +347,13 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
     }
 
     /// <summary>
-    /// Converts a bitmap to inverted RGB pixels for Smalltalk heap storage.
-    /// Uses inverted RGB scheme: 0x000000=paper/white, 0xFFFFFF=ink/black.
-    /// This makes all 16 BitBlt combination rules work correctly (matches 1bpp bit semantics).
+    /// Converts a bitmap to RGB pixels (one uint per pixel, no alpha).
+    /// Preserves anti-aliased grayscale values for smooth font rendering.
+    /// Standard RGB: 0x000000=black, 0xFFFFFF=white.
     /// </summary>
     private static uint[] ConvertBitmapTo32bppPixels(Bitmap bitmap, int width, int height)
     {
-        // Inverted RGB: one uint per pixel, XOR with 0xFFFFFF to invert
+        // Standard RGB: one uint per pixel (24 bits used)
         uint[] result = new uint[width * height];
 
         // Use LockBits for fast pixel access
@@ -382,11 +381,10 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
                         byte g = pixel[1];
                         byte r = pixel[2];
 
-                        // Invert for Smalltalk's inverted RGB scheme:
-                        // GDI white (0xFFFFFF) → Inverted RGB paper (0x000000)
-                        // GDI black (0x000000) → Inverted RGB ink (0xFFFFFF)
+                        // Standard RGB format (no inversion)
+                        // Preserves anti-aliased grayscale for smooth font edges
                         uint rgb = ((uint)r << 16) | ((uint)g << 8) | b;
-                        result[y * width + x] = rgb ^ 0x00FFFFFF;
+                        result[y * width + x] = rgb;
                     }
                 }
             }
