@@ -246,11 +246,9 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
         using (var g = System.Drawing.Graphics.FromImage(glyphsBitmap))
         {
-            // Use full anti-aliasing settings for smooth edges
-            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            g.CompositingQuality = CompositingQuality.HighQuality;
+            // Use ClearType for standard Windows text rendering with good contrast
+            // ClearType produces solid black cores with anti-aliased edges
+            g.TextRenderingHint = TextRenderingHint.ClearTypeGridFit;
             g.Clear(Color.White);
 
             // GenericTypographic format with no extra spacing
