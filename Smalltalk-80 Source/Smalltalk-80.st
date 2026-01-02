@@ -16431,7 +16431,7 @@ black
 
 	self fill: self boundingBox
 		mask: Form black!
-black: aRectangle 
+black: aRectangle
 	"Set all bits in the receiver's area defined by aRectangle to black (ones)."
 	self fill: aRectangle rule: Form over mask: Form black!
 darkGray
@@ -16441,11 +16441,11 @@ darkGray
 darkGray: aRectangle
 	"Set all bits in the receiver's area defined by aRectangle to the darkGray mask."
 	self fill: aRectangle rule: Form over mask: Form darkGray!
-fill: aRectangle 
+fill: aRectangle
 	"Fill aRectangle with the default background, Form gray."
 	self fill: aRectangle rule: Form over mask: Form gray!
-fill: aRectangle mask: aForm 
-	"Replace a rectangular area of the receiver with the pattern described by aForm 
+fill: aRectangle mask: aForm
+	"Replace a rectangular area of the receiver with the pattern described by aForm
 	according to the rule over."
 	self fill: aRectangle rule: Form over mask: aForm!
 fill: aRectangle rule: anInteger mask: aForm 
@@ -19978,7 +19978,7 @@ convexShapeFill: aMask
 			clippingBox: tempForm boundingBox rule: Form under mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm at: 0@0
-		clippingBox: destForm boundingBox rule: Form and mask: nil.
+		clippingBox: destForm boundingBox rule: Form over mask: nil.
 
 	self displayOn: tempForm at: (0@0) - self offset.
 	skew _ 1.
@@ -19987,7 +19987,7 @@ convexShapeFill: aMask
 			clippingBox: tempForm boundingBox rule: Form under mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm at: 0@0
-		clippingBox: destForm boundingBox rule: Form and mask: nil.
+		clippingBox: destForm boundingBox rule: Form over mask: nil.
 
 	self displayOn: tempForm at: (0@0) - self offset.
 	skew _ 1.
@@ -19996,7 +19996,7 @@ convexShapeFill: aMask
 			clippingBox: tempForm boundingBox rule: Form under mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm at: 0@0
-		clippingBox: destForm boundingBox rule: Form and mask: nil.
+		clippingBox: destForm boundingBox rule: Form over mask: nil.
 
 	destForm displayOn: self at: 0@0
 			clippingBox: self boundingBox rule: Form over mask: aMask!
@@ -37090,7 +37090,7 @@ composeWord: aTextLineInterval in: sourceString beginningAt: xInteger
 		character _ sourceString at: i.
 		resultX _ resultX + (self widthOf: character)].
 	^resultX!
-displayLine: aString at: aPoint 
+displayLine: aString at: aPoint
 	"Display the characters in aString, starting at position aPoint."
 
 	self characters: (1 to: aString size)

@@ -218,9 +218,12 @@ public static class BitBlt32Engine
                     int htX = destCol % halftoneWidth;
                     int htY = destRow % halftoneHeight;
                     uint halftonePixel = halftonePixels[htY * halftoneWidth + htX];
-                    // Halftone acts as a mask: if halftone pixel is black, source passes through
-                    // If halftone pixel is white, source becomes white (masked out)
-                    sourcePixel = sourcePixel & halftonePixel;
+                    // 32bpp halftone mask semantics:
+                    // Where halftone is black (0x000000), source passes through
+                    // Where halftone is white (0xFFFFFF), result becomes white
+                    // Formula: result = (source & ~halftone) | halftone
+                    // This matches 1bpp behavior where black=1 means "ink", white=0 means "masked"
+                    sourcePixel = (sourcePixel & ~halftonePixel) | halftonePixel;
                 }
 
                 // Apply combination rule
