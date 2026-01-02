@@ -3,7 +3,6 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Drawing.Text;
 using System.Runtime.Versioning;
-using System.Windows.Forms;
 
 namespace Smalltalk80.Interpreter.Core.VM.Graphics;
 
@@ -247,11 +246,17 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
         using (var g = System.Drawing.Graphics.FromImage(glyphsBitmap))
         {
+            // Use consistent rendering settings for all characters
+            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
             g.Clear(Color.White);
 
-            // Use TextRenderer (GDI) for consistent baseline alignment
-            // GDI has more reliable fixed-pitch font rendering than GDI+
-            const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
+            // GenericTypographic format with no extra spacing
+            using var format = new StringFormat(StringFormat.GenericTypographic)
+            {
+                FormatFlags = StringFormatFlags.NoClip | StringFormatFlags.FitBlackBox,
+                Alignment = StringAlignment.Near,
+                LineAlignment = StringAlignment.Near
+            };
 
             // Draw each character at its exact cell position
             for (int i = 0; i < charCount; i++)
@@ -261,8 +266,7 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
                 if (c < 32) continue;
                 // Replace underscore with left arrow (Smalltalk convention)
                 if (c == '_') c = '←';
-                var rect = new Rectangle(i * cellWidth, 0, cellWidth, fontHeight);
-                TextRenderer.DrawText(g, c.ToString(), font, rect, Color.Black, Color.White, flags);
+                g.DrawString(c.ToString(), font, Brushes.Black, i * cellWidth, 0, format);
             }
         }
 
@@ -306,14 +310,22 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
     /// <summary>
     /// Gets the fixed-pitch cell width for a monospace font.
-    /// Uses TextRenderer (GDI) for consistent measurement with DrawText.
+    /// Uses GDI+ MeasureString with GenericTypographic for accurate width.
     /// </summary>
-    private static int GetCellWidth(Font font)
+    private int GetCellWidth(Font font)
     {
-        // Use TextRenderer.MeasureText with NoPadding to match DrawText behavior
-        const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix;
-        var size = TextRenderer.MeasureText("M", font, Size.Empty, flags);
-        return size.Width;
+        using var bitmap = new Bitmap(1, 1);
+        bitmap.SetResolution(FixedDpi, FixedDpi);
+        using var g = System.Drawing.Graphics.FromImage(bitmap);
+
+        using var format = new StringFormat(StringFormat.GenericTypographic)
+        {
+            FormatFlags = StringFormatFlags.MeasureTrailingSpaces
+        };
+
+        // Measure 'M' - a representative full-width character
+        var size = g.MeasureString("M", font, PointF.Empty, format);
+        return (int)Math.Ceiling(size.Width);
     }
 
     /// <summary>
