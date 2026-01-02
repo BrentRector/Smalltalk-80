@@ -108,13 +108,32 @@ public static class BitBlt32Engine
                 return;
         }
 
-        // Fast path: Simple copy operation (Rule 3) without halftone
-        if (rule == CombinationRule.Copy && !hasHalftone && !isNilSource)
+        // Fast paths for common operations without halftone
+        if (!hasHalftone && !isNilSource)
         {
-            CopyBitsOptimized(destPixels, destWidth, clipLeft, clipTop,
-                             sourcePixels, sourceWidth, adjustedSourceX, adjustedSourceY,
-                             clippedWidth, clippedHeight);
-            return;
+            switch (rule)
+            {
+                case CombinationRule.Copy:
+                    CopyBitsOptimized(destPixels, destWidth, clipLeft, clipTop,
+                                     sourcePixels, sourceWidth, adjustedSourceX, adjustedSourceY,
+                                     clippedWidth, clippedHeight);
+                    return;
+                case CombinationRule.Or:
+                    OrBitsOptimized(destPixels, destWidth, clipLeft, clipTop,
+                                   sourcePixels, sourceWidth, adjustedSourceX, adjustedSourceY,
+                                   clippedWidth, clippedHeight);
+                    return;
+                case CombinationRule.And:
+                    AndBitsOptimized(destPixels, destWidth, clipLeft, clipTop,
+                                    sourcePixels, sourceWidth, adjustedSourceX, adjustedSourceY,
+                                    clippedWidth, clippedHeight);
+                    return;
+                case CombinationRule.Xor:
+                    XorBitsOptimized(destPixels, destWidth, clipLeft, clipTop,
+                                    sourcePixels, sourceWidth, adjustedSourceX, adjustedSourceY,
+                                    clippedWidth, clippedHeight);
+                    return;
+            }
         }
 
         // General path: Handle all rules, halftone, and nil source
@@ -146,6 +165,84 @@ public static class BitBlt32Engine
             {
                 sourcePixels.Slice(sourceOffset, width)
                            .CopyTo(destPixels.Slice(destOffset, width));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fast path for OR operations (Rule 7) without halftone.
+    /// Used for paint mode text drawing.
+    /// </summary>
+    private static void OrBitsOptimized(
+        Span<uint> destPixels, int destWidth, int destX, int destY,
+        ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
+        int width, int height)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            int destOffset = (destY + y) * destWidth + destX;
+            int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
+
+            if (destOffset >= 0 && sourceOffset >= 0 &&
+                destOffset + width <= destPixels.Length &&
+                sourceOffset + width <= sourcePixels.Length)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    destPixels[destOffset + x] |= sourcePixels[sourceOffset + x];
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fast path for AND operations (Rule 1) without halftone.
+    /// Used for masking operations.
+    /// </summary>
+    private static void AndBitsOptimized(
+        Span<uint> destPixels, int destWidth, int destX, int destY,
+        ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
+        int width, int height)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            int destOffset = (destY + y) * destWidth + destX;
+            int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
+
+            if (destOffset >= 0 && sourceOffset >= 0 &&
+                destOffset + width <= destPixels.Length &&
+                sourceOffset + width <= sourcePixels.Length)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    destPixels[destOffset + x] &= sourcePixels[sourceOffset + x];
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fast path for XOR operations (Rule 6) without halftone.
+    /// Used for cursor drawing and selection highlight.
+    /// </summary>
+    private static void XorBitsOptimized(
+        Span<uint> destPixels, int destWidth, int destX, int destY,
+        ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
+        int width, int height)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            int destOffset = (destY + y) * destWidth + destX;
+            int sourceOffset = (sourceY + y) * sourceWidth + sourceX;
+
+            if (destOffset >= 0 && sourceOffset >= 0 &&
+                destOffset + width <= destPixels.Length &&
+                sourceOffset + width <= sourcePixels.Length)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    destPixels[destOffset + x] ^= sourcePixels[sourceOffset + x];
+                }
             }
         }
     }
