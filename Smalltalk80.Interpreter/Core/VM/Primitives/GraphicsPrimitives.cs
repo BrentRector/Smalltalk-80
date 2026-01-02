@@ -103,10 +103,13 @@ public static class GraphicsOperations
                 // DEBUG: Log halftone extraction for fills
                 if (sourceForm == nil)
                 {
-                    Console.WriteLine($"[BitBlt96] Fill operation: halftone={halftoneForm}, htW={htW}, htH={htH}, htPixels={htPixels.Length}");
+                    var displayOOP = context.Metadata?.KnownObjects?.Display;
+                    bool isDisplay = destForm == displayOOP;
+                    Console.WriteLine($"[BitBlt96] Fill: dest={destForm} isDisplay={isDisplay}, rule={combinationRule}, area=({destX},{destY},{width},{height}), clip=({clipX},{clipY},{clipWidth},{clipHeight})");
+                    Console.WriteLine($"[BitBlt96]   halftone={halftoneForm}, htW={htW}, htH={htH}, htPixels={htPixels.Length}");
                     if (htPixels.Length >= 4)
                     {
-                        Console.WriteLine($"[BitBlt96] First halftone pixels: {htPixels.Span[0]:X8}, {htPixels.Span[1]:X8}, {htPixels.Span[2]:X8}, {htPixels.Span[3]:X8}");
+                        Console.WriteLine($"[BitBlt96]   First halftone pixels: {htPixels.Span[0]:X8}, {htPixels.Span[1]:X8}, {htPixels.Span[2]:X8}, {htPixels.Span[3]:X8}");
                     }
                 }
             }
@@ -128,6 +131,12 @@ public static class GraphicsOperations
                 halftonePixels,
                 halftoneWidth, halftoneHeight,
                 (CombinationRule)combinationRule);
+
+            // DEBUG: After fill, show what's in the destination
+            if (sourceForm == nil && halftonePixels.Length > 0 && destPixels.Length >= 4)
+            {
+                Console.WriteLine($"[BitBlt96]   After fill, dest first pixels: {destPixels.Span[0]:X8}, {destPixels.Span[1]:X8}, {destPixels.Span[2]:X8}, {destPixels.Span[3]:X8}");
+            }
 
             // Write modified dest pixels back to heap
             WriteFormData32(heap, destForm, destPixels.Span);
