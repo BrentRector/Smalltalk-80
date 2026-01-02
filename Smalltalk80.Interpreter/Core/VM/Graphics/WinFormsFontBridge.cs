@@ -221,35 +221,37 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
         int charCount = maxAscii - minAscii + 1;
         int fontHeight = metrics.Ascent + metrics.Descent;
 
-        // First pass: measure all character widths and compute total width
-        int[] widths = new int[charCount];
-        int totalWidth = 0;
+        // For fixed-pitch fonts: measure one character to get the fixed cell width
+        // Use 'M' as representative - it's typically the widest and defines the cell
+        int fixedWidth = GetCharWidth(descriptor, 'M');
+        if (fixedWidth <= 0) fixedWidth = GetCharWidth(descriptor, 'W');
+        if (fixedWidth <= 0) fixedWidth = descriptor.SizePixels; // Fallback
 
+        // Build width table (all same value for fixed-pitch)
+        int[] widths = new int[charCount];
+        Array.Fill(widths, fixedWidth);
+
+        // Build xTable with fixed intervals (includes sentinel at end)
+        // Smalltalk widthOf: can access xTable at: (maxAscii + 1) + 2, so we need charCount + 2 entries
+        int[] xTable = new int[charCount + 2];
+        for (int i = 0; i <= charCount + 1; i++)
+        {
+            xTable[i] = i * fixedWidth;
+        }
+
+        int strikeLength = charCount * fixedWidth;
+
+        // Build the complete character string (with underscore→arrow substitution)
+        var charArray = new char[charCount];
         for (int i = 0; i < charCount; i++)
         {
             char c = (char)(minAscii + i);
-            int w = GetCharWidth(descriptor, c);
-            if (w <= 0) w = 1; // Ensure at least 1 pixel width
-            widths[i] = w;
-            totalWidth += w;
+            // Render left-arrow for underscore (Smalltalk-80 assignment operator)
+            // Original Xerox systems displayed '_' as '←' in their fonts
+            if (c == '_') c = '←';  // U+2190 LEFTWARDS ARROW
+            charArray[i] = c;
         }
-
-        // Ensure totalWidth is reasonable
-        if (totalWidth <= 0) totalWidth = charCount;
-
-        // Build xTable (includes sentinel at end)
-        // Smalltalk widthOf: can access xTable at: (maxAscii + 1) + 2, so we need charCount + 2 entries
-        int[] xTable = new int[charCount + 2];
-        int x = 0;
-        for (int i = 0; i < charCount; i++)
-        {
-            xTable[i] = x;
-            x += widths[i];
-        }
-        xTable[charCount] = x; // Sentinel
-        xTable[charCount + 1] = x; // Extra sentinel for edge case
-
-        int strikeLength = x;
+        string allChars = new string(charArray);
 
         // Create the combined glyphs bitmap
         using var glyphsBitmap = new Bitmap(strikeLength, fontHeight);
@@ -263,23 +265,11 @@ public class WinFormsFontBridge : IFontBridge, IDisposable
 
             var font = GetOrCreateFont(descriptor);
 
-            // Use default format for drawing (not GenericTypographic) to ensure
-            // consistent baseline alignment across all characters.
-            // GenericTypographic gives tight per-character bounds which causes
-            // baseline misalignment when drawing characters individually.
+            // Draw the entire character set as a single string
+            // This ensures GDI+ handles baseline alignment consistently across all glyphs
+            // For fixed-pitch fonts, each character occupies exactly fixedWidth pixels
             var format = StringFormat.GenericDefault;
-
-            // Render each character at its position
-            for (int i = 0; i < charCount; i++)
-            {
-                char c = (char)(minAscii + i);
-
-                // Render left-arrow for underscore (Smalltalk-80 assignment operator)
-                // Original Xerox systems displayed '_' as '←' in their fonts
-                if (c == '_') c = '←';  // U+2190 LEFTWARDS ARROW
-
-                g.DrawString(c.ToString(), font, Brushes.Black, xTable[i], 0, format);
-            }
+            g.DrawString(allChars, font, Brushes.Black, 0, 0, format);
         }
 
         // Convert entire bitmap to 32bpp pixels (preserving antialiased grayscale)
