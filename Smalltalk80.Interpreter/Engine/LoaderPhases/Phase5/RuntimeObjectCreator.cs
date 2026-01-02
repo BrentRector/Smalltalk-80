@@ -226,20 +226,20 @@ public class RuntimeObjectCreator(
         SetInstanceVarByName(pointOOP, "Point", "y", SmalltalkOOP.FromSmallInteger(0));
 
         // Step 2: Create DisplayBitmap
-        // With 32-bit words: each word holds 32 pixels, so width/32 words per row
+        // 32bpp mode: each word (32 bits) holds ONE pixel, so width words per row
         int displayWidth = 800;
         int displayHeight = 600;
-        int wordsPerRow = (displayWidth + 31) / 32;  // 25 words per row for 800 pixels
-        int totalWords = wordsPerRow * displayHeight;  // 15000 words for 800x600
+        int wordsPerRow = displayWidth;  // 32bpp: 800 words per row (1 pixel per word)
+        int totalWords = wordsPerRow * displayHeight;  // 480000 words for 800x600 at 32bpp
 
         var displayBitmapOOP = context.Allocator.AllocateObject("DisplayBitmap", ObjectFormat.WordIndexed, totalWords);
         var displayBitmapClassOOP = GlobalRegistry.LookupClassOOP("DisplayBitmap");
         context.Allocator.SetClassOOP(displayBitmapOOP, displayBitmapClassOOP);
 
-        // Initialize bitmap to zeros
+        // Initialize bitmap to white (RGB 0xFFFFFF) for 32bpp
         for (int i = 0; i < totalWords; i++)
         {
-            context.HeapManager.SetIndexedWord(displayBitmapOOP, i, 0);
+            context.HeapManager.SetIndexedWord(displayBitmapOOP, i, 0x00FFFFFF);  // White (RGB only, no alpha)
         }
 
         GlobalRegistry.Register("DisplayBitmap", displayBitmapOOP);
