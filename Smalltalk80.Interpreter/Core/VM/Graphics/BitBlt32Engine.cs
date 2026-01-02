@@ -155,16 +155,19 @@ public static class BitBlt32Engine
         ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
         int width, int height)
     {
-        // Detect if this might be a same-bitmap scroll operation
-        bool mightOverlap = destWidth == sourceWidth && destPixels.Length == sourcePixels.Length;
-
-        // For vertical overlap: if dest is below source, copy bottom-to-top
-        // This prevents overwriting source rows before they're copied
-        bool copyBottomToTop = mightOverlap && destY > sourceY;
-
         fixed (uint* destPtr = destPixels)
         fixed (uint* sourcePtr = sourcePixels)
         {
+            // Check if source and dest memory regions overlap
+            // This happens during same-Form scrolling operations
+            uint* destEnd = destPtr + destPixels.Length;
+            uint* sourceEnd = sourcePtr + sourcePixels.Length;
+            bool regionsOverlap = !(destEnd <= sourcePtr || sourceEnd <= destPtr);
+
+            // For vertical overlap: if dest is below source, copy bottom-to-top
+            // This prevents overwriting source rows before they're copied
+            bool copyBottomToTop = regionsOverlap && destY > sourceY;
+
             if (copyBottomToTop)
             {
                 // Copy bottom-to-top for downward scrolling (dest below source)
