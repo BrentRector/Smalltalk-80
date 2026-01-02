@@ -103,7 +103,7 @@ public static class GraphicsOperations
                 // DEBUG: Log halftone extraction for fills
                 if (sourceForm == nil)
                 {
-                    var displayOOP = context.Metadata?.KnownObjects?.Display;
+                    var displayOOP = context.Metadata != null ? context.Metadata.KnownObjects.Display : nil;
                     bool isDisplay = destForm == displayOOP;
                     Console.WriteLine($"[BitBlt96] Fill: dest={destForm} isDisplay={isDisplay}, rule={combinationRule}, area=({destX},{destY},{width},{height}), clip=({clipX},{clipY},{clipWidth},{clipHeight})");
                     Console.WriteLine($"[BitBlt96]   halftone={halftoneForm}, htW={htW}, htH={htH}, htPixels={htPixels.Length}");
