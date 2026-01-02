@@ -126,11 +126,11 @@ public class NullDisplay : IDisplay
     public void Resize(int width, int height) { Width = width; Height = height; }
 
     public void BitBlt(
-        Span<byte> destBits, int destWidth, int destHeight, int destX, int destY,
-        ReadOnlySpan<byte> sourceBits, int sourceWidth, int sourceHeight, int sourceX, int sourceY,
+        Span<uint> destPixels, int destWidth, int destHeight, int destX, int destY,
+        ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceHeight, int sourceX, int sourceY,
         int width, int height,
         int clipX, int clipY, int clipWidth, int clipHeight,
-        ReadOnlySpan<byte> halftoneBits, int halftoneWidth, int halftoneHeight,
+        ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
         int combinationRule)
     {
         // No-op for null display
