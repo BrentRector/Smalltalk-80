@@ -86,16 +86,6 @@ public static class GraphicsOperations
                     sourceWidth = srcW;
                     sourceHeight = srcH;
                 }
-                // DEBUG: Log source-based copies to Display
-                var displayOOP = context.Metadata != null ? context.Metadata.KnownObjects.Display : nil;
-                if (destForm == displayOOP && width > 50 && height > 50)
-                {
-                    Console.WriteLine($"[BitBlt96] COPY to Display: src={sourceForm} ({srcW}x{srcH}), rule={combinationRule}, area=({destX},{destY},{width},{height})");
-                    if (srcPixels.Length >= 4)
-                    {
-                        Console.WriteLine($"[BitBlt96]   First source pixels: {srcPixels.Span[0]:X8}, {srcPixels.Span[1]:X8}, {srcPixels.Span[2]:X8}, {srcPixels.Span[3]:X8}");
-                    }
-                }
             }
 
             ReadOnlySpan<uint> halftonePixels = default;
@@ -110,22 +100,6 @@ public static class GraphicsOperations
                     halftoneWidth = htW;
                     halftoneHeight = htH;
                 }
-                // DEBUG: Log halftone extraction for fills
-                if (sourceForm == nil)
-                {
-                    var displayOOP = context.Metadata != null ? context.Metadata.KnownObjects.Display : nil;
-                    bool isDisplay = destForm == displayOOP;
-                    Console.WriteLine($"[BitBlt96] Fill: dest={destForm} isDisplay={isDisplay}, rule={combinationRule}, area=({destX},{destY},{width},{height}), clip=({clipX},{clipY},{clipWidth},{clipHeight})");
-                    Console.WriteLine($"[BitBlt96]   halftone={halftoneForm}, htW={htW}, htH={htH}, htPixels={htPixels.Length}");
-                    if (htPixels.Length >= 4)
-                    {
-                        Console.WriteLine($"[BitBlt96]   First halftone pixels: {htPixels.Span[0]:X8}, {htPixels.Span[1]:X8}, {htPixels.Span[2]:X8}, {htPixels.Span[3]:X8}");
-                    }
-                }
-            }
-            else if (sourceForm == nil)
-            {
-                Console.WriteLine($"[BitBlt96] Fill operation with NO halftone! halftoneForm={halftoneForm}, isNil={halftoneForm == nil}");
             }
 
             // Perform 32bpp BitBlt
@@ -141,12 +115,6 @@ public static class GraphicsOperations
                 halftonePixels,
                 halftoneWidth, halftoneHeight,
                 (CombinationRule)combinationRule);
-
-            // DEBUG: After fill, show what's in the destination
-            if (sourceForm == nil && halftonePixels.Length > 0 && destPixels.Length >= 4)
-            {
-                Console.WriteLine($"[BitBlt96]   After fill, dest first pixels: {destPixels.Span[0]:X8}, {destPixels.Span[1]:X8}, {destPixels.Span[2]:X8}, {destPixels.Span[3]:X8}");
-            }
 
             // Write modified dest pixels back to heap
             WriteFormData32(heap, destForm, destPixels.Span);
