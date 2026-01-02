@@ -194,7 +194,7 @@ public static class Program
             var display = new WinFormsDisplay(
                 displayWidth,
                 displayHeight,
-                "Smalltalk-80",
+                "Smalltalk-2026",
                 heapManager,
                 vmMetadata,
                 pixelDepth);
