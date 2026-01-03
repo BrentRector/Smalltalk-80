@@ -35008,9 +35008,9 @@ addCurrentToken
 	"Add the current scanner token to our collection."
 	| type start end tokenValue |
 	type := self highlightTypeFor: scanner tokenType.
-	"Scanner mark = source position - 1, but due to 2-char look-ahead,
-	 mark points to aheadChar (second char). Subtract 1 to get true start."
-	start := scanner mark - 1 max: 1.
+	"Scanner mark needs adjustment for 1-based string indexing.
+	 Subtract 2 to account for lookahead and 0/1-based conversion."
+	start := scanner mark - 2 max: 1.
 
 	"Calculate end position based on token type and value"
 	tokenValue := scanner token.
