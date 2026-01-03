@@ -12318,6 +12318,18 @@ notEmpty
 	"Answer whether the receiver contains any elements."
 
 	^self size > 0!
+ifEmpty: aBlock
+	"Evaluate aBlock if I am empty, otherwise return self."
+	^self isEmpty ifTrue: [aBlock value] ifFalse: [self]!
+ifNotEmpty: aBlock
+	"Evaluate aBlock with myself if I am not empty, otherwise return self."
+	^self isEmpty ifTrue: [self] ifFalse: [aBlock value: self]!
+ifEmpty: emptyBlock ifNotEmpty: notEmptyBlock
+	"Evaluate emptyBlock if I am empty, otherwise evaluate notEmptyBlock with myself."
+	^self isEmpty ifTrue: [emptyBlock value] ifFalse: [notEmptyBlock value: self]!
+ifNotEmpty: notEmptyBlock ifEmpty: emptyBlock
+	"Evaluate notEmptyBlock with myself if I am not empty, otherwise evaluate emptyBlock."
+	^self isEmpty ifTrue: [emptyBlock value] ifFalse: [notEmptyBlock value: self]!
 occurrencesOf: anObject 
 	"Answer how many of the receiver's elements are equal to anObject."
 
