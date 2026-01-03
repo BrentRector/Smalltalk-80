@@ -35379,36 +35379,37 @@ initializeClassicColors
 	colors at: #symbol put: (TextColor color: (Color r: 0.5 g: 0.0 b: 0.5)).
 	self registerColorSet: colors named: #Classic!
 initializeVSCodeColors
-	"Register VSCode Dark+ theme colors."
-	| colors |
+	"Register VSCode Dark+ theme colors with exact hex values from TextMate scope mapping."
+	| colors blue |
 	colors := Dictionary new.
-	"Comments - muted green (rgb 106,153,85)"
-	colors at: #comment put: (TextColor color: (Color r: 0.42 g: 0.60 b: 0.33)).
-	"Strings - orange/tan (rgb 206,145,120)"
-	colors at: #string put: (TextColor color: (Color r: 0.81 g: 0.57 b: 0.47)).
-	"Symbols - teal (rgb 78,201,176)"
-	colors at: #symbol put: (TextColor color: (Color r: 0.31 g: 0.79 b: 0.69)).
-	"Numbers - light green (rgb 181,206,168)"
-	colors at: #number put: (TextColor color: (Color r: 0.71 g: 0.81 b: 0.66)).
-	"Keywords - purple (rgb 197,134,192)"
-	colors at: #keyword put: (TextColor color: (Color r: 0.77 g: 0.53 b: 0.75)).
-	"self/super/thisContext - blue (rgb 86,156,214)"
-	colors at: #self put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
-	colors at: #super put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
-	colors at: #thisContext put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
-	"true/false/nil - blue (rgb 86,156,214)"
-	colors at: #nil put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
-	colors at: #true put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
-	colors at: #false put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
-	"Globals/Classes - teal (rgb 78,201,176)"
-	colors at: #global put: (TextColor color: (Color r: 0.31 g: 0.79 b: 0.69)).
-	"Characters - light cyan (rgb 156,220,254)"
-	colors at: #character put: (TextColor color: (Color r: 0.61 g: 0.86 b: 1.0)).
-	"Brackets - yellow/gold (rgb 255,215,0)"
-	colors at: #blockStart put: (TextColor color: (Color r: 1.0 g: 0.84 b: 0.0)).
-	colors at: #blockEnd put: (TextColor color: (Color r: 1.0 g: 0.84 b: 0.0)).
-	"Temp bars - yellow (rgb 212,212,160)"
-	colors at: #tempBar put: (TextColor color: (Color r: 0.83 g: 0.83 b: 0.63)).
+	blue := Color r: 0.337 g: 0.612 b: 0.839.  "#569CD6"
+	"Comments - #6A9955 (green)"
+	colors at: #comment put: (TextColor color: (Color r: 0.416 g: 0.600 b: 0.333)).
+	"Strings - #CE9178 (orange)"
+	colors at: #string put: (TextColor color: (Color r: 0.808 g: 0.569 b: 0.471)).
+	"Symbols - #569CD6 (blue) - constant.other.symbol"
+	colors at: #symbol put: (TextColor color: blue).
+	"Numbers - #B5CEA8 (light green)"
+	colors at: #number put: (TextColor color: (Color r: 0.710 g: 0.808 b: 0.659)).
+	"Keywords (ifTrue:, whileTrue:, ^) - #C586C0 (purple)"
+	colors at: #keyword put: (TextColor color: (Color r: 0.773 g: 0.525 b: 0.753)).
+	"self/super/thisContext - #569CD6 (blue) - storage.modifier"
+	colors at: #self put: (TextColor color: blue).
+	colors at: #super put: (TextColor color: blue).
+	colors at: #thisContext put: (TextColor color: blue).
+	"true/false/nil - #569CD6 (blue) - constant.language"
+	colors at: #nil put: (TextColor color: blue).
+	colors at: #true put: (TextColor color: blue).
+	colors at: #false put: (TextColor color: blue).
+	"Globals/Classes - #4EC9B0 (teal) - entity.name.type.class"
+	colors at: #global put: (TextColor color: (Color r: 0.306 g: 0.788 b: 0.690)).
+	"Characters ($x) - #569CD6 (blue) - constant.character"
+	colors at: #character put: (TextColor color: blue).
+	"Brackets - #FFD700 (gold) - VSCode bracket colorization"
+	colors at: #blockStart put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
+	colors at: #blockEnd put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
+	"Temp bars - #D4D4D4 (gray) - punctuation"
+	colors at: #tempBar put: (TextColor color: (Color r: 0.831 g: 0.831 b: 0.831)).
 	self registerColorSet: colors named: #VSCode! !
 
 !SyntaxStyler class methodsFor: 'color set management'!
