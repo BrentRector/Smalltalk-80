@@ -35239,25 +35239,50 @@ Instance Variables:
 !SyntaxStyler methodsFor: 'styling'!
 styleSource: sourceString
 	"Answer a Text with syntax highlighting applied.
-	 Optimized: builds color array in single pass instead of repeated copyReplace."
-	| text tokens colorArray size |
+	 Optimized: builds runs directly from sorted tokens - O(m) where m is token count."
+	| text tokens size sortedTokens runs values pos |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
 	size := sourceString size.
 	text := Text fromString: sourceString.
 	tokens := ScannerHighlighter tokenize: sourceString.
+	tokens isEmpty ifTrue: [^text].
 
-	"Build color array in single pass - O(n+m) instead of O(n*m)"
-	colorArray := Array new: size withAll: nil.
-	tokens do: [:token |
+	"Sort tokens by start position"
+	sortedTokens := tokens asSortedCollection: [:a :b | a start <= b start].
+
+	"Build runs directly - much faster than per-character array"
+	runs := OrderedCollection new.
+	values := OrderedCollection new.
+	pos := 1.
+
+	sortedTokens do: [:token |
 		| textColor start end |
 		textColor := self colorForType: token type.
-		textColor ifNotNil: [
-			start := token start max: 1.
-			end := (token end min: size) max: start.
-			start to: end do: [:i | colorArray at: i put: textColor color]]].
+		start := token start max: 1.
+		end := (token end min: size) max: start.
 
-	"Set colorRuns directly from array"
-	text setColorRuns: (RunArray newFrom: colorArray).
+		"Add gap before token (nil = default color)"
+		start > pos ifTrue: [
+			runs add: start - pos.
+			values add: nil].
+
+		"Add token's color run"
+		textColor ifNotNil: [
+			runs add: end - start + 1.
+			values add: textColor color.
+			pos := end + 1]
+		ifNil: [
+			"No color for this token type - skip, will be covered by nil run"
+			pos < start ifTrue: [pos := start]]].
+
+	"Add final nil run if needed"
+	pos <= size ifTrue: [
+		runs add: size - pos + 1.
+		values add: nil].
+
+	"Set colorRuns directly"
+	runs isEmpty ifFalse: [
+		text setColorRuns: (RunArray runs: runs asArray values: values asArray)].
 	^text!
 
 styleMethod: sourceString inClass: aClass
