@@ -34652,7 +34652,7 @@ runs: newRuns values: newValues
 	| instance |
 	instance _ self basicNew.
 	instance setRuns: newRuns setValues: newValues.
-	^instance! !
+	^instance!
 newFrom: anArray
 	"Answer a new RunArray created by compressing consecutive equal values in anArray.
 	 Example: #(a a a b b c) -> RunArray with runs #(3 2 1) values #(a b c)"
