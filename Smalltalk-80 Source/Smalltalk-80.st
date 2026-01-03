@@ -30757,6 +30757,46 @@ selectionAsStream
 		from: startBlock stringIndex
 		to: stopBlock stringIndex - 1! !
 
+!ParagraphEditor methodsFor: 'cursor movement'!
+cursorLeft: characterStream
+	"Move the cursor one character to the left."
+	| newIndex |
+	sensor keyboard.	"flush the key"
+	self closeTypeIn.
+	newIndex _ (startBlock stringIndex - 1) max: 1.
+	self selectAt: newIndex.
+	^true!
+cursorRight: characterStream
+	"Move the cursor one character to the right."
+	| newIndex |
+	sensor keyboard.	"flush the key"
+	self closeTypeIn.
+	newIndex _ (startBlock stringIndex + 1) min: paragraph text size + 1.
+	self selectAt: newIndex.
+	^true!
+cursorUp: characterStream
+	"Move the cursor up one line, trying to stay at the same horizontal position."
+	| targetPoint newBlock |
+	sensor keyboard.	"flush the key"
+	self closeTypeIn.
+	targetPoint _ startBlock topLeft - (0 @ paragraph textStyle lineGrid).
+	targetPoint y < paragraph compositionRectangle top
+		ifTrue: [^true].	"Already at top line"
+	newBlock _ paragraph characterBlockAtPoint: targetPoint.
+	self selectAt: newBlock stringIndex.
+	^true!
+cursorDown: characterStream
+	"Move the cursor down one line, trying to stay at the same horizontal position."
+	| targetPoint newBlock |
+	sensor keyboard.	"flush the key"
+	self closeTypeIn.
+	targetPoint _ startBlock topLeft + (0 @ paragraph textStyle lineGrid).
+	targetPoint y >= paragraph compositionRectangle bottom
+		ifTrue: [^true].	"Already at bottom line"
+	newBlock _ paragraph characterBlockAtPoint: targetPoint.
+	self selectAt: newBlock stringIndex.
+	^true! !
+
 !ParagraphEditor methodsFor: 'indicating'!
 flash
 	"Causes the view of he paragraph to complement twice in succession."
@@ -30880,10 +30920,16 @@ fit'
 			CTL-, CTLSHIFT-"
 		:i |	Keyboard at: i + 1 put: #changeEmphasis:].
 
-	#(213 7 218 249 219 15) do: 
+	#(213 7 218 249 219 15) do:
 		[:i | "ctl open brackets"
 		Keyboard at: i + 1 put: #enclose:].
 	Keyboard at: BS2 asciiValue + 1 put: #leaveBrackets:.
+
+	"Arrow keys for cursor movement"
+	Keyboard at: LeftArrowKey asciiValue + 1 put: #cursorLeft:.
+	Keyboard at: RightArrowKey asciiValue + 1 put: #cursorRight:.
+	Keyboard at: UpArrowKey asciiValue + 1 put: #cursorUp:.
+	Keyboard at: DownArrowKey asciiValue + 1 put: #cursorDown:.
 
 	"ParagraphEditor initialize."! !
 
@@ -41435,6 +41481,13 @@ initTextConstants2		"Text initTextConstants."
 	TextConstants		at: #Ctrln				put:	(14 asCharacter).
 	TextConstants		at: #CtrlN				put:	(245 asCharacter).
 	TextConstants		at: #Ctrlp				put:	(138 asCharacter).
+
+		"Arrow keys for cursor movement"
+	TextConstants		at: #LeftArrowKey			put:	(188 asCharacter).
+	TextConstants		at: #RightArrowKey		put:	(189 asCharacter).
+	TextConstants		at: #UpArrowKey			put:	(190 asCharacter).
+	TextConstants		at: #DownArrowKey		put:	(191 asCharacter).
+
 	TextConstants		at: #CtrlTopBlank			put:	(222 asCharacter).
 	TextConstants		at: #CtrlMiddleBlank		put:	(229 asCharacter).
 	TextConstants		at: #CtrlBottomBlank		put:	(225 asCharacter).

@@ -740,6 +740,11 @@ public class WinFormsDisplay : Form, IDisplay
             Keys.RControlKey => 138,
             Keys.ControlKey => 138,
             Keys.Capital => 139,
+            // Arrow keys for cursor movement
+            Keys.Left => 188,
+            Keys.Right => 189,
+            Keys.Up => 190,
+            Keys.Down => 191,
             _ => 0
         };
     }
