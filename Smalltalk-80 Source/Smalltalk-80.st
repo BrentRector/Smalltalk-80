@@ -16890,10 +16890,8 @@ setStopConditions
 		"No color - use default mask"
 		halftoneForm := defaultMask]
 	ifNotNil: [
-		"Color specified - create colored mask"
-		Transcript cr; show: 'DisplayScanner: color=', textColor printString.
-		halftoneForm := Form colorMask: textColor.
-		Transcript show: ' halftone=', halftoneForm printString]!
+		"Color specified - create colored 1x1 halftone mask"
+		halftoneForm := Form colorMask: textColor]!
 tab
 	"This awfulness attempts to handle leading and internal tabs in a justified line.  Leading tabs are considered legal and should be reflected on the display gracefully.  Internal tabs (when the line is justified) are considered at the very best a misguided use of the character, and are reflected on the display the best we can."
 
@@ -20654,11 +20652,9 @@ colorMask: aColor
 	"Answer a 1x1 Form filled with the given Color.
 	 Used as halftoneForm for colored text rendering.
 	 Example: Form colorMask: Color blue"
-	| form pixelValue |
+	| form |
 	form := Form extent: 1@1.
-	pixelValue := aColor asPixelValue.
-	Transcript cr; show: 'Form colorMask: pixel=', pixelValue printString.
-	form bits at: 1 put: pixelValue.
+	form bits at: 1 put: aColor asPixelValue.
 	^form! !
 
 !Form class methodsFor: 'examples'!
@@ -32007,9 +32003,11 @@ asPixelValue
 	"Answer the 24-bit RGB pixel value.
 	 Alpha is implicit (treated as opaque during rendering).
 	 This keeps values within SmallInteger range."
-	^((self red * 255) rounded bitShift: 16) +
-	 ((self green * 255) rounded bitShift: 8) +
-	 (self blue * 255) rounded!
+	| r g b |
+	r := (self red * 255 + 0.5) truncated.
+	g := (self green * 255 + 0.5) truncated.
+	b := (self blue * 255 + 0.5) truncated.
+	^(r bitShift: 16) + (g bitShift: 8) + b!
 
 asFormColor
 	"Answer 1 (black) or 0 (white) based on luminance threshold.
@@ -32041,11 +32039,13 @@ printOn: aStream
 
 !Color methodsFor: 'private'!
 setRed: r green: g blue: b
-	"Set the RGB components from 0.0-1.0 float values"
+	"Set the RGB components from 0.0-1.0 float values.
+	 Values are clamped to [0.0, 1.0] and scaled to 10-bit integers (0-1023).
+	 Packed into 30-bit rgb value: RRRRRRRRRR GGGGGGGGGG BBBBBBBBBB"
 	| ri gi bi |
-	ri := ((r max: 0.0) min: 1.0) * 1023 rounded.
-	gi := ((g max: 0.0) min: 1.0) * 1023 rounded.
-	bi := ((b max: 0.0) min: 1.0) * 1023 rounded.
+	ri := ((r max: 0.0) min: 1.0) * 1023.0 truncated.
+	gi := ((g max: 0.0) min: 1.0) * 1023.0 truncated.
+	bi := ((b max: 0.0) min: 1.0) * 1023.0 truncated.
 	rgb := (ri bitShift: 20) + (gi bitShift: 10) + bi!
 
 privateSetRgb: anInteger
@@ -35203,22 +35203,15 @@ Instance Variables:
 !SyntaxStyler methodsFor: 'styling'!
 styleSource: sourceString
 	"Answer a Text with syntax highlighting applied."
-	| text tokens colorCount |
+	| text tokens |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
 	text := Text fromString: sourceString.
 	tokens := ScannerHighlighter tokenize: sourceString.
-	colorCount := 0.
-
-	Transcript cr; show: 'SyntaxStyler: styling ', tokens size printString, ' tokens'.
-
 	tokens do: [:token |
 		| textColor |
 		textColor := self colorForType: token type.
 		textColor ifNotNil: [
-			colorCount := colorCount + 1.
 			text addAttribute: textColor from: token start to: token end]].
-
-	Transcript cr; show: 'SyntaxStyler: added ', colorCount printString, ' color attributes'.
 	^text!
 
 styleMethod: sourceString inClass: aClass
@@ -35231,18 +35224,12 @@ styleMethod: sourceString inClass: aClass
 
 !SyntaxStyler methodsFor: 'color mapping'!
 colorForType: tokenType
-	"Answer the TextColor for the given token type, or nil for default."
-	| result |
+	"Answer the TextColor for the given token type, or nil for default (black)."
 	colorMap ifNotNil: [
 		(colorMap includesKey: tokenType) ifTrue: [
 			^colorMap at: tokenType]].
-	DefaultColorMap ifNil: [
-		Transcript cr; show: 'ERROR: DefaultColorMap is nil!'.
-		^nil].
-	result := DefaultColorMap at: tokenType ifAbsent: [nil].
-	result ifNil: [
-		Transcript cr; show: 'No color for: ', tokenType printString].
-	^result!
+	DefaultColorMap ifNil: [^nil].
+	^DefaultColorMap at: tokenType ifAbsent: [nil]!
 
 colorMap: aDictionary
 	"Set a custom color map for this styler instance."
