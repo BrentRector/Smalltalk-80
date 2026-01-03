@@ -9160,6 +9160,9 @@ digitValue
 	^-1! !
 
 !Character methodsFor: 'testing'!
+isCharacter
+	"Answer whether the receiver is a Character."
+	^true!
 isAlphaNumeric
 	"Answer whether the receiver is a letter or a digit."
 	^self isLetter or: [self isDigit]!
@@ -27739,6 +27742,9 @@ yourself
 	"Answer self."! !
 
 !Object methodsFor: 'testing'!
+isCharacter
+	"Answer whether the receiver is a Character. Character overrides with ^true"
+	^false!
 isInteger
 	"Coerces Integers to true and everything else to false.  Integer
 	overrides with ^true"
