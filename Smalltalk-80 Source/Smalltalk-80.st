@@ -35036,6 +35036,12 @@ addCurrentToken
 
 	"Calculate end position based on token type and value"
 	tokenValue := scanner token.
+
+	"Character literals ($x) come through as #number with Character value"
+	(scanner tokenType == #xCharacter or:
+		[type == #number and: [tokenValue isKindOf: Character]])
+		ifTrue: [type := #character].
+
 	end := self calculateEndFor: tokenValue type: scanner tokenType startingAt: start.
 
 	tokens add: (SyntaxToken type: type start: start end: end)!
@@ -35091,8 +35097,8 @@ highlightTypeFor: scannerTokenType
 	"Special syntax"
 	scannerTokenType == #upArrow ifTrue: [^#return].
 	scannerTokenType == #leftArrow ifTrue: [^#assignment].
-	scannerTokenType == #leftBracket ifTrue: [^#blockBracket].
-	scannerTokenType == #rightBracket ifTrue: [^#blockBracket].
+	scannerTokenType == #leftBracket ifTrue: [^#blockStart].
+	scannerTokenType == #rightBracket ifTrue: [^#blockEnd].
 	scannerTokenType == #leftParenthesis ifTrue: [^#paren].
 	scannerTokenType == #rightParenthesis ifTrue: [^#paren].
 	scannerTokenType == #period ifTrue: [^#separator].
@@ -35405,9 +35411,12 @@ initializeVSCodeColors
 	colors at: #global put: (TextColor color: (Color r: 0.306 g: 0.788 b: 0.690)).
 	"Return (^) - #C586C0 (purple) - keyword.control.flow.return"
 	colors at: #return put: (TextColor color: (Color r: 0.773 g: 0.525 b: 0.753)).
-	"Brackets [] - #FFD700 (gold) - VSCode bracket colorization"
-	colors at: #blockBracket put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
-	"Temp bars || - #D4D4D4 (gray) - punctuation"
+	"Characters ($x) - #569CD6 (blue) - constant.character"
+	colors at: #character put: (TextColor color: blue).
+	"Brackets - #FFD700 (gold) - VSCode bracket colorization"
+	colors at: #blockStart put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
+	colors at: #blockEnd put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
+	"Temp bars - #D4D4D4 (gray) - punctuation"
 	colors at: #tempBar put: (TextColor color: (Color r: 0.831 g: 0.831 b: 0.831)).
 	self registerColorSet: colors named: #VSCode! !
 
