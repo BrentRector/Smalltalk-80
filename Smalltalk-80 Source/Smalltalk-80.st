@@ -16879,8 +16879,8 @@ setStopConditions
 	| fontIndex displayFont textColor |
 	font _ textStyle fontAt: (text emphasisAt: lastIndex).
 	super setStopConditions.
-	stopConditions 
-		at: Space asInteger + 1 
+	stopConditions
+		at: Space asInteger + 1
 		put: (textStyle alignment = Justified
 				ifTrue: [#paddedSpace]
 				ifFalse: [nil]).
@@ -16891,7 +16891,9 @@ setStopConditions
 		halftoneForm := defaultMask]
 	ifNotNil: [
 		"Color specified - create colored mask"
-		halftoneForm := Form colorMask: textColor]!
+		Transcript cr; show: 'DisplayScanner: color=', textColor printString.
+		halftoneForm := Form colorMask: textColor.
+		Transcript show: ' halftone=', halftoneForm printString]!
 tab
 	"This awfulness attempts to handle leading and internal tabs in a justified line.  Leading tabs are considered legal and should be reflected on the display gracefully.  Internal tabs (when the line is justified) are considered at the very best a misguided use of the character, and are reflected on the display the best we can."
 
@@ -20655,6 +20657,7 @@ colorMask: aColor
 	| form pixelValue |
 	form := Form extent: 1@1.
 	pixelValue := aColor asPixelValue.
+	Transcript cr; show: 'Form colorMask: pixel=', pixelValue printString.
 	form bits at: 1 put: pixelValue.
 	^form! !
 
@@ -35200,17 +35203,22 @@ Instance Variables:
 !SyntaxStyler methodsFor: 'styling'!
 styleSource: sourceString
 	"Answer a Text with syntax highlighting applied."
-	| text tokens |
+	| text tokens colorCount |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
 	text := Text fromString: sourceString.
 	tokens := ScannerHighlighter tokenize: sourceString.
+	colorCount := 0.
+
+	Transcript cr; show: 'SyntaxStyler: styling ', tokens size printString, ' tokens'.
 
 	tokens do: [:token |
 		| textColor |
 		textColor := self colorForType: token type.
 		textColor ifNotNil: [
+			colorCount := colorCount + 1.
 			text addAttribute: textColor from: token start to: token end]].
 
+	Transcript cr; show: 'SyntaxStyler: added ', colorCount printString, ' color attributes'.
 	^text!
 
 styleMethod: sourceString inClass: aClass
