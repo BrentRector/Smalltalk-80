@@ -35232,10 +35232,17 @@ styleMethod: sourceString inClass: aClass
 !SyntaxStyler methodsFor: 'color mapping'!
 colorForType: tokenType
 	"Answer the TextColor for the given token type, or nil for default."
+	| result |
 	colorMap ifNotNil: [
 		(colorMap includesKey: tokenType) ifTrue: [
 			^colorMap at: tokenType]].
-	^DefaultColorMap at: tokenType ifAbsent: [nil]!
+	DefaultColorMap ifNil: [
+		Transcript cr; show: 'ERROR: DefaultColorMap is nil!'.
+		^nil].
+	result := DefaultColorMap at: tokenType ifAbsent: [nil].
+	result ifNil: [
+		Transcript cr; show: 'No color for: ', tokenType printString].
+	^result!
 
 colorMap: aDictionary
 	"Set a custom color map for this styler instance."
