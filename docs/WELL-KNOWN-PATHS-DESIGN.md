@@ -1,8 +1,10 @@
 # Well-Known Paths and Theme File Design
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-01-03
 **Purpose:** Enable dynamic theme file loading from standard Windows application data locations
+
+**Constraint:** Theme files must use the exact VS Code theme JSON format, allowing users to copy VS Code theme files directly into the themes folder.
 
 ---
 
@@ -401,10 +403,10 @@ WindowsPath hasSpecialFolder: #appData
 ```
 %APPDATA%\Smalltalk-80\
 ├── themes\
-│   ├── VSCodeLight.theme
-│   ├── VSCodeDark.theme
-│   ├── Classic.theme
-│   └── custom.theme
+│   ├── light_plus.json        (copied from VS Code)
+│   ├── dark_plus.json         (copied from VS Code)
+│   ├── monokai-color-theme.json
+│   └── my-custom-theme.json
 ├── settings.st          (future: user preferences)
 └── history.st           (future: command history)
 ```
@@ -414,59 +416,327 @@ WindowsPath hasSpecialFolder: #appData
 - Small files, no performance concern for roaming
 - Standard Windows convention for user preferences
 
-### Theme File Format
+### Theme File Format: VS Code JSON
 
-**Option A: Smalltalk Dictionary Literal (Recommended)**
+Theme files use the **exact VS Code color theme JSON format**. Users can copy any VS Code theme file directly into the themes folder.
 
-Simple, no parser needed, directly evaluable by Smalltalk Compiler.
+**VS Code Theme Structure:**
 
-```smalltalk
-"VSCodeLight.theme - Theme for white backgrounds"
-"Based on VS Code Light+ (default light) theme"
-
-Dictionary new
-    at: 'comment.block' put: (Color r: 0.0 g: 0.502 b: 0.0);
-    at: 'string.quoted.single' put: (Color r: 0.639 g: 0.082 b: 0.082);
-    at: 'constant.other.symbol' put: (Color r: 0.0 g: 0.0 b: 1.0);
-    at: 'constant.numeric' put: (Color r: 0.035 g: 0.525 b: 0.345);
-    at: 'constant.character' put: (Color r: 0.035 g: 0.525 b: 0.345);
-    at: 'keyword.control' put: (Color r: 0.686 g: 0.0 b: 0.859);
-    at: 'keyword.control.return' put: (Color r: 0.686 g: 0.0 b: 0.859);
-    at: 'entity.name.type' put: (Color r: 0.149 g: 0.498 b: 0.6);
-    at: 'variable.other' put: (Color r: 0.0 g: 0.0 b: 0.0);
-    at: 'variable.parameter' put: (Color r: 0.0 g: 0.0 b: 0.0);
-    at: 'punctuation.section.block.begin' put: (Color r: 0.0 g: 0.0 b: 0.0);
-    at: 'punctuation.section.block.end' put: (Color r: 0.0 g: 0.0 b: 0.0);
-    yourself
+```json
+{
+  "$schema": "vscode://schemas/color-theme",
+  "name": "Light+ (default light)",
+  "type": "light",
+  "colors": {
+    "editor.background": "#FFFFFF",
+    "editor.foreground": "#000000"
+  },
+  "tokenColors": [
+    {
+      "name": "Comment",
+      "scope": "comment",
+      "settings": {
+        "foreground": "#008000"
+      }
+    },
+    {
+      "name": "String",
+      "scope": ["string", "string.quoted"],
+      "settings": {
+        "foreground": "#A31515"
+      }
+    },
+    {
+      "name": "Keyword",
+      "scope": "keyword.control",
+      "settings": {
+        "foreground": "#AF00DB",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Function",
+      "scope": [
+        "entity.name.function",
+        "support.function"
+      ],
+      "settings": {
+        "foreground": "#795E26"
+      }
+    }
+  ],
+  "semanticHighlighting": true,
+  "semanticTokenColors": {
+    "newOperator": "#0000FF",
+    "stringLiteral": "#A31515"
+  }
+}
 ```
 
-**Option B: Simple Key-Value Text Format**
+**Key Format Elements:**
 
-Easier to edit in text editors, requires simple parser.
+| Field | Type | Description |
+|-------|------|-------------|
+| `$schema` | string | Optional. VS Code schema URL (ignored by our parser) |
+| `name` | string | Theme display name |
+| `type` | string | `"light"` or `"dark"` - indicates background type |
+| `include` | string | Optional. Path to base theme to inherit from |
+| `colors` | object | Editor UI colors (we ignore these, only relevant for VS Code UI) |
+| `tokenColors` | array | **Primary data** - syntax highlighting rules |
+| `semanticHighlighting` | boolean | Optional. Enable semantic tokens (ignored) |
+| `semanticTokenColors` | object | Optional. Semantic token colors (ignored) |
 
+**tokenColors Array Entry:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Optional. Human-readable description |
+| `scope` | string or array | TextMate scope selector(s) |
+| `settings.foreground` | string | Hex color `#RRGGBB` or `#RRGGBBAA` |
+| `settings.fontStyle` | string | Optional. `"bold"`, `"italic"`, `"underline"`, or combinations |
+
+**Scope Matching:**
+
+The `scope` field uses TextMate scope selectors. A scope is a dot-separated hierarchy:
+- `comment` - matches all comments
+- `comment.block` - matches block comments specifically
+- `keyword.control` - matches control keywords
+- `entity.name.function` - matches function names
+
+Multiple scopes can be specified as an array. The most specific matching scope wins.
+
+---
+
+### Primitive 161: ParseJSON
+
+To parse VS Code theme files, we need a JSON parser. Rather than implementing JSON parsing in Smalltalk (complex and error-prone), we provide a C# primitive.
+
+**Location:** `Smalltalk80.Interpreter/Core/VM/Primitives/JsonPrimitives.cs`
+
+**Signature:**
 ```
-# VSCodeLight.theme - Theme for white backgrounds
-# Based on VS Code Light+ (default light) theme
-
-comment.block = 0.0, 0.502, 0.0
-string.quoted.single = 0.639, 0.082, 0.082
-constant.other.symbol = 0.0, 0.0, 1.0
-constant.numeric = 0.035, 0.525, 0.345
-constant.character = 0.035, 0.525, 0.345
-keyword.control = 0.686, 0.0, 0.859
-keyword.control.return = 0.686, 0.0, 0.859
-entity.name.type = 0.149, 0.498, 0.6
-variable.other = 0.0, 0.0, 0.0
-variable.parameter = 0.0, 0.0, 0.0
-punctuation.section.block.begin = 0.0, 0.0, 0.0
-punctuation.section.block.end = 0.0, 0.0, 0.0
+Receiver: any object
+Argument: String - JSON text
+Returns: Smalltalk object graph (Dictionary, Array, String, Number, Boolean, nil)
 ```
 
-**Recommendation:** Option A (Smalltalk Dictionary Literal)
-- No new parser code needed
-- Leverages existing Smalltalk Compiler
-- Native Smalltalk syntax familiar to users
-- Comments supported naturally
+**Implementation:**
+
+```csharp
+using System.Text.Json;
+
+/// <summary>
+/// Primitive 161: Parse JSON string into Smalltalk objects.
+/// Uses System.Text.Json for parsing, then converts to Smalltalk objects.
+/// </summary>
+public class ParseJSON : IPrimitive
+{
+    public PrimitiveResult Execute(PrimitiveExecutionContext context)
+    {
+        if (context.Arguments.Length != 1)
+            return PrimitiveResult.Fail(context.Metadata!);
+
+        var jsonStringOOP = context.Arguments[0];
+        if (jsonStringOOP.IsSmallInteger)
+            return PrimitiveResult.Fail(context.Metadata!);
+
+        string? jsonText = FilePrimitiveHelpers.ExtractString(context, jsonStringOOP);
+        if (jsonText == null)
+            return PrimitiveResult.Fail(context.Metadata!);
+
+        try
+        {
+            using var doc = JsonDocument.Parse(jsonText, new JsonDocumentOptions
+            {
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
+            });
+
+            var result = ConvertJsonElement(context, doc.RootElement);
+            return PrimitiveResult.Ok(result);
+        }
+        catch (JsonException)
+        {
+            return PrimitiveResult.Ok(context.HeapManager.GetNil());
+        }
+    }
+
+    private SmalltalkOOP ConvertJsonElement(PrimitiveExecutionContext context, JsonElement element)
+    {
+        var heap = context.HeapManager;
+
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                return ConvertObject(context, element);
+
+            case JsonValueKind.Array:
+                return ConvertArray(context, element);
+
+            case JsonValueKind.String:
+                return FilePrimitiveHelpers.CreateString(context, element.GetString() ?? "");
+
+            case JsonValueKind.Number:
+                if (element.TryGetInt32(out int intVal))
+                    return SmalltalkOOP.FromSmallInteger(intVal);
+                // For floats, create Float object
+                return CreateFloat(context, element.GetDouble());
+
+            case JsonValueKind.True:
+                return context.Metadata!.KnownObjects.True;
+
+            case JsonValueKind.False:
+                return context.Metadata!.KnownObjects.False;
+
+            case JsonValueKind.Null:
+            default:
+                return heap.GetNil();
+        }
+    }
+
+    private SmalltalkOOP ConvertObject(PrimitiveExecutionContext context, JsonElement element)
+    {
+        var heap = context.HeapManager;
+        var dictClass = context.RuntimeServices?.GetClass("Dictionary")
+            ?? throw new InvalidOperationException("Cannot find Dictionary class");
+
+        // Create Dictionary and populate
+        var dict = heap.AllocateInstanceOf(dictClass, 0);
+        // Use message sending to add entries via at:put:
+
+        foreach (var prop in element.EnumerateObject())
+        {
+            var key = FilePrimitiveHelpers.CreateString(context, prop.Name);
+            var value = ConvertJsonElement(context, prop.Value);
+            // Send at:put: message to dictionary
+            AddToDictionary(context, dict, key, value);
+        }
+
+        return dict;
+    }
+
+    private SmalltalkOOP ConvertArray(PrimitiveExecutionContext context, JsonElement element)
+    {
+        var heap = context.HeapManager;
+        int count = element.GetArrayLength();
+
+        var arrayClass = context.RuntimeServices?.GetClass("Array")
+            ?? throw new InvalidOperationException("Cannot find Array class");
+        var array = heap.AllocateInstanceOf(arrayClass, count);
+
+        int index = 0;
+        foreach (var item in element.EnumerateArray())
+        {
+            var value = ConvertJsonElement(context, item);
+            heap.SetIndexedOOP(array, index++, value);
+        }
+
+        return array;
+    }
+
+    // Helper methods for Float creation and Dictionary at:put: omitted for brevity
+}
+```
+
+**Registration:**
+
+```csharp
+// In PrimitiveRegistry.CreateWithNewPrimitives()
+// JSON primitives (161-169)
+registry.Register(161, new JsonPrimitives.ParseJSON());
+```
+
+---
+
+### Primitive 162: ParseHexColor
+
+For efficient hex color parsing, provide a dedicated primitive.
+
+**Signature:**
+```
+Receiver: Color class
+Argument: String - hex color "#RRGGBB" or "#RRGGBBAA"
+Returns: Color object, or nil if invalid format
+```
+
+**Implementation:**
+
+```csharp
+/// <summary>
+/// Primitive 162: Parse hex color string to Color object.
+/// Supports #RGB, #RRGGBB, and #RRGGBBAA formats.
+/// </summary>
+public class ParseHexColor : IPrimitive
+{
+    public PrimitiveResult Execute(PrimitiveExecutionContext context)
+    {
+        if (context.Arguments.Length != 1)
+            return PrimitiveResult.Fail(context.Metadata!);
+
+        var hexStringOOP = context.Arguments[0];
+        string? hex = FilePrimitiveHelpers.ExtractString(context, hexStringOOP);
+        if (hex == null || hex.Length == 0)
+            return PrimitiveResult.Ok(context.HeapManager.GetNil());
+
+        // Remove leading #
+        if (hex[0] == '#') hex = hex.Substring(1);
+
+        int r, g, b, a = 255;
+
+        try
+        {
+            if (hex.Length == 3)
+            {
+                // #RGB -> #RRGGBB
+                r = Convert.ToInt32(new string(hex[0], 2), 16);
+                g = Convert.ToInt32(new string(hex[1], 2), 16);
+                b = Convert.ToInt32(new string(hex[2], 2), 16);
+            }
+            else if (hex.Length == 6)
+            {
+                // #RRGGBB
+                r = Convert.ToInt32(hex.Substring(0, 2), 16);
+                g = Convert.ToInt32(hex.Substring(2, 2), 16);
+                b = Convert.ToInt32(hex.Substring(4, 2), 16);
+            }
+            else if (hex.Length == 8)
+            {
+                // #RRGGBBAA
+                r = Convert.ToInt32(hex.Substring(0, 2), 16);
+                g = Convert.ToInt32(hex.Substring(2, 2), 16);
+                b = Convert.ToInt32(hex.Substring(4, 2), 16);
+                a = Convert.ToInt32(hex.Substring(6, 2), 16);
+            }
+            else
+            {
+                return PrimitiveResult.Ok(context.HeapManager.GetNil());
+            }
+        }
+        catch
+        {
+            return PrimitiveResult.Ok(context.HeapManager.GetNil());
+        }
+
+        // Create Color object with r, g, b as floats 0.0-1.0
+        return CreateColor(context, r / 255.0, g / 255.0, b / 255.0);
+    }
+
+    private PrimitiveResult CreateColor(PrimitiveExecutionContext context,
+                                         double r, double g, double b)
+    {
+        // Allocate Color instance and set RGB values
+        var colorClass = context.RuntimeServices?.GetClass("Color")
+            ?? throw new InvalidOperationException("Cannot find Color class");
+        var color = context.HeapManager.AllocateInstanceOf(colorClass, 0);
+
+        // Set instance variables (r, g, b are floats)
+        // Color has: rgb (packed integer) or component floats depending on implementation
+        // Implementation details depend on Color class structure
+
+        return PrimitiveResult.Ok(color);
+    }
+}
+```
 
 ### SyntaxStyler Theme Loading
 
@@ -497,46 +767,69 @@ ensureThemeDirectory
 !SyntaxStyler class methodsFor: 'theme loading'!
 
 loadThemeNamed: themeName
-    "Load a theme from the themes directory.
-     themeName should be the filename without extension.
+    "Load a VS Code theme from the themes directory.
+     themeName should be the filename without .json extension.
      Answer the color Dictionary, or nil if not found.
 
-     Example: SyntaxStyler loadThemeNamed: 'VSCodeLight'"
+     Example: SyntaxStyler loadThemeNamed: 'light_plus'"
     | path file contents |
-    path := self themeDirectory / (themeName, '.theme').
+    path := self themeDirectory / (themeName, '.json').
     file := WindowsFile on: path asString.
     file exists ifFalse: [^nil].
     contents := file readStream contents.
-    ^self parseThemeString: contents!
+    ^self parseVSCodeTheme: contents!
 
-parseThemeString: aString
-    "Parse a theme file contents and answer a color Dictionary.
-     Theme files contain Smalltalk dictionary expressions."
-    | result |
-    [result := Compiler evaluate: aString]
-        on: Error
-        do: [:ex |
-            Transcript show: 'Theme parse error: ', ex description; cr.
-            ^nil].
-    (result isKindOf: Dictionary) ifFalse: [
-        Transcript show: 'Theme file must evaluate to a Dictionary'; cr.
+parseVSCodeTheme: jsonString
+    "Parse a VS Code theme JSON string and answer a color Dictionary.
+     Maps TextMate scopes to TextColor objects."
+    | json tokenColors result |
+    json := self primitiveParseJSON: jsonString.
+    json ifNil: [
+        Transcript show: 'Theme parse error: invalid JSON'; cr.
         ^nil].
-    ^self convertThemeDictionary: result!
+    (json isKindOf: Dictionary) ifFalse: [
+        Transcript show: 'Theme file must be a JSON object'; cr.
+        ^nil].
 
-convertThemeDictionary: aDictionary
-    "Convert a raw theme dictionary (with Color values) to
-     a TextColor dictionary suitable for use in styling."
-    | result |
+    tokenColors := json at: 'tokenColors' ifAbsent: [#()].
+    (tokenColors isKindOf: Array) ifFalse: [
+        Transcript show: 'tokenColors must be an array'; cr.
+        ^nil].
+
     result := Dictionary new.
-    aDictionary keysAndValuesDo: [:scope :color |
-        result at: scope put: (TextColor color: color)].
+    tokenColors do: [:rule |
+        self processTokenColorRule: rule into: result].
     ^result!
 
+processTokenColorRule: rule into: result
+    "Process a single tokenColors entry from VS Code theme.
+     rule is a Dictionary with 'scope' and 'settings' keys."
+    | scopes settings foreground color |
+    (rule isKindOf: Dictionary) ifFalse: [^self].
+
+    settings := rule at: 'settings' ifAbsent: [^self].
+    (settings isKindOf: Dictionary) ifFalse: [^self].
+
+    foreground := settings at: 'foreground' ifAbsent: [^self].
+    color := Color fromHexString: foreground.
+    color ifNil: [^self].
+
+    scopes := rule at: 'scope' ifAbsent: [^self].
+
+    "scope can be a string or an array of strings"
+    scopes isString
+        ifTrue: [result at: scopes put: (TextColor color: color)]
+        ifFalse: [
+            (scopes isKindOf: Array) ifTrue: [
+                scopes do: [:scope |
+                    scope isString ifTrue: [
+                        result at: scope put: (TextColor color: color)]]]].!
+
 useThemeNamed: themeName
-    "Load and activate a theme by name.
+    "Load and activate a VS Code theme by name.
      Answer true if successful, false if theme not found.
 
-     Example: SyntaxStyler useThemeNamed: 'VSCodeLight'"
+     Example: SyntaxStyler useThemeNamed: 'light_plus'"
     | colors |
     colors := self loadThemeNamed: themeName.
     colors ifNil: [^false].
@@ -545,61 +838,114 @@ useThemeNamed: themeName
 
 availableThemes
     "Answer a collection of available theme names (without extension).
-     Scans the themes directory for .theme files."
+     Scans the themes directory for .json files."
     | dir files |
     dir := WindowsDirectory on: self themeDirectoryString.
     dir exists ifFalse: [^#()].
-    files := dir filesMatching: '*.theme'.
+    files := dir filesMatching: '*.json'.
     ^files collect: [:f | f baseName]! !
 
-!SyntaxStyler class methodsFor: 'theme installation'!
+!SyntaxStyler class methodsFor: 'theme primitives'!
 
-installDefaultThemes
-    "Install the built-in themes to the user's theme directory.
-     Does not overwrite existing files."
-    self ensureThemeDirectory.
-    self installTheme: 'VSCodeLight' contents: self vscodeLightThemeSource.
-    self installTheme: 'VSCodeDark' contents: self vscodeDarkThemeSource.
-    self installTheme: 'Classic' contents: self classicThemeSource!
+primitiveParseJSON: aString
+    "Primitive 161: Parse JSON string into Smalltalk objects.
+     Returns Dictionary, Array, String, Number, Boolean, or nil."
+    <primitive: 161>
+    ^nil  "Fallback if primitive not available"! !
 
-installTheme: themeName contents: themeSource
-    "Install a theme file if it doesn't exist."
-    | path file |
-    path := self themeDirectory / (themeName, '.theme').
-    file := WindowsFile on: path asString.
-    file exists ifTrue: [^self].  "Don't overwrite"
-    file writeStream
-        nextPutAll: themeSource;
-        close!
+!Color class methodsFor: 'instance creation'!
 
-vscodeLightThemeSource
-    "Answer the source code for the VSCode Light+ theme."
-    ^'"VSCodeLight.theme - Theme for white backgrounds"
-"Based on VS Code Light+ (default light) theme"
+fromHexString: hexString
+    "Create a Color from a hex string like '#RRGGBB' or '#RRGGBBAA'.
+     Returns nil if the format is invalid.
 
-Dictionary new
-    at: ''comment.block'' put: (Color r: 0.0 g: 0.502 b: 0.0);
-    at: ''string.quoted.single'' put: (Color r: 0.639 g: 0.082 b: 0.082);
-    at: ''constant.other.symbol'' put: (Color r: 0.0 g: 0.0 b: 1.0);
-    at: ''constant.numeric'' put: (Color r: 0.035 g: 0.525 b: 0.345);
-    at: ''keyword.control'' put: (Color r: 0.686 g: 0.0 b: 0.859);
-    at: ''entity.name.type'' put: (Color r: 0.149 g: 0.498 b: 0.6);
-    yourself'!
+     Example: Color fromHexString: '#FF5733'"
+    <primitive: 162>
+    "Fallback: parse in Smalltalk if primitive not available"
+    ^self parseHexStringFallback: hexString!
 
-vscodeDarkThemeSource
-    "Answer the source code for the VSCode Dark+ theme."
-    ^'"VSCodeDark.theme - Theme for dark backgrounds"
-"Based on VS Code Dark+ (default dark) theme"
+parseHexStringFallback: hexString
+    "Smalltalk fallback for hex color parsing."
+    | hex r g b |
+    hex := hexString.
+    (hex size > 0 and: [hex first = $#])
+        ifTrue: [hex := hex copyFrom: 2 to: hex size].
 
-Dictionary new
-    at: ''comment.block'' put: (Color r: 0.42 g: 0.557 b: 0.137);
-    at: ''string.quoted.single'' put: (Color r: 0.808 g: 0.522 b: 0.427);
-    at: ''constant.other.symbol'' put: (Color r: 0.569 g: 0.808 b: 0.957);
-    at: ''constant.numeric'' put: (Color r: 0.71 g: 0.808 b: 0.659);
-    at: ''keyword.control'' put: (Color r: 0.784 g: 0.439 b: 0.808);
-    at: ''entity.name.type'' put: (Color r: 0.306 g: 0.788 b: 0.69);
-    yourself'! !
+    hex size = 6 ifFalse: [^nil].
+
+    [r := Integer readFrom: (hex copyFrom: 1 to: 2) base: 16.
+     g := Integer readFrom: (hex copyFrom: 3 to: 4) base: 16.
+     b := Integer readFrom: (hex copyFrom: 5 to: 6) base: 16]
+        on: Error do: [:ex | ^nil].
+
+    ^self r: (r / 255.0) g: (g / 255.0) b: (b / 255.0)! !
 ```
+
+### Theme Inheritance (include)
+
+VS Code themes can inherit from other themes using the `include` field:
+
+```json
+{
+  "name": "My Custom Theme",
+  "include": "./light_plus.json",
+  "tokenColors": [
+    {
+      "scope": "comment",
+      "settings": { "foreground": "#999999" }
+    }
+  ]
+}
+```
+
+**Implementation:**
+
+```smalltalk
+parseVSCodeTheme: jsonString
+    "Parse a VS Code theme JSON string, handling inheritance."
+    | json baseTheme result |
+    json := self primitiveParseJSON: jsonString.
+    json ifNil: [^nil].
+
+    "Handle theme inheritance"
+    (json includesKey: 'include') ifTrue: [
+        | includePath |
+        includePath := json at: 'include'.
+        baseTheme := self loadThemeNamed: (self extractBaseName: includePath).
+        baseTheme ifNil: [baseTheme := Dictionary new]]
+    ifFalse: [
+        baseTheme := Dictionary new].
+
+    "Process tokenColors and merge with base"
+    result := baseTheme copy.
+    (json at: 'tokenColors' ifAbsent: [#()]) do: [:rule |
+        self processTokenColorRule: rule into: result].
+    ^result!
+```
+
+### Obtaining VS Code Themes
+
+Users can obtain VS Code theme files from:
+
+1. **VS Code Installation:**
+   ```
+   %USERPROFILE%\.vscode\extensions\<theme-extension>\themes\
+   ```
+
+2. **VS Code GitHub Repository:**
+   ```
+   https://github.com/microsoft/vscode/tree/main/extensions/theme-defaults/themes
+   ```
+
+3. **Theme Extension Repositories:**
+   - Dracula: https://github.com/dracula/visual-studio-code
+   - One Dark Pro: https://github.com/Binaryify/OneDark-Pro
+   - Nord: https://github.com/arcticicestudio/nord-visual-studio-code
+
+**Installation Steps:**
+1. Download the `.json` theme file
+2. Copy to `%APPDATA%\Smalltalk-80\themes\`
+3. Load with `SyntaxStyler useThemeNamed: 'theme-name'`
 
 ---
 
@@ -707,26 +1053,40 @@ SyntaxStyler installDefaultThemes.
 
 ## Implementation Checklist
 
-- [ ] **Phase 1: Primitive Implementation**
-  - [ ] Add `GetSpecialFolder` class to `FileInfoPrimitives.cs`
-  - [ ] Register primitive 160 in `PrimitiveRegistry.cs`
-  - [ ] Add C# unit tests
+- [ ] **Phase 1: C# Primitives**
+  - [ ] Add `GetSpecialFolder` (160) to `FileInfoPrimitives.cs`
+  - [ ] Add `ParseJSON` (161) to new `JsonPrimitives.cs`
+  - [ ] Add `ParseHexColor` (162) to `JsonPrimitives.cs`
+  - [ ] Register primitives 160-162 in `PrimitiveRegistry.cs`
+  - [ ] Add C# unit tests for all three primitives
 
 - [ ] **Phase 2: WindowsPath Extension**
-  - [ ] Add `SpecialFolders` class variable
+  - [ ] Add `SpecialFolders` class variable to WindowsPath
   - [ ] Implement `initializeSpecialFolders`
   - [ ] Implement `specialFolder:` and convenience methods
   - [ ] Implement `applicationPath:`
   - [ ] Add to init expression if desired
 
-- [ ] **Phase 3: Theme Infrastructure**
-  - [ ] Implement `themeDirectory` in SyntaxStyler
-  - [ ] Implement `loadThemeNamed:` and `parseThemeString:`
-  - [ ] Implement `installDefaultThemes`
-  - [ ] Implement `availableThemes`
-  - [ ] Test with actual theme files
+- [ ] **Phase 3: Color Hex Parsing**
+  - [ ] Add `Color class>>fromHexString:` with primitive 162
+  - [ ] Add Smalltalk fallback `parseHexStringFallback:`
+  - [ ] Test with various hex formats (#RGB, #RRGGBB, #RRGGBBAA)
 
-- [ ] **Phase 4: Integration**
+- [ ] **Phase 4: VS Code Theme Loading**
+  - [ ] Implement `themeDirectory` in SyntaxStyler
+  - [ ] Implement `primitiveParseJSON:` wrapper
+  - [ ] Implement `parseVSCodeTheme:` and `processTokenColorRule:into:`
+  - [ ] Implement `loadThemeNamed:` and `useThemeNamed:`
+  - [ ] Implement `availableThemes`
+  - [ ] Test with actual VS Code theme files (light_plus.json, dark_plus.json)
+
+- [ ] **Phase 5: Theme Inheritance**
+  - [ ] Implement `include` field handling
+  - [ ] Implement `extractBaseName:` for path parsing
+  - [ ] Test with themes that inherit from base themes
+
+- [ ] **Phase 6: Integration & Polish**
+  - [ ] Create `%APPDATA%\Smalltalk-80\themes\` on first use
   - [ ] Add theme selection UI (future)
   - [ ] Persist theme preference (future)
   - [ ] Document for users
@@ -737,4 +1097,8 @@ SyntaxStyler installDefaultThemes.
 
 - [Environment.SpecialFolder Enum](https://docs.microsoft.com/en-us/dotnet/api/system.environment.specialfolder)
 - [Windows Known Folders](https://docs.microsoft.com/en-us/windows/win32/shell/known-folders)
+- [VS Code Color Theme Guide](https://code.visualstudio.com/api/extension-guides/color-theme)
+- [VS Code Syntax Highlighting Guide](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide)
+- [TextMate Language Grammars](https://macromates.com/manual/en/language_grammars)
+- [VS Code Default Themes (GitHub)](https://github.com/microsoft/vscode/tree/main/extensions/theme-defaults/themes)
 - [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html) (for future cross-platform)
