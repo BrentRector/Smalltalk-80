@@ -35262,47 +35262,50 @@ styleMethod: sourceString inClass: aClass
 
 !SyntaxStyler class methodsFor: 'class initialization'!
 initialize
-	"Initialize the default color map.
+	"Initialize the default color map using GitHub Smalltalk syntax colors.
+	 See: https://github.com/leocamello/vscode-smalltalk
 	 SyntaxStyler initialize"
 	DefaultColorMap := Dictionary new.
 
-	"Comments - green (traditional)"
-	DefaultColorMap at: #comment put: (TextColor color: (Color r: 0.0 g: 0.5 b: 0.0)).
+	"Comments - gray #6a737d (comment.block.smalltalk)"
+	DefaultColorMap at: #comment put: (TextColor color: (Color r: 0.42 g: 0.45 b: 0.49)).
 
-	"Strings - dark red/maroon"
-	DefaultColorMap at: #string put: (TextColor color: (Color r: 0.6 g: 0.0 b: 0.0)).
+	"Strings - brown #9a6700 (string.quoted.single.smalltalk)"
+	DefaultColorMap at: #string put: (TextColor color: (Color r: 0.60 g: 0.40 b: 0.0)).
 
-	"Symbols - dark magenta"
-	DefaultColorMap at: #symbol put: (TextColor color: (Color r: 0.5 g: 0.0 b: 0.5)).
+	"Symbols - blue #005cc5 (constant.other.symbol.smalltalk)"
+	DefaultColorMap at: #symbol put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
 
-	"Numbers - dark blue"
-	DefaultColorMap at: #number put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.7)).
+	"Numbers - blue #005cc5 (constant.numeric.smalltalk)"
+	DefaultColorMap at: #number put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
 
-	"Keywords (message selectors with colons) - dark blue"
-	DefaultColorMap at: #keyword put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.6)).
+	"Keywords (selectors with colons) - no color, use black"
+	"DefaultColorMap at: #keyword put: nil"
 
-	"Binary selectors - dark gray"
-	DefaultColorMap at: #binary put: (TextColor color: (Color r: 0.3 g: 0.3 b: 0.3)).
+	"Binary selectors - red #d73a49 (keyword.operator.smalltalk)"
+	DefaultColorMap at: #binary put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
 
-	"Pseudo-variables - bold purple"
-	DefaultColorMap at: #self put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
-	DefaultColorMap at: #super put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
-	DefaultColorMap at: #nil put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
-	DefaultColorMap at: #true put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
-	DefaultColorMap at: #false put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
-	DefaultColorMap at: #thisContext put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
+	"self/super - red #d73a49 (storage.modifier.smalltalk)"
+	DefaultColorMap at: #self put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
+	DefaultColorMap at: #super put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
 
-	"Return arrow - red"
-	DefaultColorMap at: #return put: (TextColor color: (Color r: 0.7 g: 0.0 b: 0.0)).
+	"true/false/nil - blue #005cc5 (constant.language.smalltalk)"
+	DefaultColorMap at: #nil put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
+	DefaultColorMap at: #true put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
+	DefaultColorMap at: #false put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
+	DefaultColorMap at: #thisContext put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
 
-	"Assignment - dark gray"
-	DefaultColorMap at: #assignment put: (TextColor color: (Color r: 0.3 g: 0.3 b: 0.3)).
+	"Return arrow - red #d73a49 (keyword.control.flow.return.smalltalk)"
+	DefaultColorMap at: #return put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
 
-	"Block brackets - teal"
-	DefaultColorMap at: #blockBracket put: (TextColor color: (Color r: 0.0 g: 0.4 b: 0.4)).
+	"Assignment - red #d73a49 (keyword.operator.assignment.smalltalk)"
+	DefaultColorMap at: #assignment put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
 
-	"Globals (class names) - dark teal"
-	DefaultColorMap at: #global put: (TextColor color: (Color r: 0.0 g: 0.4 b: 0.5)).
+	"Block brackets - no special color"
+	"DefaultColorMap at: #blockBracket put: nil"
+
+	"Globals (class names) - purple #6f42c1 (entity.name.type.class.smalltalk)"
+	DefaultColorMap at: #global put: (TextColor color: (Color r: 0.44 g: 0.26 b: 0.76)).
 
 	"Identifiers (locals, temps, args) - no special color (black)"
 	"DefaultColorMap at: #identifier put: nil"
@@ -35965,11 +35968,27 @@ indexOf: anElement
 	not contain anElement, answer 0."
 
 	^self indexOf: anElement ifAbsent: [0]!
-indexOf: anElement ifAbsent: exceptionBlock 
+indexOf: anElement ifAbsent: exceptionBlock
 	"Answer the index of anElement within the receiver.  If the receiver does
 	not contain anElement, answer the result of evaluating the exceptionBlock."
 
 	(1 to: self size)
+		do: [:i | (self at: i) = anElement ifTrue: [^i]].
+	^exceptionBlock value!
+indexOf: anElement startingAt: startIndex
+	"Answer the index of the first occurrence of anElement within the receiver,
+	starting the search at startIndex.  If the receiver does not contain anElement
+	at or after startIndex, answer 0."
+
+	(startIndex to: self size)
+		do: [:i | (self at: i) = anElement ifTrue: [^i]].
+	^0!
+indexOf: anElement startingAt: startIndex ifAbsent: exceptionBlock
+	"Answer the index of anElement within the receiver, starting the search
+	at startIndex.  If the receiver does not contain anElement at or after
+	startIndex, answer the result of evaluating the exceptionBlock."
+
+	(startIndex to: self size)
 		do: [:i | (self at: i) = anElement ifTrue: [^i]].
 	^exceptionBlock value!
 indexOfSubCollection: aSubCollection startingAt: anIndex 
