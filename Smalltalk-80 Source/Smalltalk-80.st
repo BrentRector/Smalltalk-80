@@ -2982,6 +2982,12 @@ hashMappedBy: map
 	self size = 0 ifTrue: [^ self hash].
 	^ (self first hashMappedBy: map) + (self last hashMappedBy: map)! !
 
+!Array methodsFor: 'testing'!
+isArray
+	"Answer true - the receiver is an Array."
+
+	^true! !
+
 !Array methodsFor: 'converting'!
 asArray
 	"Answer with the receiver itself."
@@ -3339,7 +3345,11 @@ isVariable
 isWords
 	"Answer whether the receiver has 16-bit instance variables."
 
-	^self isBytes not! !
+	^self isBytes not!
+isBehavior
+	"Answer true - the receiver is a Behavior."
+
+	^true! !
 
 !Behavior methodsFor: 'copying'!
 copy
@@ -3394,10 +3404,10 @@ removeSubclass: aSubclass
 	subclasses == nil ifFalse:
 		[subclasses remove: aSubclass ifAbsent: [].
 		subclasses isEmpty ifTrue: [subclasses _ nil]]!
-superclass: aClass 
+superclass: aClass
 	"Change the receiver's superclass to be aClass."
 
-	(aClass isKindOf: Behavior)
+	aClass isBehavior
 		ifTrue: [superclass _ aClass]
 		ifFalse: [self error: 'superclass must be a class-describing object']! !
 
@@ -6209,6 +6219,12 @@ removeSelf
 
 	^home removeSelf! !
 
+!BlockContext methodsFor: 'testing'!
+isBlock
+	"Answer true - the receiver is a BlockContext."
+
+	^true! !
+
 !BlockContext methodsFor: 'temporaries'!
 tempAt: index 
 	^home at: index!
@@ -6797,14 +6813,14 @@ selectedClass
 		ifFalse: [^ Smalltalk at: className]! !
 
 !Browser methodsFor: 'class functions'!
-acceptClass: aText from: aController 
+acceptClass: aText from: aController
 	| oldClass class |
 	oldClass _ className == nil ifTrue: [Object] ifFalse: [self selectedClass].
 	class _ oldClass subclassDefinerClass
 				evaluate: aText string
 				notifying: aController
 				logged: true.
-	(class isKindOf: Behavior)
+	class isBehavior
 		ifTrue: [self newClassList: class name.  ^true]
 		ifFalse: [^false]!
 browseClassReferences
@@ -8570,7 +8586,7 @@ scanSpecialDo: aBlock
 scanClassDefinition: classType className: superName do: aBlock
 	"Scan a presumed class definition.  The classType is the first keyword of the class defining message (subclass:, variableSubclass:, etc.)"
 	| newName parameters |
-	(tokenType == #literal and: [token isKindOf: Symbol]) ifFalse: [^nil].
+	(tokenType == #literal and: [token isSymbol]) ifFalse: [^nil].
 	newName _ token.
 	parameters _ #('instanceVariableNames:' 'classVariableNames:' 'poolDictionaries:' 'category:') collect:
 		[:keyword |
@@ -8590,14 +8606,14 @@ scanClassExpression: class do: aBlock
 	firstToken _ token.
 	self scanToken.
 	firstToken = 'removeSelector:'
-		ifTrue: 
-			[(tokenType == #literal and: [token isKindOf: Symbol]) ifTrue:
+		ifTrue:
+			[(tokenType == #literal and: [token isSymbol]) ifTrue:
 				[selector _ token.
 				self scanToken.
 				^aBlock value: (MethodOtherChange new className: class; selector: selector; type: #remove)]].
 	firstToken = 'rename:'
-		ifTrue: 
-			[(tokenType == #literal and: [token isKindOf: Symbol]) ifTrue:
+		ifTrue:
+			[(tokenType == #literal and: [token isSymbol]) ifTrue:
 				[newName _ token.
 				self scanToken.
 				aBlock value: (ClassOtherChange new className: class; type: #rename).
@@ -9068,6 +9084,9 @@ isVowel
 	"Answer whether the receiver is one of the vowels, AEIOU, in upper or lower case."
 
 	^'AEIOU' includes: self asUppercase!
+isCharacter
+	"Answer true since the receiver is a Character."
+	^true!
 tokenish
 	"Answer whether the receiver is a valid token-character--letter, digit, or colon."
 
@@ -10874,7 +10893,7 @@ getSuperclasses: superNames
 	supers _ (Scanner new scanTokens: superNames) collect:
 		[:each | Smalltalk at: each].
 	"check that each is a kind of Behavior"
-	supers do: [:each | (each isKindOf: Behavior) ifFalse: 
+	supers do: [:each | each isBehavior ifFalse:
 		[self error: 'superclass must be a class-describing object']].
 	^supers!
 named: newClassName superclasses: newSuperNames instanceVariableNames: myInstVarNames classVariableNames: classVarNames category: cat
@@ -11338,7 +11357,7 @@ category: cat
 	"Categorize the receiver under the system category, cat, removing it from any
 	previous categorization."
 
-	(cat isKindOf: String)
+	cat isString
 		ifTrue: [SystemOrganization classify: self name under: cat asSymbol]
 		ifFalse: [self errorCategoryName]!
 logOrganizationChange
@@ -12189,13 +12208,17 @@ isEmpty
 	"Answer whether the receiver contains any elements."
 
 	^self size = 0!
-occurrencesOf: anObject 
+occurrencesOf: anObject
 	"Answer how many of the receiver's elements are equal to anObject."
 
 	| tally |
 	tally _ 0.
 	self do: [:each | anObject = each ifTrue: [tally _ tally + 1]].
-	^tally! !
+	^tally!
+isCollection
+	"Answer true - the receiver is a Collection."
+
+	^true! !
 
 !Collection methodsFor: 'adding'!
 add: newObject 
@@ -18645,10 +18668,10 @@ nextPut: aByte
 			[self nextPage ifNil: [^self error: 'cannot write!!!!!!'].
 			position = readLimit ifTrue: [writeLimit _ dmax]].
 	^collection at: (position _ position + 1) put: aByte!
-nextPutAll: aCollection 
+nextPutAll: aCollection
 	| dmax howManyWritten increment collectionSize |
 
-	((aCollection isKindOf: ByteArray) or: [aCollection isKindOf: String])
+	((aCollection isKindOf: ByteArray) or: [aCollection isString])
 		ifFalse: [^super nextPutAll: aCollection].
 
 	rwmode == nil
@@ -19564,6 +19587,12 @@ truncated
 
 	<primitive: 51>
 	^(self quo: 16383.0) * 16383 + (self rem: 16383.0) truncated! !
+
+!Float methodsFor: 'testing'!
+isFloat
+	"Answer true - the receiver is a Float."
+
+	^true! !
 
 !Float methodsFor: 'coercing'!
 coerce: aNumber 
@@ -26246,10 +26275,10 @@ name: newName inEnvironment: environ subclassOf: sup and: others instanceVariabl
 			[self error: 'Class names must be capitalized'.
 			^false].
 	(wasPresent _ environ includesKey: newName)
-		ifTrue: 
+		ifTrue:
 			[oldClass _ environ at: newName.
-			(oldClass isKindOf: Behavior)
-				ifFalse: 
+			oldClass isBehavior
+				ifFalse:
 					[self error: newName , ' already exists!!  Proceed will store over it'.
 					wasPresent _ false.
 					oldClass _ self newNamed: newName otherSupers: others]]
@@ -26300,10 +26329,10 @@ name: newName inEnvironment: environ subclassOf: sup instanceVariableNames: inst
 			[self error: 'Class names must be capitalized'.
 			^false].
 	(wasPresent _ environ includesKey: newName)
-		ifTrue: 
+		ifTrue:
 			[oldClass _ environ at: newName.
-			(oldClass isKindOf: Behavior)
-				ifFalse: 
+			oldClass isBehavior
+				ifFalse:
 					[self error: newName , ' already exists!!  Proceed will store over it'.
 					wasPresent _ false.
 					oldClass _ self newNamed: newName]]
@@ -27355,7 +27384,11 @@ sign
 strictlyPositive
 	"Answer whether the receiver is greater than 0."
 
-	^self > 0! !
+	^self > 0!
+isNumber
+	"Answer true - the receiver is a Number."
+
+	^true! !
 
 !Number methodsFor: 'truncation and round off'!
 ceiling
@@ -27409,7 +27442,7 @@ retry: aSymbol coercing: aNumber
 	try again.  If the symbol is the equals sign, answer false if the argument is
 	not a Number.  If the generalities are the same, create an error message."
 
-	(aSymbol == #= and: [(aNumber isKindOf: Number) == false])
+	(aSymbol == #= and: [aNumber isNumber == false])
 		ifTrue: [^false].
 	self generality < aNumber generality
 		ifTrue: [^(aNumber coerce: self) perform: aSymbol with: aNumber].
@@ -27551,7 +27584,7 @@ at: index
 	<primitive: 60>
 	index isInteger
 		ifTrue: [self errorSubscriptBounds: index].
-	(index isKindOf: Number)
+	index isNumber
 		ifTrue: [^self at: index truncated]
 		ifFalse: [self errorNonIntegerIndex]!
 at: index put: value 
@@ -27565,7 +27598,7 @@ at: index put: value
 		ifTrue: [(index >= 1 and: [index <= self size])
 					ifTrue: [self errorImproperStore]
 					ifFalse: [self errorSubscriptBounds: index]].
-	(index isKindOf: Number)
+	index isNumber
 		ifTrue: [^self at: index truncated put: value]
 		ifFalse: [self errorNonIntegerIndex]!
 basicAt: index 
@@ -27591,7 +27624,7 @@ basicAt: index put: value
 		ifTrue: [(index >= 1 and: [index <= self size])
 					ifTrue: [self errorImproperStore]
 					ifFalse: [self errorSubscriptBounds: index]].
-	(index isKindOf: Number)
+	index isNumber
 		ifTrue: [^self basicAt: index truncated put: value]
 		ifFalse: [self errorNonIntegerIndex]!
 basicSize
@@ -27618,10 +27651,40 @@ yourself
 	"Answer self."! !
 
 !Object methodsFor: 'testing'!
+isArray
+	"Answer whether the receiver is an Array. Array overrides with ^true"
+	^false!
+isBehavior
+	"Answer whether the receiver is a Behavior (class-like). Behavior overrides with ^true"
+	^false!
+isBlock
+	"Answer whether the receiver is a BlockContext. BlockContext overrides with ^true"
+	^false!
+isCharacter
+	"Answer whether the receiver is a Character. Character overrides with ^true"
+	^false!
+isCollection
+	"Answer whether the receiver is a Collection. Collection overrides with ^true"
+	^false!
+isFloat
+	"Answer whether the receiver is a Float. Float overrides with ^true"
+	^false!
 isInteger
 	"Coerces Integers to true and everything else to false.  Integer
 	overrides with ^true"
 
+	^false!
+isNumber
+	"Answer whether the receiver is a Number. Number overrides with ^true"
+	^false!
+isString
+	"Answer whether the receiver is a String. String overrides with ^true"
+	^false!
+isSymbol
+	"Answer whether the receiver is a Symbol. Symbol overrides with ^true"
+	^false!
+isText
+	"Answer whether the receiver is a Text. Text overrides with ^true"
 	^false!
 isNil
 	"Coerces nil to true and everything else to false.  UndefinedObject 
@@ -35010,7 +35073,7 @@ calculateEndFor: tokenValue type: scannerType startingAt: start
 		^start + tokenValue size + 1].  "Include both quotes"
 
 	"For character literals ($x), include the $"
-	(scannerType == #number and: [tokenValue isKindOf: Character]) ifTrue: [
+	(scannerType == #number and: [tokenValue isCharacter]) ifTrue: [
 		^start + 1].
 
 	"For numbers, convert to string to get length"
@@ -35019,7 +35082,7 @@ calculateEndFor: tokenValue type: scannerType startingAt: start
 
 	"For symbols #foo, account for the #"
 	scannerType == #literal ifTrue: [
-		(tokenValue isKindOf: Symbol) ifTrue: [
+		tokenValue isSymbol ifTrue: [
 			^start + tokenValue size].
 		"For literal arrays, this is tricky - use source position"
 		^start + tokenValue printString size - 1].
@@ -35029,9 +35092,9 @@ calculateEndFor: tokenValue type: scannerType startingAt: start
 		^start + tokenValue size - 1].
 
 	"For words and binary selectors"
-	(tokenValue isKindOf: String) ifTrue: [
+	tokenValue isString ifTrue: [
 		^start + tokenValue size - 1].
-	(tokenValue isKindOf: Symbol) ifTrue: [
+	tokenValue isSymbol ifTrue: [
 		^start + tokenValue size - 1].
 
 	"Default: single character"
@@ -37943,13 +38006,13 @@ at: index
 
 	<primitive: 63>
 	^Character value: (super at: index)!
-at: index put: aCharacter 
-	"Store the Character in the field of the receiver indicated by the index.  Fail if the 
-	index is not an Integer or is out of bounds, or if the argument is not a Character.  
+at: index put: aCharacter
+	"Store the Character in the field of the receiver indicated by the index.  Fail if the
+	index is not an Integer or is out of bounds, or if the argument is not a Character.
 	Essential.  See Object documentation whatIsAPrimitive."
 
 	<primitive: 64>
-	(aCharacter isKindOf: Character)
+	aCharacter isCharacter
 		ifTrue: [self errorNonIntegerIndex]
 		ifFalse: [self error: 'Strings only store Characters']!
 basicAt: index 
@@ -37959,13 +38022,13 @@ basicAt: index
 
 	<primitive: 63>
 	^Character value: (super at: index)!
-basicAt: index put: aCharacter 
-	"Store the Character in the field of the receiver indicated by the index.  Fail if the 
-	index is not an Integer or is out of bounds, or if the argument is not a Character.  
+basicAt: index put: aCharacter
+	"Store the Character in the field of the receiver indicated by the index.  Fail if the
+	index is not an Integer or is out of bounds, or if the argument is not a Character.
 	Essential.  See Object documentation whatIsAPrimitive."
 
 	<primitive: 64>
-	(aCharacter isKindOf: Character)
+	aCharacter isCharacter
 		ifTrue: [self errorNonIntegerIndex]
 		ifFalse: [self error: 'Strings only store Characters']!
 findString: subString startingAt: start 
@@ -37982,11 +38045,11 @@ findString: subString startingAt: start
 				[index = subString size ifTrue: [^startIndex].
 				index _ index+1]]].
 	^0!
-replaceFrom: start to: stop with: replacement startingAt: repStart 
+replaceFrom: start to: stop with: replacement startingAt: repStart
 	"This destructively replaces elements from start to stop in the receiver
 	starting at index, repStart, in the collection, replacement.  Answer the
 	receiver."
-	(replacement isKindOf: String)
+	replacement isString
 		ifTrue:
 			[self primReplaceFrom: start to: stop with: replacement startingAt: repStart]
 		ifFalse:
@@ -38172,6 +38235,11 @@ displayOn: aDisplayMedium at: aPoint
 	"Show a representation of the receiver as a DisplayText at location
 	aPoint on aDisplayMedium."
 	self asDisplayText displayOn: aDisplayMedium at: aPoint! !
+
+!String methodsFor: 'testing'!
+isString
+	"Answer true since the receiver is a String."
+	^true! !
 
 !String methodsFor: 'private'!
 compare: s 
@@ -39038,6 +39106,11 @@ asString
 	1 to: self size do: [:index | newString at: index put: (self at: index)].
 	^newString!
 asSymbol! !
+
+!Symbol methodsFor: 'testing'!
+isSymbol
+	"Answer true since the receiver is a Symbol."
+	^true! !
 
 !Symbol methodsFor: 'private'!
 errorNoModification
@@ -40558,10 +40631,10 @@ asOopToIndex: oop
 	oop < 0
 		ifTrue: [^ oop + 32768]
 		ifFalse: [^ oop]!
-clamp: obj 
+clamp: obj
 	refcts at: (self oopOf: obj) put: Clamped.
-	(obj isKindOf: Behavior)
-		ifTrue: 
+	obj isBehavior
+		ifTrue:
 			[writeDict at: obj put: #writeClamped:.
 			Smalltalk removeKey: obj name.
 			SystemOrganization removeElement: obj name]!
@@ -40697,8 +40770,14 @@ The emphasis codes indicate abstract changes in character appearance.  Actual di
 
 
 !Text methodsFor: 'comparing'!
-= anotherText 
+= anotherText
 	^string = anotherText string! !
+
+!Text methodsFor: 'testing'!
+isText
+	"Answer true - the receiver is a Text."
+
+	^true! !
 
 !Text methodsFor: 'accessing'!
 at: index 
