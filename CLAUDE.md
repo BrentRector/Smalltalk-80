@@ -224,6 +224,21 @@ Full 32bpp color support with anti-aliased text rendering:
 - **[PROCESS-MANAGEMENT.md](docs/Architecture/PROCESS-MANAGEMENT.md)** - Process scheduling, semaphores, priority queues
 - **[PROPOSED-TIMER-OPTIMIZATION.md](docs/Architecture/PROPOSED-TIMER-OPTIMIZATION.md)** - Timer/event system, WaitHandle.WaitAny implementation
 
+## Feature Design Documents
+
+**Design specifications for features under development:**
+
+| Document | Purpose |
+|----------|---------|
+| **[JSON-PROCESSING-IN-SMALLTALK.md](docs/JSON-PROCESSING-IN-SMALLTALK.md)** | Pure Smalltalk JSON reader/writer implementation |
+| **[WINDOWS-SPECIAL-FOLDERS-IMPLEMENTATION.md](docs/WINDOWS-SPECIAL-FOLDERS-IMPLEMENTATION.md)** | Primitive 160 for Windows %APPDATA%, %LOCALAPPDATA%, etc. |
+| **[WELL-KNOWN-PATHS-DESIGN.md](docs/WELL-KNOWN-PATHS-DESIGN.md)** | Theme file loading from AppData using VS Code JSON format |
+
+**Key Design Decisions:**
+- JSON parsing is pure Smalltalk using `JsonReader`/`JsonWriter` classes (no C# primitive)
+- Only ONE C# primitive needed: Primitive 160 (GetSpecialFolder) for Windows paths
+- Theme files use exact VS Code JSON format for compatibility
+
 ## 32-bit Migration & Graphics Documentation Map
 
 **Status**: 32bpp graphics pipeline complete. 32-bit word migration planned but not yet started.

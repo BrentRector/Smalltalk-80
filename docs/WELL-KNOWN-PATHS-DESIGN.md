@@ -1,6 +1,6 @@
 # Well-Known Paths and Theme File Design
 
-**Version:** 1.1
+**Version:** 1.3
 **Date:** 2026-01-03
 **Purpose:** Enable dynamic theme file loading from standard Windows application data locations
 
@@ -507,144 +507,31 @@ Multiple scopes can be specified as an array. The most specific matching scope w
 
 ---
 
-### Primitive 161: ParseJSON
+## JSON Parsing: Pure Smalltalk Implementation
 
-To parse VS Code theme files, we need a JSON parser. Rather than implementing JSON parsing in Smalltalk (complex and error-prone), we provide a C# primitive.
+JSON parsing is implemented in pure Smalltalk using `JsonReader` and `JsonWriter` classes.
 
-**Location:** `Smalltalk80.Interpreter/Core/VM/Primitives/JsonPrimitives.cs`
+**Full specification:** See [JSON-PROCESSING-IN-SMALLTALK.md](JSON-PROCESSING-IN-SMALLTALK.md)
 
-**Signature:**
-```
-Receiver: any object
-Argument: String - JSON text
-Returns: Smalltalk object graph (Dictionary, Array, String, Number, Boolean, nil)
-```
+**Key points:**
+- `JsonReader parse: aString` - parses JSON to Smalltalk objects
+- `JsonWriter stringify: anObject` - writes Smalltalk objects as JSON
+- Leverages existing `Number readFrom:` for number parsing
+- No C# primitive needed
 
-**Implementation:**
+**Quick Reference:**
 
-```csharp
-using System.Text.Json;
+```smalltalk
+"Parsing"
+JsonReader parse: '{"name": "Alice", "age": 30}'
+    => a Dictionary('name'->'Alice' 'age'->30)
 
-/// <summary>
-/// Primitive 161: Parse JSON string into Smalltalk objects.
-/// Uses System.Text.Json for parsing, then converts to Smalltalk objects.
-/// </summary>
-public class ParseJSON : IPrimitive
-{
-    public PrimitiveResult Execute(PrimitiveExecutionContext context)
-    {
-        if (context.Arguments.Length != 1)
-            return PrimitiveResult.Fail(context.Metadata!);
-
-        var jsonStringOOP = context.Arguments[0];
-        if (jsonStringOOP.IsSmallInteger)
-            return PrimitiveResult.Fail(context.Metadata!);
-
-        string? jsonText = FilePrimitiveHelpers.ExtractString(context, jsonStringOOP);
-        if (jsonText == null)
-            return PrimitiveResult.Fail(context.Metadata!);
-
-        try
-        {
-            using var doc = JsonDocument.Parse(jsonText, new JsonDocumentOptions
-            {
-                CommentHandling = JsonCommentHandling.Skip,
-                AllowTrailingCommas = true
-            });
-
-            var result = ConvertJsonElement(context, doc.RootElement);
-            return PrimitiveResult.Ok(result);
-        }
-        catch (JsonException)
-        {
-            return PrimitiveResult.Ok(context.HeapManager.GetNil());
-        }
-    }
-
-    private SmalltalkOOP ConvertJsonElement(PrimitiveExecutionContext context, JsonElement element)
-    {
-        var heap = context.HeapManager;
-
-        switch (element.ValueKind)
-        {
-            case JsonValueKind.Object:
-                return ConvertObject(context, element);
-
-            case JsonValueKind.Array:
-                return ConvertArray(context, element);
-
-            case JsonValueKind.String:
-                return FilePrimitiveHelpers.CreateString(context, element.GetString() ?? "");
-
-            case JsonValueKind.Number:
-                if (element.TryGetInt32(out int intVal))
-                    return SmalltalkOOP.FromSmallInteger(intVal);
-                // For floats, create Float object
-                return CreateFloat(context, element.GetDouble());
-
-            case JsonValueKind.True:
-                return context.Metadata!.KnownObjects.True;
-
-            case JsonValueKind.False:
-                return context.Metadata!.KnownObjects.False;
-
-            case JsonValueKind.Null:
-            default:
-                return heap.GetNil();
-        }
-    }
-
-    private SmalltalkOOP ConvertObject(PrimitiveExecutionContext context, JsonElement element)
-    {
-        var heap = context.HeapManager;
-        var dictClass = context.RuntimeServices?.GetClass("Dictionary")
-            ?? throw new InvalidOperationException("Cannot find Dictionary class");
-
-        // Create Dictionary and populate
-        var dict = heap.AllocateInstanceOf(dictClass, 0);
-        // Use message sending to add entries via at:put:
-
-        foreach (var prop in element.EnumerateObject())
-        {
-            var key = FilePrimitiveHelpers.CreateString(context, prop.Name);
-            var value = ConvertJsonElement(context, prop.Value);
-            // Send at:put: message to dictionary
-            AddToDictionary(context, dict, key, value);
-        }
-
-        return dict;
-    }
-
-    private SmalltalkOOP ConvertArray(PrimitiveExecutionContext context, JsonElement element)
-    {
-        var heap = context.HeapManager;
-        int count = element.GetArrayLength();
-
-        var arrayClass = context.RuntimeServices?.GetClass("Array")
-            ?? throw new InvalidOperationException("Cannot find Array class");
-        var array = heap.AllocateInstanceOf(arrayClass, count);
-
-        int index = 0;
-        foreach (var item in element.EnumerateArray())
-        {
-            var value = ConvertJsonElement(context, item);
-            heap.SetIndexedOOP(array, index++, value);
-        }
-
-        return array;
-    }
-
-    // Helper methods for Float creation and Dictionary at:put: omitted for brevity
-}
+"Writing"
+JsonWriter stringify: (Dictionary new at: 'key' put: 'value'; yourself)
+    => '{"key":"value"}'
 ```
 
-**Registration:**
-
-```csharp
-// In PrimitiveRegistry.CreateWithNewPrimitives()
-// JSON primitives (161-169)
-registry.Register(161, new JsonPrimitives.ParseJSON());
-```
+---
 
 ### SyntaxStyler Theme Loading
 
@@ -691,10 +578,10 @@ parseVSCodeTheme: jsonString
     "Parse a VS Code theme JSON string and answer a color Dictionary.
      Maps TextMate scopes to TextColor objects."
     | json tokenColors result |
-    json := self primitiveParseJSON: jsonString.
-    json ifNil: [
-        Transcript show: 'Theme parse error: invalid JSON'; cr.
-        ^nil].
+    [json := JsonReader parse: jsonString]
+        on: Error do: [:ex |
+            Transcript show: 'Theme parse error: ', ex messageText; cr.
+            ^nil].
     (json isKindOf: Dictionary) ifFalse: [
         Transcript show: 'Theme file must be a JSON object'; cr.
         ^nil].
@@ -753,14 +640,6 @@ availableThemes
     files := dir filesMatching: '*.json'.
     ^files collect: [:f | f baseName]! !
 
-!SyntaxStyler class methodsFor: 'theme primitives'!
-
-primitiveParseJSON: aString
-    "Primitive 161: Parse JSON string into Smalltalk objects.
-     Returns Dictionary, Array, String, Number, Boolean, or nil."
-    <primitive: 161>
-    ^nil  "Fallback if primitive not available"! !
-
 !Color class methodsFor: 'instance creation'!
 
 fromHexString: hexString
@@ -812,8 +691,8 @@ VS Code themes can inherit from other themes using the `include` field:
 parseVSCodeTheme: jsonString
     "Parse a VS Code theme JSON string, handling inheritance."
     | json baseTheme result |
-    json := self primitiveParseJSON: jsonString.
-    json ifNil: [^nil].
+    [json := JsonReader parse: jsonString]
+        on: Error do: [:ex | ^nil].
 
     "Handle theme inheritance"
     (json includesKey: 'include') ifTrue: [
@@ -947,6 +826,46 @@ SyntaxStyler installDefaultThemes.
     ifFalse: [self error: 'theme not installed'].
 ```
 
+### JSON Parser Tests (Smalltalk)
+
+```smalltalk
+"Test JsonReader - basic values"
+(JsonReader parse: '42') = 42 ifFalse: [self error: 'integer failed'].
+(JsonReader parse: '3.14') = 3.14 ifFalse: [self error: 'float failed'].
+(JsonReader parse: '"hello"') = 'hello' ifFalse: [self error: 'string failed'].
+(JsonReader parse: 'true') == true ifFalse: [self error: 'true failed'].
+(JsonReader parse: 'false') == false ifFalse: [self error: 'false failed'].
+(JsonReader parse: 'null') isNil ifFalse: [self error: 'null failed'].
+
+"Test JsonReader - string escapes"
+(JsonReader parse: '"line1\nline2"') = ('line1', Character lf asString, 'line2')
+    ifFalse: [self error: 'newline escape failed'].
+(JsonReader parse: '"\u0041"') = 'A' ifFalse: [self error: 'unicode escape failed'].
+
+"Test JsonReader - arrays"
+| arr |
+arr := JsonReader parse: '[1, 2, 3]'.
+(arr size = 3 and: [arr first = 1]) ifFalse: [self error: 'array failed'].
+
+"Test JsonReader - objects"
+| obj |
+obj := JsonReader parse: '{"name": "Alice", "age": 30}'.
+((obj at: 'name') = 'Alice' and: [(obj at: 'age') = 30])
+    ifFalse: [self error: 'object failed'].
+
+"Test JsonReader - nested"
+| nested |
+nested := JsonReader parse: '{"items": [1, 2], "meta": {"count": 2}}'.
+((nested at: 'items') size = 2 and: [((nested at: 'meta') at: 'count') = 2])
+    ifFalse: [self error: 'nested failed'].
+
+"Test JsonWriter - round trip"
+| original roundTrip |
+original := Dictionary new at: 'key' put: 'value'; yourself.
+roundTrip := JsonReader parse: (JsonWriter stringify: original).
+((roundTrip at: 'key') = 'value') ifFalse: [self error: 'round trip failed'].
+```
+
 ---
 
 ## Future Extensions
@@ -961,11 +880,10 @@ SyntaxStyler installDefaultThemes.
 
 ## Implementation Checklist
 
-- [ ] **Phase 1: C# Primitives**
+- [ ] **Phase 1: C# Primitive (GetSpecialFolder only)**
   - [ ] Add `GetSpecialFolder` (160) to `FileInfoPrimitives.cs`
-  - [ ] Add `ParseJSON` (161) to new `JsonPrimitives.cs`
-  - [ ] Register primitives 160-161 in `PrimitiveRegistry.cs`
-  - [ ] Add C# unit tests for both primitives
+  - [ ] Register primitive 160 in `PrimitiveRegistry.cs`
+  - [ ] Add C# unit tests for primitive 160
 
 - [ ] **Phase 2: WindowsPath Extension**
   - [ ] Add `SpecialFolders` class variable to WindowsPath
@@ -974,24 +892,36 @@ SyntaxStyler installDefaultThemes.
   - [ ] Implement `applicationPath:`
   - [ ] Add to init expression if desired
 
-- [ ] **Phase 3: Color Hex Parsing (Smalltalk)**
+- [ ] **Phase 3: JSON Parsing (Pure Smalltalk)**
+  - [ ] Add `JsonReader` class to `Smalltalk-80.st`
+  - [ ] Add `JsonWriter` class to `Smalltalk-80.st`
+  - [ ] Test JsonReader with various JSON inputs:
+    - [ ] Objects: `{"key": "value"}`
+    - [ ] Arrays: `[1, 2, 3]`
+    - [ ] Nested structures
+    - [ ] Numbers (integer, float, exponent)
+    - [ ] Strings with escapes (`\n`, `\t`, `\"`, `\\`, `\uXXXX`)
+    - [ ] Booleans and null
+  - [ ] Test JsonWriter round-trip (parse then stringify)
+
+- [ ] **Phase 4: Color Hex Parsing (Smalltalk)**
   - [ ] Add `Color class>>fromHexString:` (pure Smalltalk)
   - [ ] Test with various hex formats (#RGB, #RRGGBB)
 
-- [ ] **Phase 4: VS Code Theme Loading**
+- [ ] **Phase 5: VS Code Theme Loading**
   - [ ] Implement `themeDirectory` in SyntaxStyler
-  - [ ] Implement `primitiveParseJSON:` wrapper
-  - [ ] Implement `parseVSCodeTheme:` and `processTokenColorRule:into:`
+  - [ ] Implement `parseVSCodeTheme:` using `JsonReader parse:`
+  - [ ] Implement `processTokenColorRule:into:`
   - [ ] Implement `loadThemeNamed:` and `useThemeNamed:`
   - [ ] Implement `availableThemes`
   - [ ] Test with actual VS Code theme files (light_plus.json, dark_plus.json)
 
-- [ ] **Phase 5: Theme Inheritance**
+- [ ] **Phase 6: Theme Inheritance**
   - [ ] Implement `include` field handling
   - [ ] Implement `extractBaseName:` for path parsing
   - [ ] Test with themes that inherit from base themes
 
-- [ ] **Phase 6: Integration & Polish**
+- [ ] **Phase 7: Integration & Polish**
   - [ ] Create `%APPDATA%\Smalltalk-80\themes\` on first use
   - [ ] Add theme selection UI (future)
   - [ ] Persist theme preference (future)
