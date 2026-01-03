@@ -12314,6 +12314,10 @@ isEmpty
 	"Answer whether the receiver contains any elements."
 
 	^self size = 0!
+notEmpty
+	"Answer whether the receiver contains any elements."
+
+	^self size > 0!
 occurrencesOf: anObject 
 	"Answer how many of the receiver's elements are equal to anObject."
 
