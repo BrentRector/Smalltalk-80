@@ -378,44 +378,15 @@ public static class BitBlt32Engine
                     if (halftoneWidth == 1 && halftoneHeight == 1 &&
                         halftonePixel != BlackPixel && halftonePixel != WhitePixel)
                     {
-                        // Colored text mode: halftone is the text color, source grayscale is alpha
-                        // Font glyphs are black text on white background:
-                        // - Black source (0x000000) → fully opaque color
-                        // - White source (0xFFFFFF) → fully transparent (keep dest)
-                        // - Gray source → partial blend
-
-                        // Calculate grayscale of source (average RGB)
-                        int srcR = (int)((sourcePixel >> 16) & 0xFF);
-                        int srcG = (int)((sourcePixel >> 8) & 0xFF);
-                        int srcB = (int)(sourcePixel & 0xFF);
-                        int gray = (srcR + srcG + srcB) / 3;
-
-                        // Alpha is inverted grayscale: black=255 (opaque), white=0 (transparent)
-                        int alpha = 255 - gray;
-
-                        if (alpha == 0)
-                        {
-                            // Fully transparent - skip this pixel, keep destination
-                            continue;
-                        }
-
-                        // Extract color components from halftone
-                        int colorR = (int)((halftonePixel >> 16) & 0xFF);
-                        int colorG = (int)((halftonePixel >> 8) & 0xFF);
-                        int colorB = (int)(halftonePixel & 0xFF);
-
-                        // Extract destination components
-                        int dstR = (int)((destPixel >> 16) & 0xFF);
-                        int dstG = (int)((destPixel >> 8) & 0xFF);
-                        int dstB = (int)(destPixel & 0xFF);
-
-                        // Alpha blend: result = color * alpha + dest * (255 - alpha)
-                        int outR = (colorR * alpha + dstR * (255 - alpha)) / 255;
-                        int outG = (colorG * alpha + dstG * (255 - alpha)) / 255;
-                        int outB = (colorB * alpha + dstB * (255 - alpha)) / 255;
-
-                        // Write result directly and skip combination rule
-                        destPixels[destIndex] = ((uint)outR << 16) | ((uint)outG << 8) | (uint)outB;
+                        // Colored text mode using bit manipulation:
+                        // Font glyphs are black (0x000000) text on white (0xFFFFFF) background.
+                        // Formula: result = (~source & color) | (source & dest)
+                        // - Black source: (~0 & color) | (0 & dest) = color (show colored text)
+                        // - White source: (~0xFFFFFF & color) | (0xFFFFFF & dest) = dest (transparent)
+                        // - Gray source: partial blend of color and dest based on bit patterns
+                        uint invertedSource = ~sourcePixel;
+                        uint result = (invertedSource & halftonePixel) | (sourcePixel & destPixel);
+                        destPixels[destIndex] = result;
                         continue;
                     }
 
