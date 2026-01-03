@@ -80,6 +80,7 @@ public class TestDisplay : IDisplay
             width, height,
             clipX, clipY, clipWidth, clipHeight,
             halftonePixels, halftoneWidth, halftoneHeight,
+            null,  // no color for test display
             (CombinationRule)combinationRule);
     }
 
