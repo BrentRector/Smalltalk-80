@@ -35068,22 +35068,46 @@ findTokenEndFor: tokenValue type: scannerType from: start
 				ifFalse: [pos := pos + 1]].
 		^pos].
 
-	"For symbols #foo or #'foo', find end"
+	"For symbols #foo or #'foo', and literal arrays #() #[]"
 	scannerType == #literal ifTrue: [
-		(tokenValue isKindOf: Symbol) ifTrue: [
-			(sourceString at: pos) = $# ifFalse: [^start].
+		(sourceString at: pos) = $# ifFalse: [^start].
+		pos := pos + 1.
+		pos > sourceString size ifTrue: [^pos - 1].
+		char := sourceString at: pos.
+
+		"Literal array #(...)"
+		char = $( ifTrue: [
+			| depth |
+			depth := 1.
 			pos := pos + 1.
-			pos > sourceString size ifTrue: [^pos - 1].
-			"Quoted symbol?"
-			(sourceString at: pos) = $'
-				ifTrue: [^self findTokenEndFor: nil type: #string from: pos]
-				ifFalse: [
-					"Unquoted symbol - scan identifier chars and colons"
-					[pos <= sourceString size and: [
-						char := sourceString at: pos.
-						char isAlphaNumeric or: [char = $_ or: [char = $:]]]]
-						whileTrue: [pos := pos + 1].
-					^pos - 1]]].
+			[pos <= sourceString size and: [depth > 0]] whileTrue: [
+				char := sourceString at: pos.
+				char = $( ifTrue: [depth := depth + 1].
+				char = $) ifTrue: [depth := depth - 1].
+				pos := pos + 1].
+			^pos - 1].
+
+		"Byte array #[...]"
+		char = $[ ifTrue: [
+			pos := pos + 1.
+			[pos <= sourceString size and: [(sourceString at: pos) ~= $]]]
+				whileTrue: [pos := pos + 1].
+			^pos].
+
+		"Quoted symbol #'...'"
+		char = $' ifTrue: [
+			^self findTokenEndFor: nil type: #string from: pos].
+
+		"Unquoted symbol #foo - scan identifier chars and colons"
+		(tokenValue isKindOf: Symbol) ifTrue: [
+			[pos <= sourceString size and: [
+				char := sourceString at: pos.
+				char isAlphaNumeric or: [char = $_ or: [char = $:]]]]
+				whileTrue: [pos := pos + 1].
+			^pos - 1].
+
+		"Unknown literal - just return start"
+		^start].
 
 	"For keywords, scan word chars plus trailing colon"
 	scannerType == #keyword ifTrue: [
