@@ -30925,11 +30925,11 @@ fit'
 		Keyboard at: i + 1 put: #enclose:].
 	Keyboard at: BS2 asciiValue + 1 put: #leaveBrackets:.
 
-	"Arrow keys for cursor movement"
-	Keyboard at: LeftArrowKey asciiValue + 1 put: #cursorLeft:.
-	Keyboard at: RightArrowKey asciiValue + 1 put: #cursorRight:.
-	Keyboard at: UpArrowKey asciiValue + 1 put: #cursorUp:.
-	Keyboard at: DownArrowKey asciiValue + 1 put: #cursorDown:.
+	"Arrow keys for cursor movement (codes 188-191 from WinFormsDisplay)"
+	Keyboard at: 188 + 1 put: #cursorLeft:.
+	Keyboard at: 189 + 1 put: #cursorRight:.
+	Keyboard at: 190 + 1 put: #cursorUp:.
+	Keyboard at: 191 + 1 put: #cursorDown:.
 
 	"ParagraphEditor initialize."! !
 

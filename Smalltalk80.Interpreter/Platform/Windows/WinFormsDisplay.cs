@@ -697,6 +697,16 @@ public class WinFormsDisplay : Form, IDisplay
     // Keyboard Input Handlers
     // ============================================================================
 
+    // Override to treat arrow keys as input keys (not navigation keys)
+    protected override bool IsInputKey(Keys keyData)
+    {
+        return keyData switch
+        {
+            Keys.Left or Keys.Right or Keys.Up or Keys.Down => true,
+            _ => base.IsInputKey(keyData)
+        };
+    }
+
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         int smalltalkCode = MapToSmalltalkCode(e.KeyCode);
