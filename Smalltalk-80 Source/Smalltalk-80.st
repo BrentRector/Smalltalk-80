@@ -35215,16 +35215,26 @@ Instance Variables:
 
 !SyntaxStyler methodsFor: 'styling'!
 styleSource: sourceString
-	"Answer a Text with syntax highlighting applied."
-	| text tokens |
+	"Answer a Text with syntax highlighting applied.
+	 Optimized: builds color array in single pass instead of repeated copyReplace."
+	| text tokens colorArray size |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
+	size := sourceString size.
 	text := Text fromString: sourceString.
 	tokens := ScannerHighlighter tokenize: sourceString.
+
+	"Build color array in single pass - O(n+m) instead of O(n*m)"
+	colorArray := Array new: size withAll: nil.
 	tokens do: [:token |
-		| textColor |
+		| textColor start end |
 		textColor := self colorForType: token type.
 		textColor ifNotNil: [
-			text addAttribute: textColor from: token start to: token end]].
+			start := token start max: 1.
+			end := (token end min: size) max: start.
+			start to: end do: [:i | colorArray at: i put: textColor color]]].
+
+	"Set colorRuns directly from array"
+	text setColorRuns: (RunArray newFrom: colorArray).
 	^text!
 
 styleMethod: sourceString inClass: aClass
@@ -40845,9 +40855,12 @@ storeOn: aStream
 !Text methodsFor: 'private'!
 runs
 	^runs!
-setString: aString setRuns: anArray 
+setString: aString setRuns: anArray
 	string _ aString.
-	runs _ anArray! !
+	runs _ anArray!
+setColorRuns: aRunArray
+	"Set the color runs directly (for efficient bulk color setting)."
+	colorRuns := aRunArray! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 Text class
