@@ -32043,9 +32043,9 @@ setRed: r green: g blue: b
 	 Values are clamped to [0.0, 1.0] and scaled to 10-bit integers (0-1023).
 	 Packed into 30-bit rgb value: RRRRRRRRRR GGGGGGGGGG BBBBBBBBBB"
 	| ri gi bi |
-	ri := ((r max: 0.0) min: 1.0) * 1023.0 truncated.
-	gi := ((g max: 0.0) min: 1.0) * 1023.0 truncated.
-	bi := ((b max: 0.0) min: 1.0) * 1023.0 truncated.
+	ri := (((r max: 0.0) min: 1.0) * 1023) truncated.
+	gi := (((g max: 0.0) min: 1.0) * 1023) truncated.
+	bi := (((b max: 0.0) min: 1.0) * 1023) truncated.
 	rgb := (ri bitShift: 20) + (gi bitShift: 10) + bi!
 
 privateSetRgb: anInteger
