@@ -35335,12 +35335,13 @@ styleMethod: sourceString inClass: aClass
 
 !SyntaxStyler class methodsFor: 'class initialization'!
 initialize
-	"Initialize color sets and select Pharo as default.
+	"Initialize color sets and select VSCode as default.
 	 SyntaxStyler initialize"
 	ColorSets := Dictionary new.
 	self initializePharoColors.
 	self initializeClassicColors.
-	self useColorSet: #Pharo!
+	self initializeVSCodeColors.
+	self useColorSet: #VSCode!
 initializePharoColors
 	"Register Pharo/Shout-style syntax colors."
 	| colors |
@@ -35376,7 +35377,39 @@ initializeClassicColors
 	colors at: #string put: (TextColor color: (Color r: 0.6 g: 0.0 b: 0.0)).
 	"Symbols - purple"
 	colors at: #symbol put: (TextColor color: (Color r: 0.5 g: 0.0 b: 0.5)).
-	self registerColorSet: colors named: #Classic! !
+	self registerColorSet: colors named: #Classic!
+initializeVSCodeColors
+	"Register VSCode Dark+ theme colors."
+	| colors |
+	colors := Dictionary new.
+	"Comments - muted green (rgb 106,153,85)"
+	colors at: #comment put: (TextColor color: (Color r: 0.42 g: 0.60 b: 0.33)).
+	"Strings - orange/tan (rgb 206,145,120)"
+	colors at: #string put: (TextColor color: (Color r: 0.81 g: 0.57 b: 0.47)).
+	"Symbols - teal (rgb 78,201,176)"
+	colors at: #symbol put: (TextColor color: (Color r: 0.31 g: 0.79 b: 0.69)).
+	"Numbers - light green (rgb 181,206,168)"
+	colors at: #number put: (TextColor color: (Color r: 0.71 g: 0.81 b: 0.66)).
+	"Keywords - purple (rgb 197,134,192)"
+	colors at: #keyword put: (TextColor color: (Color r: 0.77 g: 0.53 b: 0.75)).
+	"self/super/thisContext - blue (rgb 86,156,214)"
+	colors at: #self put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
+	colors at: #super put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
+	colors at: #thisContext put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
+	"true/false/nil - blue (rgb 86,156,214)"
+	colors at: #nil put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
+	colors at: #true put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
+	colors at: #false put: (TextColor color: (Color r: 0.34 g: 0.61 b: 0.84)).
+	"Globals/Classes - teal (rgb 78,201,176)"
+	colors at: #global put: (TextColor color: (Color r: 0.31 g: 0.79 b: 0.69)).
+	"Characters - light cyan (rgb 156,220,254)"
+	colors at: #character put: (TextColor color: (Color r: 0.61 g: 0.86 b: 1.0)).
+	"Brackets - yellow/gold (rgb 255,215,0)"
+	colors at: #blockStart put: (TextColor color: (Color r: 1.0 g: 0.84 b: 0.0)).
+	colors at: #blockEnd put: (TextColor color: (Color r: 1.0 g: 0.84 b: 0.0)).
+	"Temp bars - yellow (rgb 212,212,160)"
+	colors at: #tempBar put: (TextColor color: (Color r: 0.83 g: 0.83 b: 0.63)).
+	self registerColorSet: colors named: #VSCode! !
 
 !SyntaxStyler class methodsFor: 'color set management'!
 colorSetNames
