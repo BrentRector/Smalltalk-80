@@ -646,98 +646,6 @@ public class ParseJSON : IPrimitive
 registry.Register(161, new JsonPrimitives.ParseJSON());
 ```
 
----
-
-### Primitive 162: ParseHexColor
-
-For efficient hex color parsing, provide a dedicated primitive.
-
-**Signature:**
-```
-Receiver: Color class
-Argument: String - hex color "#RRGGBB" or "#RRGGBBAA"
-Returns: Color object, or nil if invalid format
-```
-
-**Implementation:**
-
-```csharp
-/// <summary>
-/// Primitive 162: Parse hex color string to Color object.
-/// Supports #RGB, #RRGGBB, and #RRGGBBAA formats.
-/// </summary>
-public class ParseHexColor : IPrimitive
-{
-    public PrimitiveResult Execute(PrimitiveExecutionContext context)
-    {
-        if (context.Arguments.Length != 1)
-            return PrimitiveResult.Fail(context.Metadata!);
-
-        var hexStringOOP = context.Arguments[0];
-        string? hex = FilePrimitiveHelpers.ExtractString(context, hexStringOOP);
-        if (hex == null || hex.Length == 0)
-            return PrimitiveResult.Ok(context.HeapManager.GetNil());
-
-        // Remove leading #
-        if (hex[0] == '#') hex = hex.Substring(1);
-
-        int r, g, b, a = 255;
-
-        try
-        {
-            if (hex.Length == 3)
-            {
-                // #RGB -> #RRGGBB
-                r = Convert.ToInt32(new string(hex[0], 2), 16);
-                g = Convert.ToInt32(new string(hex[1], 2), 16);
-                b = Convert.ToInt32(new string(hex[2], 2), 16);
-            }
-            else if (hex.Length == 6)
-            {
-                // #RRGGBB
-                r = Convert.ToInt32(hex.Substring(0, 2), 16);
-                g = Convert.ToInt32(hex.Substring(2, 2), 16);
-                b = Convert.ToInt32(hex.Substring(4, 2), 16);
-            }
-            else if (hex.Length == 8)
-            {
-                // #RRGGBBAA
-                r = Convert.ToInt32(hex.Substring(0, 2), 16);
-                g = Convert.ToInt32(hex.Substring(2, 2), 16);
-                b = Convert.ToInt32(hex.Substring(4, 2), 16);
-                a = Convert.ToInt32(hex.Substring(6, 2), 16);
-            }
-            else
-            {
-                return PrimitiveResult.Ok(context.HeapManager.GetNil());
-            }
-        }
-        catch
-        {
-            return PrimitiveResult.Ok(context.HeapManager.GetNil());
-        }
-
-        // Create Color object with r, g, b as floats 0.0-1.0
-        return CreateColor(context, r / 255.0, g / 255.0, b / 255.0);
-    }
-
-    private PrimitiveResult CreateColor(PrimitiveExecutionContext context,
-                                         double r, double g, double b)
-    {
-        // Allocate Color instance and set RGB values
-        var colorClass = context.RuntimeServices?.GetClass("Color")
-            ?? throw new InvalidOperationException("Cannot find Color class");
-        var color = context.HeapManager.AllocateInstanceOf(colorClass, 0);
-
-        // Set instance variables (r, g, b are floats)
-        // Color has: rgb (packed integer) or component floats depending on implementation
-        // Implementation details depend on Color class structure
-
-        return PrimitiveResult.Ok(color);
-    }
-}
-```
-
 ### SyntaxStyler Theme Loading
 
 ```smalltalk
@@ -859,17 +767,17 @@ fromHexString: hexString
     "Create a Color from a hex string like '#RRGGBB' or '#RRGGBBAA'.
      Returns nil if the format is invalid.
 
-     Example: Color fromHexString: '#FF5733'"
-    <primitive: 162>
-    "Fallback: parse in Smalltalk if primitive not available"
-    ^self parseHexStringFallback: hexString!
-
-parseHexStringFallback: hexString
-    "Smalltalk fallback for hex color parsing."
+     Example: Color fromHexString: '#FF5733'
+              Color fromHexString: '#F00'  (short form)"
     | hex r g b |
     hex := hexString.
     (hex size > 0 and: [hex first = $#])
         ifTrue: [hex := hex copyFrom: 2 to: hex size].
+
+    "Handle short form #RGB"
+    hex size = 3 ifTrue: [
+        hex := String streamContents: [:s |
+            hex do: [:c | s nextPut: c; nextPut: c]]].
 
     hex size = 6 ifFalse: [^nil].
 
@@ -1056,9 +964,8 @@ SyntaxStyler installDefaultThemes.
 - [ ] **Phase 1: C# Primitives**
   - [ ] Add `GetSpecialFolder` (160) to `FileInfoPrimitives.cs`
   - [ ] Add `ParseJSON` (161) to new `JsonPrimitives.cs`
-  - [ ] Add `ParseHexColor` (162) to `JsonPrimitives.cs`
-  - [ ] Register primitives 160-162 in `PrimitiveRegistry.cs`
-  - [ ] Add C# unit tests for all three primitives
+  - [ ] Register primitives 160-161 in `PrimitiveRegistry.cs`
+  - [ ] Add C# unit tests for both primitives
 
 - [ ] **Phase 2: WindowsPath Extension**
   - [ ] Add `SpecialFolders` class variable to WindowsPath
@@ -1067,10 +974,9 @@ SyntaxStyler installDefaultThemes.
   - [ ] Implement `applicationPath:`
   - [ ] Add to init expression if desired
 
-- [ ] **Phase 3: Color Hex Parsing**
-  - [ ] Add `Color class>>fromHexString:` with primitive 162
-  - [ ] Add Smalltalk fallback `parseHexStringFallback:`
-  - [ ] Test with various hex formats (#RGB, #RRGGBB, #RRGGBBAA)
+- [ ] **Phase 3: Color Hex Parsing (Smalltalk)**
+  - [ ] Add `Color class>>fromHexString:` (pure Smalltalk)
+  - [ ] Test with various hex formats (#RGB, #RRGGBB)
 
 - [ ] **Phase 4: VS Code Theme Loading**
   - [ ] Implement `themeDirectory` in SyntaxStyler
