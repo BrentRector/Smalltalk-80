@@ -36492,8 +36492,8 @@ remove: oldObject ifAbsent: anExceptionBlock
 	^self copyReplaceFrom: self size + 1
 		  to: self size
 		  with: aSequenceableCollection!
-copyFrom: start to: stop 
-	"Answer a copy of a subset of the receiver, starting from element at index start 
+copyFrom: start to: stop
+	"Answer a copy of a subset of the receiver, starting from element at index start
 	until element at index stop."
 
 	| newSize |
@@ -36503,6 +36503,20 @@ copyFrom: start to: stop
 		to: newSize
 		with: self
 		startingAt: start!
+allButFirst
+	"Answer a copy of the receiver containing all but the first element.
+	Raise an error if there are not enough elements."
+	^self allButFirst: 1!
+allButFirst: n
+	"Answer a copy of the receiver containing all but the first n elements."
+	^self copyFrom: n + 1 to: self size!
+allButLast
+	"Answer a copy of the receiver containing all but the last element.
+	Raise an error if there are not enough elements."
+	^self allButLast: 1!
+allButLast: n
+	"Answer a copy of the receiver containing all but the last n elements."
+	^self copyFrom: 1 to: self size - n!
 copyReplaceAll: oldSubstring with: newSubstring 
 	"Answer a copy of the receiver in which all occurrances of oldSubstring have
 	been replaced by newSubstring."
