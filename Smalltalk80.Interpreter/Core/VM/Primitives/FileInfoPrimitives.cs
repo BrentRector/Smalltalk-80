@@ -465,4 +465,78 @@ public static class FileInfoPrimitives
             }
         }
     }
+
+    /// <summary>
+    /// Primitive 160: Get path for a Windows special folder.
+    /// Receiver: WindowsPath class or any object.
+    /// Argument: Symbol identifier for the special folder (#appData, #localAppData, etc.).
+    /// Returns: String path or nil if folder unknown or unavailable.
+    /// </summary>
+    public class GetSpecialFolder : IPrimitive
+    {
+        private static readonly Dictionary<string, Environment.SpecialFolder> FolderMap = new()
+        {
+            { "appData", Environment.SpecialFolder.ApplicationData },
+            { "localAppData", Environment.SpecialFolder.LocalApplicationData },
+            { "userProfile", Environment.SpecialFolder.UserProfile },
+            { "personal", Environment.SpecialFolder.Personal },
+            { "desktop", Environment.SpecialFolder.Desktop },
+            { "programFiles", Environment.SpecialFolder.ProgramFiles },
+            { "programFilesX86", Environment.SpecialFolder.ProgramFilesX86 },
+            { "commonAppData", Environment.SpecialFolder.CommonApplicationData },
+            { "system", Environment.SpecialFolder.System },
+            { "windows", Environment.SpecialFolder.Windows },
+            { "startup", Environment.SpecialFolder.Startup },
+            { "fonts", Environment.SpecialFolder.Fonts },
+        };
+
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 1)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            var symbolOOP = context.Arguments[0];
+            if (symbolOOP.IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // Extract symbol name from Symbol object
+            string? symbolName = ExtractSymbolName(context, symbolOOP);
+            if (symbolName == null)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // Look up in folder map
+            if (!FolderMap.TryGetValue(symbolName, out var folder))
+                return PrimitiveResult.Ok(context.HeapManager.GetNil());
+
+            try
+            {
+                string path = Environment.GetFolderPath(folder);
+                if (string.IsNullOrEmpty(path))
+                    return PrimitiveResult.Ok(context.HeapManager.GetNil());
+
+                return PrimitiveResult.Ok(FilePrimitiveHelpers.CreateString(context, path));
+            }
+            catch
+            {
+                return PrimitiveResult.Ok(context.HeapManager.GetNil());
+            }
+        }
+
+        private static string? ExtractSymbolName(PrimitiveExecutionContext context, SmalltalkOOP symbolOOP)
+        {
+            // Symbol is stored as a String-like object (bytes are character codes)
+            var heap = context.HeapManager;
+            int length = heap.GetIndexedSize(symbolOOP);
+            if (length <= 0) return null;
+
+            var chars = new char[length];
+            for (int i = 0; i < length; i++)
+            {
+                var byteOOP = heap.GetIndexedOOP(symbolOOP, i);
+                if (!byteOOP.IsSmallInteger) return null;
+                chars[i] = (char)byteOOP.AsSmallInteger();
+            }
+            return new string(chars);
+        }
+    }
 }

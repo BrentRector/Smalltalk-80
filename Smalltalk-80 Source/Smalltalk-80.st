@@ -251,7 +251,7 @@ Path class
 
 Path subclass: #WindowsPath
 	instanceVariableNames: 'driveLetter uncServer uncShare'
-	classVariableNames: 'Separator'
+	classVariableNames: 'Separator SpecialFolders'
 	poolDictionaries: ''
 	category: 'Files-Windows'!
 
@@ -293,8 +293,23 @@ This design gives callers control over when normalization occurs.'!
 !WindowsPath class methodsFor: 'class initialization'!
 
 initialize
-    "Initialize the path separator."
+    "Initialize the path separator. SpecialFolders uses lazy init."
     Separator _ $\.
+    SpecialFolders _ nil.
+    ^self!
+
+initializeSpecialFolders
+    "Populate SpecialFolders dictionary from primitive.
+     Called once on first access. Keys are symbols, values are path strings."
+    | keys |
+    SpecialFolders _ Dictionary new.
+    keys _ #(appData localAppData userProfile personal desktop
+              programFiles programFilesX86 commonAppData system
+              windows startup fonts).
+    keys do: [:key |
+        | path |
+        path _ self primitiveGetSpecialFolder: key.
+        path ifNotNil: [SpecialFolders at: key put: path]].
     ^self! !
 
 !WindowsPath class methodsFor: 'instance creation'!
@@ -311,6 +326,102 @@ isSeparator: aCharacter
     "Answer whether aCharacter is a path separator.
      Windows accepts both backslash and forward slash."
     ^aCharacter = $\ or: [aCharacter = $/]! !
+
+!WindowsPath class methodsFor: 'special folders - accessing'!
+
+specialFolder: aSymbol
+    "Answer the path string for aSymbol, or nil if unknown.
+     Lazily initializes SpecialFolders on first call.
+
+     Example: WindowsPath specialFolder: #appData
+              => 'C:\Users\johndoe\AppData\Roaming'"
+    SpecialFolders ifNil: [self initializeSpecialFolders].
+    ^SpecialFolders at: aSymbol ifAbsent: [nil]!
+
+specialFolderNames
+    "Answer a collection of all known special folder symbols."
+    ^#(appData localAppData userProfile personal desktop
+       programFiles programFilesX86 commonAppData system
+       windows startup fonts)!
+
+hasSpecialFolder: aSymbol
+    "Answer whether the special folder aSymbol is available on this system."
+    ^(self specialFolder: aSymbol) notNil! !
+
+!WindowsPath class methodsFor: 'special folders - convenience'!
+
+appDataPath
+    "Answer a WindowsPath for the user's roaming AppData folder.
+     This folder roams with the user profile in domain environments."
+    | path |
+    path _ self specialFolder: #appData.
+    path ifNil: [self error: 'AppData folder not available'].
+    ^self fromString: path!
+
+localAppDataPath
+    "Answer a WindowsPath for the user's local AppData folder.
+     This folder does NOT roam - use for machine-specific data."
+    | path |
+    path _ self specialFolder: #localAppData.
+    path ifNil: [self error: 'LocalAppData folder not available'].
+    ^self fromString: path!
+
+userProfilePath
+    "Answer a WindowsPath for the user's profile folder."
+    | path |
+    path _ self specialFolder: #userProfile.
+    path ifNil: [self error: 'UserProfile folder not available'].
+    ^self fromString: path!
+
+documentsPath
+    "Answer a WindowsPath for the user's Documents folder."
+    | path |
+    path _ self specialFolder: #personal.
+    path ifNil: [self error: 'Documents folder not available'].
+    ^self fromString: path!
+
+desktopPath
+    "Answer a WindowsPath for the user's Desktop folder."
+    | path |
+    path _ self specialFolder: #desktop.
+    path ifNil: [self error: 'Desktop folder not available'].
+    ^self fromString: path!
+
+commonAppDataPath
+    "Answer a WindowsPath for the shared application data folder.
+     Use for data shared between all users on this machine."
+    | path |
+    path _ self specialFolder: #commonAppData.
+    path ifNil: [self error: 'CommonAppData folder not available'].
+    ^self fromString: path! !
+
+!WindowsPath class methodsFor: 'special folders - application'!
+
+applicationPath: appName
+    "Answer a WindowsPath for an application's data folder under AppData.
+     Creates the path object but does NOT create the directory.
+
+     Example: WindowsPath applicationPath: 'Smalltalk-80'
+              => WindowsPath for 'C:\Users\johndoe\AppData\Roaming\Smalltalk-80'"
+    ^self appDataPath / appName!
+
+localApplicationPath: appName
+    "Answer a WindowsPath for an application's local data folder.
+     Use for machine-specific data that should not roam."
+    ^self localAppDataPath / appName!
+
+sharedApplicationPath: appName
+    "Answer a WindowsPath for an application's shared data folder.
+     Use for data shared between all users."
+    ^self commonAppDataPath / appName! !
+
+!WindowsPath class methodsFor: 'special folders - primitive'!
+
+primitiveGetSpecialFolder: aSymbol
+    "Primitive 160: Get path for a Windows special folder.
+     Answer the path string for aSymbol, or nil if unknown."
+    <primitive: 160>
+    ^nil  "Fallback if primitive fails"! !
 
 !WindowsPath methodsFor: 'initialization'!
 
