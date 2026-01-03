@@ -16887,10 +16887,10 @@ setStopConditions
 	"Check for text color attribute"
 	textColor := text colorAt: lastIndex.
 	textColor ifNil: [
-		"No color - use default mask"
+		"No color - use default mask (black text)"
 		halftoneForm := defaultMask]
 	ifNotNil: [
-		"Color specified - create colored 1x1 halftone mask"
+		"Color specified - create 1x1 solid color form"
 		halftoneForm := Form colorMask: textColor]!
 tab
 	"This awfulness attempts to handle leading and internal tabs in a justified line.  Leading tabs are considered legal and should be reflected on the display gracefully.  Internal tabs (when the line is justified) are considered at the very best a misguided use of the character, and are reflected on the display the best we can."
@@ -20285,9 +20285,13 @@ spread: rectangle from: sourceForm by: scale spacing: spacing direction: dir
 			in: self
 			rule: 7]!
 wrapAround: aPoint
-	"Answer a new form which contains the image of the receiver, but translated by deltaPoint, with wrap-around.  Used for realigning halftone masks.  Assumes the receiver is 16x16 with zero offset."
+	"Answer a new form which contains the image of the receiver, but translated by deltaPoint, with wrap-around.  Used for realigning halftone masks.  Assumes the receiver is 16x16 with zero offset.
+	 32bpp: For 1x1 solid color forms, wrapping is unnecessary - just return self."
 
 	| newForm delta |
+	"Early return for 1x1 solid color forms (32bpp optimization)"
+	(width = 1 and: [height = 1]) ifTrue: [^self].
+
 	newForm _ Form extent: width@height.
 	delta _ (aPoint x\\16)@(aPoint y\\16).
 	delta = (0@0) ifTrue: [^self].
@@ -20478,25 +20482,28 @@ initialize
 
 	"Form  initialize."!
 initializeMasks
-	| anArray |
-	anArray _ Array new: 16.
-	anArray atAllPut: 0.
-	whiteMask _ Form extent: 16 @ 16 fromArray: anArray offset: 0 @ 0.
-	anArray atAllPut: 65535.
-	blackMask _ Form extent: 16 @ 16 fromArray: anArray offset: 0 @ 0.
-	anArray atAll: (1 to: anArray size by: 2) put: 21845.
-	anArray atAll: (2 to: anArray size by: 2) put: 43690.
-	grayMask _ Form extent: 16 @ 16 fromArray: anArray offset: 0 @ 0.
-	anArray atAll: (1 to: anArray size by: 2) put: 30583.
-	anArray atAll: (2 to: anArray size by: 2) put: 56797.
-	darkGrayMask _ Form extent: 16 @ 16 fromArray: anArray offset: 0 @ 0.
-	lightGrayMask _ darkGrayMask deepCopy reverse.
-	anArray atAll: (1 to: anArray size by: 4) put: 34952.
-	anArray atAll: (2 to: anArray size by: 2) put: 0.
-	anArray atAll: (3 to: anArray size by: 4) put: 8738.
-	veryLightGrayMask _  Form extent: 16 @ 16 fromArray: anArray offset: 0 @ 0
-	
-	"Form initializeMasks"! !
+	"Initialize halftone masks as 1x1 solid color Forms for 32bpp rendering.
+	 Uses standard RGB values: black=0x000000, white=0xFFFFFF, grays at 25/50/75/87.5%.
+	 32bpp architecture: solid colors replace legacy 16x16 dithered patterns.
+	 Form initializeMasks"
+
+	whiteMask _ Form extent: 1@1.
+	whiteMask bits at: 1 put: 16rFFFFFF.
+
+	blackMask _ Form extent: 1@1.
+	blackMask bits at: 1 put: 16r000000.
+
+	grayMask _ Form extent: 1@1.
+	grayMask bits at: 1 put: 16r808080.      "50% gray"
+
+	darkGrayMask _ Form extent: 1@1.
+	darkGrayMask bits at: 1 put: 16r404040.  "25% gray"
+
+	lightGrayMask _ Form extent: 1@1.
+	lightGrayMask bits at: 1 put: 16rC0C0C0. "75% gray"
+
+	veryLightGrayMask _ Form extent: 1@1.
+	veryLightGrayMask bits at: 1 put: 16rE0E0E0  "87.5% gray"! !
 
 !Form class methodsFor: 'instance creation'!
 dotOfSize: diameter
@@ -21090,8 +21097,12 @@ initializeYellowButtonMenu
 	self yellowButtonMenu: YellowButtonMenu
 		yellowButtonMessages: YellowButtonMessages!
 normalizeColor: halftoneForm
+	"Set the color/mask for drawing operations.
+	 32bpp: For 1x1 solid color forms, no wrapping needed."
 	unNormalizedColor _ halftoneForm.
-	color _ unNormalizedColor wrapAround: view insetDisplayBox origin.!
+	color _ (halftoneForm width = 1 and: [halftoneForm height = 1])
+		ifTrue: [halftoneForm]
+		ifFalse: [unNormalizedColor wrapAround: view insetDisplayBox origin].!
 promptRequest: outputMessage 
 	"Answers with a string typed by the user on the keyboard. keyboard input is 
 	terminated by a line feed character. Typing feedback happens in a window that 
