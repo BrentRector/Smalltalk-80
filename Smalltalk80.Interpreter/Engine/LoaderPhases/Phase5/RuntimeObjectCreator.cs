@@ -38,16 +38,17 @@ public class RuntimeObjectCreator(
             using var fontBridge = FontBridgeFactory.Create() as IDisposable;
             var bridge = fontBridge as IFontBridge ?? FontBridgeFactory.CreateNull();
 
-            // Create font sizes 14-24 in 2px increments for flexibility
+            // Create font sizes 11-20 for flexibility
             // Consolas is designed for anti-aliased rendering without embedded bitmaps
+            // Starting at 11px for a compact default, scaling up for emphasis
             var fontDescriptors = new[]
             {
+                new FontDescriptor("Consolas", 11),
+                new FontDescriptor("Consolas", 12),
                 new FontDescriptor("Consolas", 14),
                 new FontDescriptor("Consolas", 16),
                 new FontDescriptor("Consolas", 18),
-                new FontDescriptor("Consolas", 20),
-                new FontDescriptor("Consolas", 22),
-                new FontDescriptor("Consolas", 24)
+                new FontDescriptor("Consolas", 20)
             };
 
             var strikeFontOOPs = new List<SmalltalkOOP>();
