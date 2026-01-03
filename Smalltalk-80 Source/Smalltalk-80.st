@@ -38556,7 +38556,23 @@ oldRunEncoded
 	^stream contents!
 withCRs
 	"substitute CRs for backslashes"
-	^ self collect: [:char | char = $\ ifTrue: [Character cr] ifFalse: [char]]! !
+	^ self collect: [:char | char = $\ ifTrue: [Character cr] ifFalse: [char]]!
+findTokens: delimiters
+	"Answer a collection of tokens that result from parsing the receiver.
+	Tokens are separated by any character in delimiters."
+	| tokens start delimSet |
+	tokens _ OrderedCollection new.
+	delimSet _ delimiters isCharacter
+		ifTrue: [String with: delimiters]
+		ifFalse: [delimiters].
+	start _ 1.
+	1 to: self size do: [:i |
+		(delimSet includes: (self at: i))
+			ifTrue: [
+				start < i ifTrue: [tokens add: (self copyFrom: start to: i - 1)].
+				start _ i + 1]].
+	start <= self size ifTrue: [tokens add: (self copyFrom: start to: self size)].
+	^tokens! !
 
 !String methodsFor: 'displaying'!
 displayAt: aPoint 
