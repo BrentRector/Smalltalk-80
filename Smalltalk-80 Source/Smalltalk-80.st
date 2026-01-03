@@ -35010,7 +35010,7 @@ calculateEndFor: tokenValue type: scannerType startingAt: start
 		^start + tokenValue size + 1].  "Include both quotes"
 
 	"For character literals ($x), include the $"
-	(scannerType == #number and: [tokenValue isCharacter]) ifTrue: [
+	(scannerType == #number and: [tokenValue isKindOf: Character]) ifTrue: [
 		^start + 1].
 
 	"For numbers, convert to string to get length"
@@ -35019,7 +35019,7 @@ calculateEndFor: tokenValue type: scannerType startingAt: start
 
 	"For symbols #foo, account for the #"
 	scannerType == #literal ifTrue: [
-		tokenValue isSymbol ifTrue: [
+		(tokenValue isKindOf: Symbol) ifTrue: [
 			^start + tokenValue size].
 		"For literal arrays, this is tricky - use source position"
 		^start + tokenValue printString size - 1].
@@ -35029,9 +35029,9 @@ calculateEndFor: tokenValue type: scannerType startingAt: start
 		^start + tokenValue size - 1].
 
 	"For words and binary selectors"
-	tokenValue isString ifTrue: [
+	(tokenValue isKindOf: String) ifTrue: [
 		^start + tokenValue size - 1].
-	tokenValue isSymbol ifTrue: [
+	(tokenValue isKindOf: Symbol) ifTrue: [
 		^start + tokenValue size - 1].
 
 	"Default: single character"
