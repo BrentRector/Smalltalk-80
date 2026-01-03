@@ -35277,50 +35277,50 @@ styleMethod: sourceString inClass: aClass
 
 !SyntaxStyler class methodsFor: 'class initialization'!
 initialize
-	"Initialize the default color map using GitHub Smalltalk syntax colors.
-	 See: https://github.com/leocamello/vscode-smalltalk
+	"Initialize the default color map using Pharo/Shout-style syntax colors.
+	 Based on modern Pharo Smalltalk IDE conventions.
 	 SyntaxStyler initialize"
 	DefaultColorMap := Dictionary new.
 
-	"Comments - gray #6a737d (comment.block.smalltalk)"
-	DefaultColorMap at: #comment put: (TextColor color: (Color r: 0.42 g: 0.45 b: 0.49)).
+	"Comments - forest green (Pharo style)"
+	DefaultColorMap at: #comment put: (TextColor color: (Color r: 0.0 g: 0.56 b: 0.0)).
 
-	"Strings - brown #9a6700 (string.quoted.single.smalltalk)"
-	DefaultColorMap at: #string put: (TextColor color: (Color r: 0.60 g: 0.40 b: 0.0)).
+	"Strings - magenta/red (Pharo style)"
+	DefaultColorMap at: #string put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
 
-	"Symbols - blue #005cc5 (constant.other.symbol.smalltalk)"
-	DefaultColorMap at: #symbol put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
+	"Symbols - blue (Pharo style)"
+	DefaultColorMap at: #symbol put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.80)).
 
-	"Numbers - blue #005cc5 (constant.numeric.smalltalk)"
-	DefaultColorMap at: #number put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
+	"Numbers - red (Pharo style)"
+	DefaultColorMap at: #number put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
 
-	"Keywords (selectors with colons) - no color, use black"
-	"DefaultColorMap at: #keyword put: nil"
+	"Keywords (selectors with colons like ifTrue:, do:) - blue (Pharo style)"
+	DefaultColorMap at: #keyword put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.80)).
 
-	"Binary selectors - red #d73a49 (keyword.operator.smalltalk)"
-	DefaultColorMap at: #binary put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
+	"Binary selectors (+, -, *, etc) - black (Pharo style)"
+	"DefaultColorMap at: #binary put: nil"
 
-	"self/super - red #d73a49 (storage.modifier.smalltalk)"
-	DefaultColorMap at: #self put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
-	DefaultColorMap at: #super put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
+	"self/super/thisContext - red (Pharo pseudo-variable style)"
+	DefaultColorMap at: #self put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	DefaultColorMap at: #super put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	DefaultColorMap at: #thisContext put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
 
-	"true/false/nil - blue #005cc5 (constant.language.smalltalk)"
-	DefaultColorMap at: #nil put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
-	DefaultColorMap at: #true put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
-	DefaultColorMap at: #false put: (TextColor color: (Color r: 0.0 g: 0.36 b: 0.77)).
-	DefaultColorMap at: #thisContext put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
+	"true/false/nil - red (Pharo pseudo-variable style)"
+	DefaultColorMap at: #nil put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	DefaultColorMap at: #true put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	DefaultColorMap at: #false put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
 
-	"Return arrow - red #d73a49 (keyword.control.flow.return.smalltalk)"
-	DefaultColorMap at: #return put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
+	"Return arrow - black (Pharo style)"
+	"DefaultColorMap at: #return put: nil"
 
-	"Assignment - red #d73a49 (keyword.operator.assignment.smalltalk)"
-	DefaultColorMap at: #assignment put: (TextColor color: (Color r: 0.84 g: 0.23 b: 0.29)).
+	"Assignment arrow - black (Pharo style)"
+	"DefaultColorMap at: #assignment put: nil"
 
 	"Block brackets - no special color"
 	"DefaultColorMap at: #blockBracket put: nil"
 
-	"Globals (class names) - purple #6f42c1 (entity.name.type.class.smalltalk)"
-	DefaultColorMap at: #global put: (TextColor color: (Color r: 0.44 g: 0.26 b: 0.76)).
+	"Globals (class names) - dark blue (Pharo style)"
+	DefaultColorMap at: #global put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.55)).
 
 	"Identifiers (locals, temps, args) - no special color (black)"
 	"DefaultColorMap at: #identifier put: nil"
