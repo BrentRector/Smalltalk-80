@@ -34652,7 +34652,30 @@ runs: newRuns values: newValues
 	| instance |
 	instance _ self basicNew.
 	instance setRuns: newRuns setValues: newValues.
-	^instance! !Object subclass: #Scanner
+	^instance! !
+newFrom: anArray
+	"Answer a new RunArray created by compressing consecutive equal values in anArray.
+	 Example: #(a a a b b c) -> RunArray with runs #(3 2 1) values #(a b c)"
+	| runs values currentValue currentRun |
+	anArray isEmpty ifTrue: [^self new].
+	runs := OrderedCollection new.
+	values := OrderedCollection new.
+	currentValue := anArray first.
+	currentRun := 1.
+	2 to: anArray size do: [:i |
+		| value |
+		value := anArray at: i.
+		value = currentValue
+			ifTrue: [currentRun := currentRun + 1]
+			ifFalse: [
+				runs add: currentRun.
+				values add: currentValue.
+				currentValue := value.
+				currentRun := 1]].
+	runs add: currentRun.
+	values add: currentValue.
+	^self runs: runs asArray values: values asArray! !
+Object subclass: #Scanner
 	instanceVariableNames: 'source mark hereChar aheadChar token tokenType currentComment buffer typeTable '
 	classVariableNames: 'EndChar TypeTable '
 	poolDictionaries: ''
