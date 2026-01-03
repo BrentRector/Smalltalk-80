@@ -35008,9 +35008,8 @@ addCurrentToken
 	"Add the current scanner token to our collection."
 	| type start end tokenValue |
 	type := self highlightTypeFor: scanner tokenType.
-	"Scanner mark needs adjustment for 1-based string indexing.
-	 Subtract 2 to account for lookahead and 0/1-based conversion."
-	start := scanner mark - 2 max: 1.
+	"Use scanner mark directly for 1-based string position."
+	start := scanner mark max: 1.
 
 	"Calculate end position based on token type and value"
 	tokenValue := scanner token.
@@ -35019,7 +35018,8 @@ addCurrentToken
 	tokens add: (SyntaxToken type: type start: start end: end)!
 
 calculateEndFor: tokenValue type: scannerType startingAt: start
-	"Calculate the end position for a token."
+	"Calculate the end position for a token.
+	 End is inclusive. For 'nil' (size 3) at start=1: end = 1+3-1 = 3."
 
 	"For strings, account for quotes"
 	scannerType == #string ifTrue: [
