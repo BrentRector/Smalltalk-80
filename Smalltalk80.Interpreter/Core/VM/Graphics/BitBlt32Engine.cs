@@ -378,15 +378,44 @@ public static class BitBlt32Engine
                     if (halftoneWidth == 1 && halftoneHeight == 1 &&
                         halftonePixel != BlackPixel && halftonePixel != WhitePixel)
                     {
-                        // Colored text mode using bit manipulation:
-                        // Font glyphs are black (0x000000) text on white (0xFFFFFF) background.
-                        // Formula: result = (~source & color) | (source & dest)
-                        // - Black source: (~0 & color) | (0 & dest) = color (show colored text)
-                        // - White source: (~0xFFFFFF & color) | (0xFFFFFF & dest) = dest (transparent)
-                        // - Gray source: partial blend of color and dest based on bit patterns
-                        uint invertedSource = ~sourcePixel;
-                        uint result = (invertedSource & halftonePixel) | (sourcePixel & destPixel);
-                        destPixels[destIndex] = result;
+                        // Colored text mode with per-channel alpha blending:
+                        // Font glyphs are rendered black on white, with gray anti-aliased edges.
+                        // ClearType may have different values per channel (subpixel rendering).
+                        // Each channel's source value indicates transparency (inverted):
+                        //   black (0) = fully opaque, show color
+                        //   white (255) = fully transparent, show dest
+                        //   gray = partial blend
+
+                        // Extract source RGB (glyph: dark=ink, light=paper)
+                        int srcR = (int)((sourcePixel >> 16) & 0xFF);
+                        int srcG = (int)((sourcePixel >> 8) & 0xFF);
+                        int srcB = (int)(sourcePixel & 0xFF);
+
+                        // Fast path: white source = fully transparent, skip
+                        if (srcR == 255 && srcG == 255 && srcB == 255)
+                            continue;
+
+                        // Extract color RGB (the desired text color from halftone)
+                        int colorR = (int)((halftonePixel >> 16) & 0xFF);
+                        int colorG = (int)((halftonePixel >> 8) & 0xFF);
+                        int colorB = (int)(halftonePixel & 0xFF);
+
+                        // Extract dest RGB
+                        int dstR = (int)((destPixel >> 16) & 0xFF);
+                        int dstG = (int)((destPixel >> 8) & 0xFF);
+                        int dstB = (int)(destPixel & 0xFF);
+
+                        // Per-channel alpha: 255 - source (black=255 opaque, white=0 transparent)
+                        int alphaR = 255 - srcR;
+                        int alphaG = 255 - srcG;
+                        int alphaB = 255 - srcB;
+
+                        // Blend: result = color * alpha/255 + dest * (255 - alpha)/255
+                        int outR = (colorR * alphaR + dstR * (255 - alphaR)) / 255;
+                        int outG = (colorG * alphaG + dstG * (255 - alphaG)) / 255;
+                        int outB = (colorB * alphaB + dstB * (255 - alphaB)) / 255;
+
+                        destPixels[destIndex] = ((uint)outR << 16) | ((uint)outG << 8) | (uint)outB;
                         continue;
                     }
 
