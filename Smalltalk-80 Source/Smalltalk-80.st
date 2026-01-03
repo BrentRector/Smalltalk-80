@@ -35226,17 +35226,26 @@ type: aSymbol start: startPos end: endPos
 
 Object subclass: #SyntaxStyler
 	instanceVariableNames: 'colorMap'
-	classVariableNames: 'ColorSets CurrentColorSetName DefaultColorMap'
+	classVariableNames: 'ColorSets CurrentColorSetName DefaultColorMap TokenToScopeMap'
 	poolDictionaries: ''
 	category: 'System-Compiler'!
-SyntaxStyler comment: 'I apply syntax highlighting to Smalltalk source code by mapping token types to TextColor attributes. I use ScannerHighlighter to tokenize the source and then apply colors based on a configurable color map.
+SyntaxStyler comment: 'I apply syntax highlighting to Smalltalk source code using a two-level mapping:
+1. Token types (from ScannerHighlighter) → TextMate scopes
+2. TextMate scopes → Colors (defined by themes)
+
+This architecture allows easy theme swapping since themes are defined in terms
+of standard TextMate scopes, matching VSCode/TextMate conventions.
 
 Usage:
     | styledText |
     styledText := SyntaxStyler new styleSource: ''self foo: 42''.
+    SyntaxStyler useColorSet: #VSCodeLight.  "Switch themes"
 
 Class Variables:
-    DefaultColorMap     Dictionary - token type to TextColor mapping
+    TokenToScopeMap     Dictionary - token type to TextMate scope
+    ColorSets           Dictionary - theme name to (scope → color) mapping
+    CurrentColorSetName Symbol - active theme name
+    DefaultColorMap     Dictionary - current active scope → color mapping
 
 Instance Variables:
     colorMap            Dictionary - instance-specific color map (optional override)'!
@@ -35301,15 +35310,21 @@ styleMethod: sourceString inClass: aClass
 
 !SyntaxStyler methodsFor: 'color mapping'!
 colorForType: tokenType
-	"Answer the TextColor for the given token type, or nil for default (black)."
+	"Answer the TextColor for the given token type, or nil for default (black).
+	 Uses two-level lookup: token type → TextMate scope → color."
+	| scope |
+	"First map token type to TextMate scope"
+	scope := TokenToScopeMap at: tokenType ifAbsent: [^nil].
+	scope ifNil: [^nil].
+	"Then look up color for scope in current theme"
 	colorMap ifNotNil: [
-		(colorMap includesKey: tokenType) ifTrue: [
-			^colorMap at: tokenType]].
+		(colorMap includesKey: scope) ifTrue: [
+			^colorMap at: scope]].
 	DefaultColorMap ifNil: [^nil].
-	^DefaultColorMap at: tokenType ifAbsent: [nil]!
+	^DefaultColorMap at: scope ifAbsent: [nil]!
 
 colorMap: aDictionary
-	"Set a custom color map for this styler instance."
+	"Set a custom color map for this styler instance (scope → color)."
 	colorMap := aDictionary!
 
 useDefaultColors
@@ -35341,84 +35356,106 @@ styleMethod: sourceString inClass: aClass
 
 !SyntaxStyler class methodsFor: 'class initialization'!
 initialize
-	"Initialize color sets and select VSCode as default.
+	"Initialize token-to-scope mapping and themes. Select VSCodeLight as default.
 	 SyntaxStyler initialize"
+	self initializeTokenToScopeMap.
 	ColorSets := Dictionary new.
-	self initializePharoColors.
-	self initializeClassicColors.
-	self initializeVSCodeColors.
-	self useColorSet: #VSCode!
-initializePharoColors
-	"Register Pharo/Shout-style syntax colors."
+	self initializeVSCodeLightTheme.
+	self initializeVSCodeDarkTheme.
+	self useColorSet: #VSCodeLight!
+initializeTokenToScopeMap
+	"Map ScannerHighlighter token types to TextMate scopes.
+	 This mapping is fixed - themes define colors for scopes."
+	TokenToScopeMap := Dictionary new.
+	"Comments"
+	TokenToScopeMap at: #comment put: 'comment.block'.
+	"Literals"
+	TokenToScopeMap at: #string put: 'string.quoted.single'.
+	TokenToScopeMap at: #symbol put: 'constant.other.symbol'.
+	TokenToScopeMap at: #number put: 'constant.numeric'.
+	TokenToScopeMap at: #character put: 'constant.character'.
+	"Language constants"
+	TokenToScopeMap at: #true put: 'constant.language'.
+	TokenToScopeMap at: #false put: 'constant.language'.
+	TokenToScopeMap at: #nil put: 'constant.language'.
+	"Pseudo-variables"
+	TokenToScopeMap at: #self put: 'variable.language.self'.
+	TokenToScopeMap at: #super put: 'variable.language.super'.
+	TokenToScopeMap at: #thisContext put: 'variable.language.thisContext'.
+	"Keywords and control flow"
+	TokenToScopeMap at: #keyword put: 'keyword.control'.
+	TokenToScopeMap at: #return put: 'keyword.control.return'.
+	"Types"
+	TokenToScopeMap at: #global put: 'entity.name.type'.
+	"Punctuation"
+	TokenToScopeMap at: #blockStart put: 'punctuation.section.block.begin'.
+	TokenToScopeMap at: #blockEnd put: 'punctuation.section.block.end'.
+	TokenToScopeMap at: #tempBar put: 'punctuation.definition.variable'.
+	"Identifiers (no color by default)"
+	TokenToScopeMap at: #identifier put: nil.
+	TokenToScopeMap at: #default put: nil!
+initializeVSCodeLightTheme
+	"VSCode Light+ theme - designed for white backgrounds.
+	 Colors from VSCode's built-in Light+ (default light) theme."
 	| colors |
 	colors := Dictionary new.
-	"Comments - forest green"
-	colors at: #comment put: (TextColor color: (Color r: 0.0 g: 0.56 b: 0.0)).
-	"Strings - magenta/red"
-	colors at: #string put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	"Symbols - blue"
-	colors at: #symbol put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.80)).
-	"Numbers - red"
-	colors at: #number put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	"Keywords - blue"
-	colors at: #keyword put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.80)).
-	"self/super/thisContext - red"
-	colors at: #self put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	colors at: #super put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	colors at: #thisContext put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	"true/false/nil - red"
-	colors at: #nil put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	colors at: #true put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	colors at: #false put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	"Globals - dark blue"
-	colors at: #global put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.55)).
-	self registerColorSet: colors named: #Pharo!
-initializeClassicColors
-	"Register classic Smalltalk-80 style colors (minimal coloring)."
-	| colors |
+	"Comments - #008000 (green)"
+	colors at: 'comment.block' put: (TextColor color: (Color r: 0.0 g: 0.502 b: 0.0)).
+	"Strings - #A31515 (dark red)"
+	colors at: 'string.quoted.single' put: (TextColor color: (Color r: 0.639 g: 0.082 b: 0.082)).
+	"Symbols - #0000FF (blue)"
+	colors at: 'constant.other.symbol' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	"Numbers - #098658 (teal green)"
+	colors at: 'constant.numeric' put: (TextColor color: (Color r: 0.035 g: 0.525 b: 0.345)).
+	"Characters - #0000FF (blue)"
+	colors at: 'constant.character' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	"Language constants (true/false/nil) - #0000FF (blue)"
+	colors at: 'constant.language' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	"self/super - #0000FF (blue)"
+	colors at: 'variable.language.self' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	colors at: 'variable.language.super' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	colors at: 'variable.language.thisContext' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	"Keywords - #AF00DB (purple)"
+	colors at: 'keyword.control' put: (TextColor color: (Color r: 0.686 g: 0.0 b: 0.859)).
+	colors at: 'keyword.control.return' put: (TextColor color: (Color r: 0.686 g: 0.0 b: 0.859)).
+	"Types/Classes - #267F99 (teal)"
+	colors at: 'entity.name.type' put: (TextColor color: (Color r: 0.149 g: 0.498 b: 0.6)).
+	"Brackets - #319331 (green) from bracket colorization"
+	colors at: 'punctuation.section.block.begin' put: (TextColor color: (Color r: 0.192 g: 0.576 b: 0.192)).
+	colors at: 'punctuation.section.block.end' put: (TextColor color: (Color r: 0.192 g: 0.576 b: 0.192)).
+	self registerColorSet: colors named: #VSCodeLight!
+initializeVSCodeDarkTheme
+	"VSCode Dark+ theme - designed for dark backgrounds.
+	 Colors from VSCode's built-in Dark+ (default dark) theme."
+	| colors blue purple |
 	colors := Dictionary new.
-	"Comments - dark green"
-	colors at: #comment put: (TextColor color: (Color r: 0.0 g: 0.5 b: 0.0)).
-	"Strings - dark red"
-	colors at: #string put: (TextColor color: (Color r: 0.6 g: 0.0 b: 0.0)).
-	"Symbols - purple"
-	colors at: #symbol put: (TextColor color: (Color r: 0.5 g: 0.0 b: 0.5)).
-	self registerColorSet: colors named: #Classic!
-initializeVSCodeColors
-	"Register VSCode Dark+ theme colors with exact hex values from TextMate scope mapping."
-	| colors blue |
-	colors := Dictionary new.
-	blue := Color r: 0.337 g: 0.612 b: 0.839.  "#569CD6"
+	blue := Color r: 0.337 g: 0.612 b: 0.839.    "#569CD6"
+	purple := Color r: 0.773 g: 0.525 b: 0.753.  "#C586C0"
 	"Comments - #6A9955 (green)"
-	colors at: #comment put: (TextColor color: (Color r: 0.416 g: 0.600 b: 0.333)).
+	colors at: 'comment.block' put: (TextColor color: (Color r: 0.416 g: 0.600 b: 0.333)).
 	"Strings - #CE9178 (orange)"
-	colors at: #string put: (TextColor color: (Color r: 0.808 g: 0.569 b: 0.471)).
-	"Symbols - #569CD6 (blue) - constant.other.symbol"
-	colors at: #symbol put: (TextColor color: blue).
+	colors at: 'string.quoted.single' put: (TextColor color: (Color r: 0.808 g: 0.569 b: 0.471)).
+	"Symbols - #569CD6 (blue)"
+	colors at: 'constant.other.symbol' put: (TextColor color: blue).
 	"Numbers - #B5CEA8 (light green)"
-	colors at: #number put: (TextColor color: (Color r: 0.710 g: 0.808 b: 0.659)).
-	"Keywords (ifTrue:, whileTrue:, ^) - #C586C0 (purple)"
-	colors at: #keyword put: (TextColor color: (Color r: 0.773 g: 0.525 b: 0.753)).
-	"self/super/thisContext - #569CD6 (blue) - storage.modifier"
-	colors at: #self put: (TextColor color: blue).
-	colors at: #super put: (TextColor color: blue).
-	colors at: #thisContext put: (TextColor color: blue).
-	"true/false/nil - #569CD6 (blue) - constant.language"
-	colors at: #nil put: (TextColor color: blue).
-	colors at: #true put: (TextColor color: blue).
-	colors at: #false put: (TextColor color: blue).
-	"Globals/Classes - #4EC9B0 (teal) - entity.name.type.class"
-	colors at: #global put: (TextColor color: (Color r: 0.306 g: 0.788 b: 0.690)).
-	"Return (^) - #C586C0 (purple) - keyword.control.flow.return"
-	colors at: #return put: (TextColor color: (Color r: 0.773 g: 0.525 b: 0.753)).
-	"Characters ($x) - #569CD6 (blue) - constant.character"
-	colors at: #character put: (TextColor color: blue).
-	"Brackets - #FFD700 (gold) - VSCode bracket colorization"
-	colors at: #blockStart put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
-	colors at: #blockEnd put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
-	"Temp bars - #D4D4D4 (gray) - punctuation"
-	colors at: #tempBar put: (TextColor color: (Color r: 0.831 g: 0.831 b: 0.831)).
-	self registerColorSet: colors named: #VSCode! !
+	colors at: 'constant.numeric' put: (TextColor color: (Color r: 0.710 g: 0.808 b: 0.659)).
+	"Characters - #569CD6 (blue)"
+	colors at: 'constant.character' put: (TextColor color: blue).
+	"Language constants - #569CD6 (blue)"
+	colors at: 'constant.language' put: (TextColor color: blue).
+	"self/super - #569CD6 (blue)"
+	colors at: 'variable.language.self' put: (TextColor color: blue).
+	colors at: 'variable.language.super' put: (TextColor color: blue).
+	colors at: 'variable.language.thisContext' put: (TextColor color: blue).
+	"Keywords - #C586C0 (purple)"
+	colors at: 'keyword.control' put: (TextColor color: purple).
+	colors at: 'keyword.control.return' put: (TextColor color: purple).
+	"Types/Classes - #4EC9B0 (teal)"
+	colors at: 'entity.name.type' put: (TextColor color: (Color r: 0.306 g: 0.788 b: 0.690)).
+	"Brackets - #FFD700 (gold)"
+	colors at: 'punctuation.section.block.begin' put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
+	colors at: 'punctuation.section.block.end' put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
+	self registerColorSet: colors named: #VSCodeDark! !
 
 !SyntaxStyler class methodsFor: 'color set management'!
 colorSetNames
