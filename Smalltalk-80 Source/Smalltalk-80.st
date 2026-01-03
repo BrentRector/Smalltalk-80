@@ -7097,7 +7097,7 @@ then accept or CR'
 		initialAnswer: initialString.
 	^ aString!
 text
-	| text |
+	| text sourceCode |
 	textMode == #classDefinition ifTrue:
 		[className == nil
 			ifTrue: [^ (Class template: category) asText]
@@ -7105,8 +7105,10 @@ text
 	textMode == #methodDefinition ifTrue:
 		[selector == nil
 			ifTrue: [^ self selectedClass sourceCodeTemplate asText]
-			ifFalse: [^ (self selectedClass sourceCodeAt: selector) asText
-						makeSelectorBoldIn: self selectedClass]].
+			ifFalse: [
+				"Apply syntax highlighting to method source code"
+				sourceCode := self selectedClass sourceCodeAt: selector.
+				^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass]].
 	textMode == #category ifTrue:
 		[^ 'category to add' asText].
 	textMode == #categories ifTrue:
@@ -16763,7 +16765,7 @@ moveTo: newLoc restoring: background
 			background fromDisplay: rect2.
 			self displayOn: Display at: newLoc].
 	^ background offset: newLoc! !CharacterScanner subclass: #DisplayScanner
-	instanceVariableNames: 'lineY runX '
+	instanceVariableNames: 'lineY runX defaultMask'
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '
 	category: 'Graphics-Support'!
@@ -16775,6 +16777,8 @@ Instance Variables
 	lineY	<Integer>  Top of line currently being displayed or scanned.  The textStyle lineGrid is added or subtracted to discover the top of the next line.  May differ from destY when fonts of differing height fall on the same line.
 
 	runX	<Integer>  Left of first character in the current run -- allows for creating underlining or similar emphasis.
+
+	defaultMask	<Form>  The default halftone mask (from Paragraph) used when no color is specified.
 '!
 
 
@@ -16870,15 +16874,24 @@ paddedSpace
 	lastIndex _ lastIndex + 1.
 	^false!
 setStopConditions
-	"Set the font and the stop conditions for the current run."
-	| fontIndex displayFont |
+	"Set the font and the stop conditions for the current run.
+	 Also handles text color from TextColor attributes."
+	| fontIndex displayFont textColor |
 	font _ textStyle fontAt: (text emphasisAt: lastIndex).
 	super setStopConditions.
 	stopConditions 
 		at: Space asInteger + 1 
 		put: (textStyle alignment = Justified
 				ifTrue: [#paddedSpace]
-				ifFalse: [nil])!
+				ifFalse: [nil]).
+	"Check for text color attribute"
+	textColor := text colorAt: lastIndex.
+	textColor ifNil: [
+		"No color - use default mask"
+		halftoneForm := defaultMask]
+	ifNotNil: [
+		"Color specified - create colored mask"
+		halftoneForm := Form colorMask: textColor]!
 tab
 	"This awfulness attempts to handle leading and internal tabs in a justified line.  Leading tabs are considered legal and should be reflected on the display gracefully.  Internal tabs (when the line is justified) are considered at the very best a misguided use of the character, and are reflected on the display the best we can."
 
@@ -16964,7 +16977,8 @@ fontAscentDelta
 					ifFalse:	[^ textStyle baseline - currentFont ascent]].!
 initializeFromParagraph: aParagraph clippedBy: clippingRectangle
 
-	super initializeFromParagraph: aParagraph clippedBy: clippingRectangle! !Form subclass: #DisplayScreen
+	super initializeFromParagraph: aParagraph clippedBy: clippingRectangle.
+	defaultMask := halftoneForm! !Form subclass: #DisplayScreen
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -20632,6 +20646,17 @@ whitePixel
 	 Standard RGB: white = 0xFFFFFF.
 	 Provides default if Form not yet initialized."
 	^WhitePixel ifNil: [16rFFFFFF]! !
+
+!Form class methodsFor: 'color masks'!
+colorMask: aColor
+	"Answer a 1x1 Form filled with the given Color.
+	 Used as halftoneForm for colored text rendering.
+	 Example: Form colorMask: Color blue"
+	| form pixelValue |
+	form := Form extent: 1@1.
+	pixelValue := aColor asPixelValue.
+	form bits at: 1 put: pixelValue.
+	^form! !
 
 !Form class methodsFor: 'examples'!
 exampleEdits
@@ -32182,6 +32207,243 @@ fromInteger: argbaInteger
 		b: (argbaInteger bitAnd: 255) / 255.0
 		alpha: ((argbaInteger bitShift: -24) bitAnd: 255) / 255.0! !
 Color initialize!
+Object subclass: #TextAttribute
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Text'!
+TextAttribute comment: 'I am an abstract class representing text attributes such as color, emphasis, or font changes. My subclasses implement specific attribute types. I provide polymorphism with integer emphasis codes used by the original Text implementation.
+
+Subclasses:
+    TextColor - text foreground color
+    TextEmphasis - bold, italic, underline, strikethrough'!
+
+
+!TextAttribute methodsFor: 'accessing'!
+emphasisCode
+	"Answer an integer emphasis code for backward compatibility.
+	 Subclasses that cannot be represented as integer codes answer 1 (normal)."
+	^1!
+
+color
+	"Answer the color for this attribute, or nil if not a color attribute"
+	^nil! !
+
+!TextAttribute methodsFor: 'testing'!
+isColor
+	"Answer whether this attribute represents a color"
+	^false!
+
+isEmphasis
+	"Answer whether this attribute represents emphasis (bold, italic, etc.)"
+	^false! !
+
+!TextAttribute methodsFor: 'merging'!
+dominates: another
+	"Answer whether the receiver should take precedence over another attribute.
+	 Used when combining runs of attributes."
+	^self class = another class!
+
+merge: another
+	"Merge another attribute with the receiver.
+	 Default behavior is receiver takes precedence."
+	^self! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+TextAttribute class
+	instanceVariableNames: ''!
+
+
+TextAttribute subclass: #TextColor
+	instanceVariableNames: 'color'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Text'!
+TextColor comment: 'I represent a text foreground color attribute. I wrap a Color object and provide integration with the Text emphasis system.
+
+Instance Variables:
+    color   Color - the foreground color for text'!
+
+
+!TextColor methodsFor: 'accessing'!
+color
+	"Answer the color for this attribute"
+	^color!
+
+emphasisCode
+	"Color attributes don't map to integer codes, return normal"
+	^1! !
+
+!TextColor methodsFor: 'testing'!
+isColor
+	"Answer whether this attribute represents a color"
+	^true! !
+
+!TextColor methodsFor: 'comparing'!
+= aTextColor
+	"Answer whether the receiver equals aTextColor"
+	self species = aTextColor species ifFalse: [^false].
+	^color = aTextColor color!
+
+hash
+	"Answer a hash value for the receiver"
+	^color hash! !
+
+!TextColor methodsFor: 'private'!
+color: aColor
+	"Set the color - private, use class-side creation"
+	color := aColor! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+TextColor class
+	instanceVariableNames: ''!
+
+
+!TextColor class methodsFor: 'instance creation'!
+color: aColor
+	"Answer a new TextColor for the given color"
+	^self new color: aColor!
+
+black
+	"Answer a TextColor for black text"
+	^self color: Color black!
+
+blue
+	"Answer a TextColor for blue text"
+	^self color: Color blue!
+
+red
+	"Answer a TextColor for red text"
+	^self color: Color red!
+
+green
+	"Answer a TextColor for green text"
+	^self color: (Color r: 0.0 g: 0.5 b: 0.0)!
+
+gray
+	"Answer a TextColor for gray text"
+	^self color: Color gray!
+
+cyan
+	"Answer a TextColor for cyan text"
+	^self color: Color cyan!
+
+magenta
+	"Answer a TextColor for magenta text"
+	^self color: Color magenta!
+
+orange
+	"Answer a TextColor for orange text"
+	^self color: (Color r: 1.0 g: 0.5 b: 0.0)!
+
+purple
+	"Answer a TextColor for purple text"
+	^self color: (Color r: 0.5 g: 0.0 b: 0.5)!
+
+brown
+	"Answer a TextColor for brown text"
+	^self color: (Color r: 0.6 g: 0.3 b: 0.0)! !
+
+
+TextAttribute subclass: #TextEmphasis
+	instanceVariableNames: 'emphasisCode'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Text'!
+TextEmphasis comment: 'I represent a text emphasis attribute such as bold, italic, underline, or strikethrough. I store an integer emphasis code compatible with the original Text system.
+
+Emphasis codes (bitfield):
+    1 - bold
+    2 - italic
+    4 - underlined
+    8 - strikethrough
+
+Instance Variables:
+    emphasisCode    SmallInteger - the emphasis bitfield'!
+
+
+!TextEmphasis methodsFor: 'accessing'!
+emphasisCode
+	"Answer the integer emphasis code"
+	^emphasisCode! !
+
+!TextEmphasis methodsFor: 'testing'!
+isEmphasis
+	"Answer whether this attribute represents emphasis"
+	^true!
+
+isBold
+	"Answer whether this emphasis includes bold"
+	^(emphasisCode bitAnd: 1) ~= 0!
+
+isItalic
+	"Answer whether this emphasis includes italic"
+	^(emphasisCode bitAnd: 2) ~= 0!
+
+isUnderlined
+	"Answer whether this emphasis includes underline"
+	^(emphasisCode bitAnd: 4) ~= 0!
+
+isStruckOut
+	"Answer whether this emphasis includes strikethrough"
+	^(emphasisCode bitAnd: 8) ~= 0! !
+
+!TextEmphasis methodsFor: 'comparing'!
+= aTextEmphasis
+	"Answer whether the receiver equals aTextEmphasis"
+	self species = aTextEmphasis species ifFalse: [^false].
+	^emphasisCode = aTextEmphasis emphasisCode!
+
+hash
+	"Answer a hash value for the receiver"
+	^emphasisCode hash! !
+
+!TextEmphasis methodsFor: 'merging'!
+merge: aTextEmphasis
+	"Merge another emphasis with the receiver by combining bitfields"
+	aTextEmphasis isEmphasis
+		ifTrue: [^TextEmphasis code: (emphasisCode bitOr: aTextEmphasis emphasisCode)]
+		ifFalse: [^self]! !
+
+!TextEmphasis methodsFor: 'private'!
+code: anInteger
+	"Set the emphasis code - private, use class-side creation"
+	emphasisCode := anInteger! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+TextEmphasis class
+	instanceVariableNames: ''!
+
+
+!TextEmphasis class methodsFor: 'instance creation'!
+code: anInteger
+	"Answer a new TextEmphasis for the given code"
+	^self new code: anInteger!
+
+normal
+	"Answer a normal (no emphasis) attribute"
+	^self code: 0!
+
+bold
+	"Answer a bold emphasis attribute"
+	^self code: 1!
+
+italic
+	"Answer an italic emphasis attribute"
+	^self code: 2!
+
+boldItalic
+	"Answer a bold italic emphasis attribute"
+	^self code: 3!
+
+underlined
+	"Answer an underlined emphasis attribute"
+	^self code: 4!
+
+struckOut
+	"Answer a strikethrough emphasis attribute"
+	^self code: 8! !
+
 Object subclass: #Point
 	instanceVariableNames: 'x y '
 	classVariableNames: ''
@@ -34578,6 +34840,27 @@ xSingleQuote
 	token _ buffer contents.
 	tokenType _ #string! !
 
+!Scanner methodsFor: 'accessing'!
+mark
+	"Answer the position where the current token began."
+	^mark!
+
+token
+	"Answer the current token value."
+	^token!
+
+tokenType
+	"Answer the Symbol indicating the current token type."
+	^tokenType!
+
+currentComment
+	"Answer the collection of comment strings accumulated during scanning."
+	^currentComment!
+
+source
+	"Answer the source stream being scanned."
+	^source! !
+
 !Scanner methodsFor: 'error handling'!
 notify: string 
 	self error: string!
@@ -34661,6 +34944,373 @@ isLiteralSymbol: aSymbol
 	^false! !
 
 Scanner initialize!
+Object subclass: #ScannerHighlighter
+	instanceVariableNames: 'scanner tokens sourceString'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'System-Compiler'!
+ScannerHighlighter comment: 'I wrap the Scanner class to provide syntax highlighting tokens with position information. I tokenize Smalltalk source code and categorize each token for syntax highlighting purposes.
+
+I produce a collection of SyntaxToken objects, each containing:
+- type: a Symbol indicating the highlight category (#keyword, #string, #comment, etc.)
+- start: the 1-based start position in source
+- end: the 1-based end position in source
+
+Usage:
+    | tokens |
+    tokens := ScannerHighlighter new tokenize: ''self foo: 42''.
+    tokens do: [:token | Transcript show: token type; cr]
+
+Instance Variables:
+    scanner     Scanner - the underlying Smalltalk scanner
+    tokens      OrderedCollection - collected syntax tokens
+    sourceString String - the source being scanned'!
+
+
+!ScannerHighlighter methodsFor: 'tokenizing'!
+tokenize: aString
+	"Answer a collection of SyntaxToken objects for the source string."
+	| stream |
+	sourceString := aString.
+	tokens := OrderedCollection new.
+	aString isEmpty ifTrue: [^tokens].
+
+	stream := ReadStream on: aString.
+	scanner := Scanner new initScanner; scan: stream.
+
+	"First, find all comments (Scanner doesn't track positions)"
+	self findComments.
+
+	"Then scan all tokens"
+	[scanner tokenType ~~ #doIt] whileTrue: [
+		self addCurrentToken.
+		scanner scanToken].
+
+	"Sort by position (comments may be interleaved)"
+	tokens := tokens asSortedCollection: [:a :b | a start < b start].
+	^tokens asOrderedCollection!
+
+addCurrentToken
+	"Add the current scanner token to our collection."
+	| type start end tokenValue |
+	type := self highlightTypeFor: scanner tokenType.
+	start := scanner mark + 1.  "Convert 0-based to 1-based"
+
+	"Calculate end position based on token type and value"
+	tokenValue := scanner token.
+	end := self calculateEndFor: tokenValue type: scanner tokenType startingAt: start.
+
+	tokens add: (SyntaxToken type: type start: start end: end)!
+
+calculateEndFor: tokenValue type: scannerType startingAt: start
+	"Calculate the end position for a token."
+
+	"For strings, account for quotes"
+	scannerType == #string ifTrue: [
+		^start + tokenValue size + 1].  "Include both quotes"
+
+	"For character literals ($x), include the $"
+	(scannerType == #number and: [tokenValue isCharacter]) ifTrue: [
+		^start + 1].
+
+	"For numbers, convert to string to get length"
+	scannerType == #number ifTrue: [
+		^start + tokenValue printString size - 1].
+
+	"For symbols #foo, account for the #"
+	scannerType == #literal ifTrue: [
+		tokenValue isSymbol ifTrue: [
+			^start + tokenValue size].
+		"For literal arrays, this is tricky - use source position"
+		^start + tokenValue printString size - 1].
+
+	"For keywords (foo:), include the colon"
+	scannerType == #keyword ifTrue: [
+		^start + tokenValue size - 1].
+
+	"For words and binary selectors"
+	tokenValue isString ifTrue: [
+		^start + tokenValue size - 1].
+	tokenValue isSymbol ifTrue: [
+		^start + tokenValue size - 1].
+
+	"Default: single character"
+	^start!
+
+highlightTypeFor: scannerTokenType
+	"Map Scanner token types to highlight categories."
+
+	"Literals"
+	scannerTokenType == #string ifTrue: [^#string].
+	scannerTokenType == #number ifTrue: [^#number].
+	scannerTokenType == #literal ifTrue: [^#symbol].
+
+	"Selectors"
+	scannerTokenType == #keyword ifTrue: [^#keyword].
+	scannerTokenType == #binary ifTrue: [^#binary].
+
+	"Special syntax"
+	scannerTokenType == #upArrow ifTrue: [^#return].
+	scannerTokenType == #leftArrow ifTrue: [^#assignment].
+	scannerTokenType == #leftBracket ifTrue: [^#blockBracket].
+	scannerTokenType == #rightBracket ifTrue: [^#blockBracket].
+	scannerTokenType == #leftParenthesis ifTrue: [^#paren].
+	scannerTokenType == #rightParenthesis ifTrue: [^#paren].
+	scannerTokenType == #period ifTrue: [^#separator].
+	scannerTokenType == #semicolon ifTrue: [^#cascade].
+	scannerTokenType == #verticalBar ifTrue: [^#tempBar].
+	scannerTokenType == #colon ifTrue: [^#colon].
+
+	"Identifiers - need semantic analysis"
+	scannerTokenType == #word ifTrue: [
+		^self categorizeWord: scanner token].
+
+	^#default!
+
+categorizeWord: word
+	"Distinguish pseudo-variables, globals, and local identifiers."
+
+	"Pseudo-variables"
+	word = 'self' ifTrue: [^#self].
+	word = 'super' ifTrue: [^#super].
+	word = 'true' ifTrue: [^#true].
+	word = 'false' ifTrue: [^#false].
+	word = 'nil' ifTrue: [^#nil].
+	word = 'thisContext' ifTrue: [^#thisContext].
+
+	"Globals start with uppercase"
+	word first isUppercase ifTrue: [^#global].
+
+	"Local variable, temp, or argument"
+	^#identifier!
+
+findComments
+	"Find comment positions by scanning for double-quote pairs."
+	| pos startPos |
+	pos := 1.
+	[pos := sourceString indexOf: $" startingAt: pos.
+	 pos > 0] whileTrue: [
+		startPos := pos.
+		pos := sourceString indexOf: $" startingAt: pos + 1.
+		pos = 0 ifTrue: [^self].  "Unterminated comment"
+		tokens add: (SyntaxToken type: #comment start: startPos end: pos).
+		pos := pos + 1]! !
+
+!ScannerHighlighter methodsFor: 'accessing'!
+tokens
+	"Answer the collection of syntax tokens."
+	^tokens! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+ScannerHighlighter class
+	instanceVariableNames: ''!
+
+
+!ScannerHighlighter class methodsFor: 'instance creation'!
+tokenize: aString
+	"Convenience method to tokenize a string."
+	^self new tokenize: aString! !
+
+Object subclass: #SyntaxToken
+	instanceVariableNames: 'type start end'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'System-Compiler'!
+SyntaxToken comment: 'I represent a syntax token with its position in source code. I am produced by ScannerHighlighter for syntax highlighting.
+
+Instance Variables:
+    type    Symbol - the highlight category (#keyword, #string, #comment, etc.)
+    start   Integer - 1-based start position in source
+    end     Integer - 1-based end position in source (inclusive)'!
+
+
+!SyntaxToken methodsFor: 'accessing'!
+type
+	"Answer the highlight category Symbol."
+	^type!
+
+start
+	"Answer the 1-based start position."
+	^start!
+
+end
+	"Answer the 1-based end position (inclusive)."
+	^end!
+
+length
+	"Answer the length of this token."
+	^end - start + 1! !
+
+!SyntaxToken methodsFor: 'comparing'!
+= aSyntaxToken
+	"Answer whether the receiver equals aSyntaxToken."
+	self species = aSyntaxToken species ifFalse: [^false].
+	^type = aSyntaxToken type and: [start = aSyntaxToken start and: [end = aSyntaxToken end]]!
+
+hash
+	"Answer a hash value."
+	^type hash bitXor: (start hash bitXor: end hash)! !
+
+!SyntaxToken methodsFor: 'printing'!
+printOn: aStream
+	"Print the receiver on aStream."
+	aStream nextPutAll: 'SyntaxToken(';
+		print: type;
+		nextPutAll: ' ';
+		print: start;
+		nextPutAll: '-';
+		print: end;
+		nextPut: $)! !
+
+!SyntaxToken methodsFor: 'private'!
+setType: aSymbol start: startPos end: endPos
+	"Set instance variables - private."
+	type := aSymbol.
+	start := startPos.
+	end := endPos! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+SyntaxToken class
+	instanceVariableNames: ''!
+
+
+!SyntaxToken class methodsFor: 'instance creation'!
+type: aSymbol start: startPos end: endPos
+	"Answer a new SyntaxToken."
+	^self new setType: aSymbol start: startPos end: endPos! !
+
+Object subclass: #SyntaxStyler
+	instanceVariableNames: 'colorMap'
+	classVariableNames: 'DefaultColorMap'
+	poolDictionaries: ''
+	category: 'System-Compiler'!
+SyntaxStyler comment: 'I apply syntax highlighting to Smalltalk source code by mapping token types to TextColor attributes. I use ScannerHighlighter to tokenize the source and then apply colors based on a configurable color map.
+
+Usage:
+    | styledText |
+    styledText := SyntaxStyler new styleSource: ''self foo: 42''.
+
+Class Variables:
+    DefaultColorMap     Dictionary - token type to TextColor mapping
+
+Instance Variables:
+    colorMap            Dictionary - instance-specific color map (optional override)'!
+
+
+!SyntaxStyler methodsFor: 'styling'!
+styleSource: sourceString
+	"Answer a Text with syntax highlighting applied."
+	| text tokens |
+	sourceString isEmpty ifTrue: [^Text fromString: ''].
+	text := Text fromString: sourceString.
+	tokens := ScannerHighlighter tokenize: sourceString.
+
+	tokens do: [:token |
+		| textColor |
+		textColor := self colorForType: token type.
+		textColor ifNotNil: [
+			text addAttribute: textColor from: token start to: token end]].
+
+	^text!
+
+styleMethod: sourceString inClass: aClass
+	"Answer a styled Text for a method in the given class.
+	 Makes the selector bold in addition to color highlighting."
+	| text |
+	text := self styleSource: sourceString.
+	text makeSelectorBoldIn: aClass.
+	^text! !
+
+!SyntaxStyler methodsFor: 'color mapping'!
+colorForType: tokenType
+	"Answer the TextColor for the given token type, or nil for default."
+	colorMap ifNotNil: [
+		(colorMap includesKey: tokenType) ifTrue: [
+			^colorMap at: tokenType]].
+	^DefaultColorMap at: tokenType ifAbsent: [nil]!
+
+colorMap: aDictionary
+	"Set a custom color map for this styler instance."
+	colorMap := aDictionary!
+
+useDefaultColors
+	"Reset to use the default color map."
+	colorMap := nil! !
+
+!SyntaxStyler methodsFor: 'private'!
+initialize
+	"Initialize the styler."
+	colorMap := nil! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+SyntaxStyler class
+	instanceVariableNames: ''!
+
+
+!SyntaxStyler class methodsFor: 'instance creation'!
+new
+	"Answer a new SyntaxStyler."
+	^super new initialize!
+
+styleSource: sourceString
+	"Convenience method to style source code."
+	^self new styleSource: sourceString!
+
+styleMethod: sourceString inClass: aClass
+	"Convenience method to style a method with class context."
+	^self new styleMethod: sourceString inClass: aClass! !
+
+!SyntaxStyler class methodsFor: 'class initialization'!
+initialize
+	"Initialize the default color map.
+	 SyntaxStyler initialize"
+	DefaultColorMap := Dictionary new.
+
+	"Comments - green (traditional)"
+	DefaultColorMap at: #comment put: (TextColor color: (Color r: 0.0 g: 0.5 b: 0.0)).
+
+	"Strings - dark red/maroon"
+	DefaultColorMap at: #string put: (TextColor color: (Color r: 0.6 g: 0.0 b: 0.0)).
+
+	"Symbols - dark magenta"
+	DefaultColorMap at: #symbol put: (TextColor color: (Color r: 0.5 g: 0.0 b: 0.5)).
+
+	"Numbers - dark blue"
+	DefaultColorMap at: #number put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.7)).
+
+	"Keywords (message selectors with colons) - dark blue"
+	DefaultColorMap at: #keyword put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.6)).
+
+	"Binary selectors - dark gray"
+	DefaultColorMap at: #binary put: (TextColor color: (Color r: 0.3 g: 0.3 b: 0.3)).
+
+	"Pseudo-variables - bold purple"
+	DefaultColorMap at: #self put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
+	DefaultColorMap at: #super put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
+	DefaultColorMap at: #nil put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
+	DefaultColorMap at: #true put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
+	DefaultColorMap at: #false put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
+	DefaultColorMap at: #thisContext put: (TextColor color: (Color r: 0.4 g: 0.0 b: 0.4)).
+
+	"Return arrow - red"
+	DefaultColorMap at: #return put: (TextColor color: (Color r: 0.7 g: 0.0 b: 0.0)).
+
+	"Assignment - dark gray"
+	DefaultColorMap at: #assignment put: (TextColor color: (Color r: 0.3 g: 0.3 b: 0.3)).
+
+	"Block brackets - teal"
+	DefaultColorMap at: #blockBracket put: (TextColor color: (Color r: 0.0 g: 0.4 b: 0.4)).
+
+	"Globals (class names) - dark teal"
+	DefaultColorMap at: #global put: (TextColor color: (Color r: 0.0 g: 0.4 b: 0.5)).
+
+	"Identifiers (locals, temps, args) - no special color (black)"
+	"DefaultColorMap at: #identifier put: nil"
+
+	"Separators and other syntax - no special color"
+	"#separator, #cascade, #tempBar, #paren, #colon, #default - use black"! !
+
+SyntaxStyler initialize!
 MouseMenuController subclass: #ScreenController
 	instanceVariableNames: ''
 	classVariableNames: 'ScreenYellowButtonMenu ScreenYellowButtonMessages '
@@ -37413,6 +38063,13 @@ asSymbol
 asText
 	"Answer a Text whose string is the receiver."
 	^Text fromString: self!
+withColor: aColor
+	"Answer a Text with the receiver as string and aColor as foreground.
+	 Example: 'Hello' withColor: Color blue"
+	| text |
+	text := self asText.
+	text addAttribute: (TextColor color: aColor) from: 1 to: self size.
+	^text!
 asUppercase
 	"Answer a string made up from the receiver whose characters are all uppercase."
 
@@ -40111,11 +40768,45 @@ makeSelectorBoldIn: aClass
 	self emphasizeFrom: 1
 		to: (parser endOfLastToken min: string size)
 		with: 2!
-runLengthFor: characterIndex 
-	"Answer the count of characters remaining in run beginning with 
+runLengthFor: characterIndex
+	"Answer the count of characters remaining in run beginning with
 	characterIndex."
 
 	^runs runLengthAt: characterIndex! !
+
+!Text methodsFor: 'attributes'!
+addAttribute: aTextAttribute from: start to: stop
+	"Apply aTextAttribute to the character range start-stop.
+	 Works alongside integer emphasis codes."
+	runs := runs
+		copyReplaceFrom: start
+		to: stop
+		with: (RunArray new: stop - start + 1 withAll: aTextAttribute)!
+
+attributeAt: characterIndex
+	"Answer the attribute at characterIndex.
+	 May be an integer (legacy emphasis) or a TextAttribute object."
+	self size = 0 ifTrue: [^1].
+	^runs at: characterIndex!
+
+colorAt: characterIndex
+	"Answer the Color at characterIndex, or nil if no color attribute.
+	 Handles both TextColor attributes and legacy integer emphasis codes."
+	| attr |
+	self size = 0 ifTrue: [^nil].
+	attr := runs at: characterIndex.
+	attr isInteger ifTrue: [^nil].
+	attr isColor ifTrue: [^attr color].
+	^nil!
+
+emphasisCodeAt: characterIndex
+	"Answer the integer emphasis code at characterIndex.
+	 Works with both integer runs and TextAttribute objects."
+	| attr |
+	self size = 0 ifTrue: [^1].
+	attr := runs at: characterIndex.
+	attr isInteger ifTrue: [^attr].
+	^attr emphasisCode! !
 
 !Text methodsFor: 'printing'!
 printOn: aStream 
