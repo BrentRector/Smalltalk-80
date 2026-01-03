@@ -499,8 +499,8 @@ public static class FileInfoPrimitives
             if (symbolOOP.IsSmallInteger)
                 return PrimitiveResult.Fail(context.Metadata!);
 
-            // Extract symbol name from Symbol object
-            string? symbolName = ExtractSymbolName(context, symbolOOP);
+            // Extract symbol name - Symbol is ByteIndexed like String
+            string? symbolName = FilePrimitiveHelpers.ExtractString(context, symbolOOP);
             if (symbolName == null)
                 return PrimitiveResult.Fail(context.Metadata!);
 
@@ -520,23 +520,6 @@ public static class FileInfoPrimitives
             {
                 return PrimitiveResult.Ok(context.HeapManager.GetNil());
             }
-        }
-
-        private static string? ExtractSymbolName(PrimitiveExecutionContext context, SmalltalkOOP symbolOOP)
-        {
-            // Symbol is stored as a String-like object (bytes are character codes)
-            var heap = context.HeapManager;
-            int length = heap.GetIndexedSize(symbolOOP);
-            if (length <= 0) return null;
-
-            var chars = new char[length];
-            for (int i = 0; i < length; i++)
-            {
-                var byteOOP = heap.GetIndexedOOP(symbolOOP, i);
-                if (!byteOOP.IsSmallInteger) return null;
-                chars[i] = (char)byteOOP.AsSmallInteger();
-            }
-            return new string(chars);
         }
     }
 }
