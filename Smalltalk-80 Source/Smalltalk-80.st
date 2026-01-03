@@ -7097,7 +7097,7 @@ then accept or CR'
 		initialAnswer: initialString.
 	^ aString!
 text
-	| text sourceCode |
+	| text |
 	textMode == #classDefinition ifTrue:
 		[className == nil
 			ifTrue: [^ (Class template: category) asText]
@@ -7105,10 +7105,7 @@ text
 	textMode == #methodDefinition ifTrue:
 		[selector == nil
 			ifTrue: [^ self selectedClass sourceCodeTemplate asText]
-			ifFalse: [
-				"Apply syntax highlighting to method source code"
-				sourceCode := self selectedClass sourceCodeAt: selector.
-				^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass]].
+			ifFalse: [^ SyntaxStyler styleMethod: (self selectedClass sourceCodeAt: selector) inClass: self selectedClass]].
 	textMode == #category ifTrue:
 		[^ 'category to add' asText].
 	textMode == #categories ifTrue:
