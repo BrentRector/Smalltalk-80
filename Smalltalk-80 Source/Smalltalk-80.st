@@ -7097,7 +7097,7 @@ then accept or CR'
 		initialAnswer: initialString.
 	^ aString!
 text
-	| text |
+	| text sourceCode |
 	textMode == #classDefinition ifTrue:
 		[className == nil
 			ifTrue: [^ (Class template: category) asText]
@@ -7105,7 +7105,10 @@ text
 	textMode == #methodDefinition ifTrue:
 		[selector == nil
 			ifTrue: [^ self selectedClass sourceCodeTemplate asText]
-			ifFalse: [^ SyntaxStyler styleMethod: (self selectedClass sourceCodeAt: selector) inClass: self selectedClass]].
+			ifFalse: [
+				"Apply syntax highlighting to method source code"
+				sourceCode := self selectedClass sourceCodeAt: selector.
+				^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass]].
 	textMode == #category ifTrue:
 		[^ 'category to add' asText].
 	textMode == #categories ifTrue:
@@ -40684,13 +40687,14 @@ writeCloneWithout: aSet
 SystemTracer initialize!
 
 ArrayedCollection subclass: #Text
-	instanceVariableNames: 'string runs '
+	instanceVariableNames: 'string runs colorRuns '
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '
 	category: 'Collections-Text'!
 Text comment: 'Instance Variables:
-	string:	A String of Characters
-	runs:	A RunArray of emphasis codes
+	string:		A String of Characters
+	runs:		A RunArray of integer emphasis codes (for font selection)
+	colorRuns:	A RunArray of Color objects (nil = default black)
 					
 The emphasis codes indicate abstract changes in character appearance.  Actual display is performed in the presence of a TextStyle which indicates, for each abstract code, an actual font to be used'!
 
@@ -40763,7 +40767,7 @@ asUppercase
 !Text methodsFor: 'emphasis'!
 allBold
 	self emphasizeFrom: 1 to: self size with: 2!
-emphasisAt: characterIndex 
+emphasisAt: characterIndex
 	"Answer the code for characters in the run beginning at characterIndex."
 
 	self size = 0 ifTrue: [^1].	"null text tolerates access"
@@ -40794,37 +40798,20 @@ runLengthFor: characterIndex
 
 !Text methodsFor: 'attributes'!
 addAttribute: aTextAttribute from: start to: stop
-	"Apply aTextAttribute to the character range start-stop.
-	 Works alongside integer emphasis codes."
-	runs := runs
+	"Apply a TextColor attribute to the character range start-stop.
+	 Colors are stored in colorRuns, separate from emphasis runs."
+	aTextAttribute isColor ifFalse: [^self].  "Only handle color attributes"
+	colorRuns ifNil: [colorRuns := RunArray new: self size withAll: nil].
+	colorRuns := colorRuns
 		copyReplaceFrom: start
 		to: stop
-		with: (RunArray new: stop - start + 1 withAll: aTextAttribute)!
-
-attributeAt: characterIndex
-	"Answer the attribute at characterIndex.
-	 May be an integer (legacy emphasis) or a TextAttribute object."
-	self size = 0 ifTrue: [^1].
-	^runs at: characterIndex!
+		with: (RunArray new: stop - start + 1 withAll: aTextAttribute color)!
 
 colorAt: characterIndex
-	"Answer the Color at characterIndex, or nil if no color attribute.
-	 Handles both TextColor attributes and legacy integer emphasis codes."
-	| attr |
+	"Answer the Color at characterIndex, or nil if no color (default black)."
 	self size = 0 ifTrue: [^nil].
-	attr := runs at: characterIndex.
-	attr isInteger ifTrue: [^nil].
-	attr isColor ifTrue: [^attr color].
-	^nil!
-
-emphasisCodeAt: characterIndex
-	"Answer the integer emphasis code at characterIndex.
-	 Works with both integer runs and TextAttribute objects."
-	| attr |
-	self size = 0 ifTrue: [^1].
-	attr := runs at: characterIndex.
-	attr isInteger ifTrue: [^attr].
-	^attr emphasisCode! !
+	colorRuns ifNil: [^nil].
+	^colorRuns at: characterIndex! !
 
 !Text methodsFor: 'printing'!
 printOn: aStream 
