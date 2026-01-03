@@ -35039,6 +35039,17 @@ addCurrentTokenAt: streamPosition
 		[type == #number and: [tokenValue isKindOf: Character]])
 		ifTrue: [type := #character].
 
+	"Skip literal arrays - they cause position issues and their parens
+	 should just be black like regular parens"
+	(scanner tokenType == #literal and: [tokenValue isKindOf: Array])
+		ifTrue: [^self].
+
+	"Skip single-character 'literals' that are really punctuation"
+	(scanner tokenType == #literal and: [
+		(tokenValue isKindOf: Symbol) and: [tokenValue size = 1 and: [
+			'()[]' includes: tokenValue first]]])
+		ifTrue: [^self].
+
 	"Stream position is after token+whitespace. Scanner reads 2 chars ahead.
 	 Use scanner mark for start, find actual end in source."
 	start := scanner mark max: 1.
