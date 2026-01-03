@@ -36326,7 +36326,7 @@ SequenceableCollection comment: 'Abstract superclass for collections that have a
 
 
 !SequenceableCollection methodsFor: 'comparing'!
-= otherCollection 
+= otherCollection
 	"Answer whether the species of the receiver is the same as otherCollection's species,
 	and the receiver's size is the same as otherCollection's size, and each of the receiver's
 	elements equal the corresponding element of otherCollection"
@@ -36337,6 +36337,21 @@ SequenceableCollection comment: 'Abstract superclass for collections that have a
 	index _ 0.
 	[(index _ index + 1) <= size]
 		whileTrue: [(self at: index) = (otherCollection at: index) ifFalse: [^false]].
+	^true!
+beginsWith: aSequenceableCollection
+	"Answer whether the receiver's first elements match aSequenceableCollection."
+	| size |
+	(size _ aSequenceableCollection size) > self size ifTrue: [^false].
+	1 to: size do: [:i |
+		(self at: i) = (aSequenceableCollection at: i) ifFalse: [^false]].
+	^true!
+endsWith: aSequenceableCollection
+	"Answer whether the receiver's last elements match aSequenceableCollection."
+	| size offset |
+	(size _ aSequenceableCollection size) > self size ifTrue: [^false].
+	offset _ self size - size.
+	1 to: size do: [:i |
+		(self at: offset + i) = (aSequenceableCollection at: i) ifFalse: [^false]].
 	^true! !
 
 !SequenceableCollection methodsFor: 'accessing'!
@@ -38572,7 +38587,43 @@ findTokens: delimiters
 				start < i ifTrue: [tokens add: (self copyFrom: start to: i - 1)].
 				start _ i + 1]].
 	start <= self size ifTrue: [tokens add: (self copyFrom: start to: self size)].
-	^tokens! !
+	^tokens!
+trimBoth
+	"Answer a copy of the receiver with leading and trailing whitespace removed."
+	| left right |
+	self isEmpty ifTrue: [^self].
+	left _ 1.
+	[left <= self size and: [(self at: left) isSeparator]]
+		whileTrue: [left _ left + 1].
+	left > self size ifTrue: [^''].
+	right _ self size.
+	[right >= left and: [(self at: right) isSeparator]]
+		whileTrue: [right _ right - 1].
+	^self copyFrom: left to: right!
+trimLeft
+	"Answer a copy of the receiver with leading whitespace removed."
+	| left |
+	self isEmpty ifTrue: [^self].
+	left _ 1.
+	[left <= self size and: [(self at: left) isSeparator]]
+		whileTrue: [left _ left + 1].
+	left > self size ifTrue: [^''].
+	^self copyFrom: left to: self size!
+trimRight
+	"Answer a copy of the receiver with trailing whitespace removed."
+	| right |
+	self isEmpty ifTrue: [^self].
+	right _ self size.
+	[right >= 1 and: [(self at: right) isSeparator]]
+		whileTrue: [right _ right - 1].
+	right < 1 ifTrue: [^''].
+	^self copyFrom: 1 to: right!
+substrings
+	"Answer an array of substrings from the receiver separated by whitespace."
+	^(self findTokens: ' ', (String with: Character tab), (String with: Character cr), (String with: Character lf)) asArray!
+lines
+	"Answer an array of lines from the receiver, split on CR or LF."
+	^(self findTokens: (String with: Character cr), (String with: Character lf)) asArray! !
 
 !String methodsFor: 'displaying'!
 displayAt: aPoint 
