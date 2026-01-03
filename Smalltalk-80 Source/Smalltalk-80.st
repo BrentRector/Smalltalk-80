@@ -35403,12 +35403,11 @@ initializeVSCodeColors
 	colors at: #false put: (TextColor color: blue).
 	"Globals/Classes - #4EC9B0 (teal) - entity.name.type.class"
 	colors at: #global put: (TextColor color: (Color r: 0.306 g: 0.788 b: 0.690)).
-	"Characters ($x) - #569CD6 (blue) - constant.character"
-	colors at: #character put: (TextColor color: blue).
-	"Brackets - #FFD700 (gold) - VSCode bracket colorization"
-	colors at: #blockStart put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
-	colors at: #blockEnd put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
-	"Temp bars - #D4D4D4 (gray) - punctuation"
+	"Return (^) - #C586C0 (purple) - keyword.control.flow.return"
+	colors at: #return put: (TextColor color: (Color r: 0.773 g: 0.525 b: 0.753)).
+	"Brackets [] - #FFD700 (gold) - VSCode bracket colorization"
+	colors at: #blockBracket put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
+	"Temp bars || - #D4D4D4 (gray) - punctuation"
 	colors at: #tempBar put: (TextColor color: (Color r: 0.831 g: 0.831 b: 0.831)).
 	self registerColorSet: colors named: #VSCode! !
 
