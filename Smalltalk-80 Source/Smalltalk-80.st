@@ -5527,15 +5527,17 @@ buildSwitchesFor: aBinaryChoice	width: anInteger
 
 BinaryChoiceView initialize!
 Object subclass: #BitBlt
-	instanceVariableNames: 'destForm sourceForm halftoneForm combinationRule destX destY width height sourceX sourceY clipX clipY clipWidth clipHeight '
+	instanceVariableNames: 'destForm sourceForm halftoneForm combinationRule destX destY width height sourceX sourceY clipX clipY clipWidth clipHeight color '
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Graphics-Support'!
 BitBlt comment: 'The BitBlt operation copies bits from one rectangle within a Form (source) to another (dest).  The result is stored according to a combination rule which specifies one of the sixteen possibilities for how white and black should be combined.
 
-If halftoneForm is not nil, it is a halftone screen which masks (is ANDed with) the source during the operation.  Halftones are 16x16 bit Forms which are repeated indefinitely as needed by the BitBlt operation. with the two forms and a halftoneForm.
+If halftoneForm is not nil, it is a halftone screen which masks (is ANDed with) the source during the operation.  Halftones are 16x16 bit Forms which are repeated indefinitely as needed by the BitBlt operation.
 
 If sourceForm is nil, the halftone is taken by itself to be the source, as for filling with a constant pattern.
+
+If color is not nil, it specifies a Color object for solid color drawing operations (32bpp). This is the preferred way to specify colors rather than using halftoneForm.
 
 The clipping parameters specify a rectangle in the destination outside of which BitBlt will not make any changes'!
 
@@ -5629,10 +5631,19 @@ sourceY: anInteger
 	"Set the sourceY instance variable in BitBlt."
 
 	sourceY _ anInteger!
-width: anInteger 
+width: anInteger
 	"Set the width instance variable in BitBlt."
 
-	width _ anInteger! !
+	width _ anInteger!
+color
+	"Answer the color for solid color drawing operations (32bpp).
+	 This is the preferred way to specify colors rather than halftoneForm."
+	^color!
+color: aColor
+	"Set the color for solid color drawing operations (32bpp).
+	 aColor should be a Color or TranslucentColor object.
+	 This is the preferred way to specify colors rather than halftoneForm."
+	color _ aColor! !
 
 !BitBlt methodsFor: 'copying'!
 copyBits
@@ -16884,14 +16895,14 @@ setStopConditions
 		put: (textStyle alignment = Justified
 				ifTrue: [#paddedSpace]
 				ifFalse: [nil]).
-	"Check for text color attribute"
+	"Check for text color attribute - use Color directly (not halftone Form)"
 	textColor := text colorAt: lastIndex.
 	textColor ifNil: [
-		"No color - use default mask"
-		halftoneForm := defaultMask]
+		"No color - use black (default text color)"
+		color := Color black]
 	ifNotNil: [
-		"Color specified - create colored 1x1 halftone mask"
-		halftoneForm := Form colorMask: textColor]!
+		"Color specified - use it directly"
+		color := textColor]!
 tab
 	"This awfulness attempts to handle leading and internal tabs in a justified line.  Leading tabs are considered legal and should be reflected on the display gracefully.  Internal tabs (when the line is justified) are considered at the very best a misguided use of the character, and are reflected on the display the best we can."
 

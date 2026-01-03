@@ -26,7 +26,7 @@ public static class GraphicsOperations
             var heap = context.HeapManager;
             var nil = heap.GetNil();
 
-            // Get BitBlt fields (14 instance variables)
+            // Get BitBlt fields (15 instance variables - 'color' added at index 14)
             SmalltalkOOP destForm = heap.GetInstanceVariable(receiverOOP, 0);
             SmalltalkOOP sourceForm = heap.GetInstanceVariable(receiverOOP, 1);
             SmalltalkOOP halftoneForm = heap.GetInstanceVariable(receiverOOP, 2);
@@ -41,6 +41,7 @@ public static class GraphicsOperations
             SmalltalkOOP clipYOOP = heap.GetInstanceVariable(receiverOOP, 11);
             SmalltalkOOP clipWidthOOP = heap.GetInstanceVariable(receiverOOP, 12);
             SmalltalkOOP clipHeightOOP = heap.GetInstanceVariable(receiverOOP, 13);
+            SmalltalkOOP colorOOP = heap.GetInstanceVariable(receiverOOP, 14);
 
             // Validate all numeric parameters
             if (!combinationRuleOOP.IsSmallInteger || !destXOOP.IsSmallInteger || !destYOOP.IsSmallInteger ||
@@ -92,6 +93,23 @@ public static class GraphicsOperations
             }
             ReadOnlySpan<uint> halftonePixels = halftonePixelsSpan;
 
+            // Extract color if present (first-class color support for 32bpp)
+            // Color object stores 10-bit RGB in instance variable 0 (rgb field)
+            uint? colorPixel = null;
+            if (colorOOP != nil && !colorOOP.IsSmallInteger)
+            {
+                SmalltalkOOP rgbOOP = heap.GetInstanceVariable(colorOOP, 0);
+                if (rgbOOP.IsSmallInteger)
+                {
+                    int rgb = rgbOOP.AsSmallInteger();
+                    // Convert from 10-bit RGB (internal Color format) to 8-bit RGB (pixel)
+                    int r = ((rgb >> 20) & 0x3FF) * 255 / 1023;
+                    int g = ((rgb >> 10) & 0x3FF) * 255 / 1023;
+                    int b = (rgb & 0x3FF) * 255 / 1023;
+                    colorPixel = ((uint)r << 16) | ((uint)g << 8) | (uint)b;
+                }
+            }
+
             // Perform 32bpp BitBlt directly on heap memory - no copy needed!
             BitBlt32Engine.CopyBits(
                 destPixels,
@@ -104,6 +122,7 @@ public static class GraphicsOperations
                 clipX, clipY, clipWidth, clipHeight,
                 halftonePixels,
                 halftoneWidth, halftoneHeight,
+                colorPixel,
                 (CombinationRule)combinationRule);
 
             // No writeback needed - we modified heap directly!
@@ -277,6 +296,7 @@ public static class GraphicsOperations
             var clipYOOP = heap.GetInstanceVariable(context.Receiver, 11);
             var clipWidthOOP = heap.GetInstanceVariable(context.Receiver, 12);
             var clipHeightOOP = heap.GetInstanceVariable(context.Receiver, 13);
+            var colorOOP = heap.GetInstanceVariable(context.Receiver, 14);
 
             // Validate numeric fields
             if (!combinationRuleOOP.IsSmallInteger || !destXOOP.IsSmallInteger || !destYOOP.IsSmallInteger ||
@@ -321,6 +341,23 @@ public static class GraphicsOperations
             }
             ReadOnlySpan<uint> halftonePixels = halftonePixelsSpan;
 
+            // Extract color if present (first-class color support for 32bpp)
+            // Color object stores 10-bit RGB in instance variable 0 (rgb field)
+            uint? colorPixel = null;
+            if (colorOOP != nil && !colorOOP.IsSmallInteger)
+            {
+                SmalltalkOOP rgbOOP = heap.GetInstanceVariable(colorOOP, 0);
+                if (rgbOOP.IsSmallInteger)
+                {
+                    int rgb = rgbOOP.AsSmallInteger();
+                    // Convert from 10-bit RGB (internal Color format) to 8-bit RGB (pixel)
+                    int r = ((rgb >> 20) & 0x3FF) * 255 / 1023;
+                    int g = ((rgb >> 10) & 0x3FF) * 255 / 1023;
+                    int b = (rgb & 0x3FF) * 255 / 1023;
+                    colorPixel = ((uint)r << 16) | ((uint)g << 8) | (uint)b;
+                }
+            }
+
             // Map combination rule 16 (paint) to Or
             var rule = combinationRule == 16 ? CombinationRule.Or : (CombinationRule)combinationRule;
 
@@ -334,7 +371,7 @@ public static class GraphicsOperations
             DrawPixel32(destPixels, destWidth, destHeight, destX, destY,
                 sourcePixels, sourceWidth, sourceHeight, sourceX, sourceY,
                 width, height, clipX, clipY, clipWidth, clipHeight,
-                halftonePixels, halftoneWidth, halftoneHeight, rule);
+                halftonePixels, halftoneWidth, halftoneHeight, colorPixel, rule);
 
             if (py > px)
             {
@@ -352,7 +389,7 @@ public static class GraphicsOperations
                     DrawPixel32(destPixels, destWidth, destHeight, destX, destY,
                         sourcePixels, sourceWidth, sourceHeight, sourceX, sourceY,
                         width, height, clipX, clipY, clipWidth, clipHeight,
-                        halftonePixels, halftoneWidth, halftoneHeight, rule);
+                        halftonePixels, halftoneWidth, halftoneHeight, colorPixel, rule);
                 }
             }
             else
@@ -371,7 +408,7 @@ public static class GraphicsOperations
                     DrawPixel32(destPixels, destWidth, destHeight, destX, destY,
                         sourcePixels, sourceWidth, sourceHeight, sourceX, sourceY,
                         width, height, clipX, clipY, clipWidth, clipHeight,
-                        halftonePixels, halftoneWidth, halftoneHeight, rule);
+                        halftonePixels, halftoneWidth, halftoneHeight, colorPixel, rule);
                 }
             }
 
@@ -396,6 +433,7 @@ public static class GraphicsOperations
             int width, int height,
             int clipX, int clipY, int clipWidth, int clipHeight,
             ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
+            uint? color,
             CombinationRule rule)
         {
             BitBlt32Engine.CopyBits(
@@ -404,6 +442,7 @@ public static class GraphicsOperations
                 width, height,
                 clipX, clipY, clipWidth, clipHeight,
                 halftonePixels, halftoneWidth, halftoneHeight,
+                color,  // first-class color support for all drawing
                 rule);
         }
     }

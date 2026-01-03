@@ -52,6 +52,7 @@ public static class BitBlt32Engine
     /// <param name="halftonePixels">Optional halftone pattern (empty if not used).</param>
     /// <param name="halftoneWidth">Halftone pattern width (typically 16).</param>
     /// <param name="halftoneHeight">Halftone pattern height (typically 16).</param>
+    /// <param name="color">Optional solid color for drawing operations (null if not used).</param>
     /// <param name="rule">Combination rule (0-15).</param>
     public static void CopyBits(
         Span<uint> destPixels, int destWidth, int destHeight, int destX, int destY,
@@ -59,6 +60,7 @@ public static class BitBlt32Engine
         int width, int height,
         int clipX, int clipY, int clipWidth, int clipHeight,
         ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
+        uint? color,
         CombinationRule rule)
     {
         // Step 1: Calculate clipped bounds
@@ -137,11 +139,12 @@ public static class BitBlt32Engine
             }
         }
 
-        // General path: Handle all rules, halftone, and nil source
+        // General path: Handle all rules, halftone, color, and nil source
         CopyBitsGeneral(destPixels, destWidth, clipLeft, clipTop,
                        sourcePixels, sourceWidth, adjustedSourceX, adjustedSourceY,
                        clippedWidth, clippedHeight,
                        halftonePixels, halftoneWidth, halftoneHeight,
+                       color,
                        rule, isNilSource);
     }
 
@@ -297,7 +300,7 @@ public static class BitBlt32Engine
     }
 
     /// <summary>
-    /// General implementation handling all rules, halftone patterns, and nil source.
+    /// General implementation handling all rules, halftone patterns, color, and nil source.
     /// Handles overlapping regions by iterating in the correct direction.
     /// </summary>
     private static void CopyBitsGeneral(
@@ -305,6 +308,7 @@ public static class BitBlt32Engine
         ReadOnlySpan<uint> sourcePixels, int sourceWidth, int sourceX, int sourceY,
         int width, int height,
         ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight,
+        uint? color,
         CombinationRule rule, bool isNilSource)
     {
         // Use safe copy direction based on coordinates for overlapping regions
@@ -367,59 +371,60 @@ public static class BitBlt32Engine
 
                 uint destPixel = destPixels[destIndex];
 
-                // Apply halftone mask to source (only for non-nil source)
+                // Apply solid color for colored text/drawing (first-class color support)
+                if (!isNilSource && color.HasValue)
+                {
+                    uint colorPixel = color.Value;
+
+                    // Colored drawing mode with per-channel alpha blending:
+                    // Font glyphs are rendered black on white, with gray anti-aliased edges.
+                    // ClearType may have different values per channel (subpixel rendering).
+                    // Each channel's source value indicates transparency (inverted):
+                    //   black (0) = fully opaque, show color
+                    //   white (255) = fully transparent, show dest
+                    //   gray = partial blend
+
+                    // Extract source RGB (glyph: dark=ink, light=paper)
+                    int srcR = (int)((sourcePixel >> 16) & 0xFF);
+                    int srcG = (int)((sourcePixel >> 8) & 0xFF);
+                    int srcB = (int)(sourcePixel & 0xFF);
+
+                    // Fast path: white source = fully transparent, skip
+                    if (srcR == 255 && srcG == 255 && srcB == 255)
+                        continue;
+
+                    // Extract color RGB (the desired text/drawing color)
+                    int colorR = (int)((colorPixel >> 16) & 0xFF);
+                    int colorG = (int)((colorPixel >> 8) & 0xFF);
+                    int colorB = (int)(colorPixel & 0xFF);
+
+                    // Extract dest RGB
+                    int dstR = (int)((destPixel >> 16) & 0xFF);
+                    int dstG = (int)((destPixel >> 8) & 0xFF);
+                    int dstB = (int)(destPixel & 0xFF);
+
+                    // Per-channel alpha: 255 - source (black=255 opaque, white=0 transparent)
+                    int alphaR = 255 - srcR;
+                    int alphaG = 255 - srcG;
+                    int alphaB = 255 - srcB;
+
+                    // Blend: result = color * alpha/255 + dest * (255 - alpha)/255
+                    int outR = (colorR * alphaR + dstR * (255 - alphaR)) / 255;
+                    int outG = (colorG * alphaG + dstG * (255 - alphaG)) / 255;
+                    int outB = (colorB * alphaB + dstB * (255 - alphaB)) / 255;
+
+                    destPixels[destIndex] = ((uint)outR << 16) | ((uint)outG << 8) | (uint)outB;
+                    continue;
+                }
+
+                // Apply halftone mask to source (only for non-nil source, legacy pattern support)
                 if (!isNilSource && halftonePixels.Length > 0 && halftoneWidth > 0 && halftoneHeight > 0)
                 {
                     int htX = destCol % halftoneWidth;
                     int htY = destRow % halftoneHeight;
                     uint halftonePixel = halftonePixels[htY * halftoneWidth + htX];
 
-                    // Check for colored text mode: 1x1 halftone with a color (not black, not white)
-                    if (halftoneWidth == 1 && halftoneHeight == 1 &&
-                        halftonePixel != BlackPixel && halftonePixel != WhitePixel)
-                    {
-                        // Colored text mode with per-channel alpha blending:
-                        // Font glyphs are rendered black on white, with gray anti-aliased edges.
-                        // ClearType may have different values per channel (subpixel rendering).
-                        // Each channel's source value indicates transparency (inverted):
-                        //   black (0) = fully opaque, show color
-                        //   white (255) = fully transparent, show dest
-                        //   gray = partial blend
-
-                        // Extract source RGB (glyph: dark=ink, light=paper)
-                        int srcR = (int)((sourcePixel >> 16) & 0xFF);
-                        int srcG = (int)((sourcePixel >> 8) & 0xFF);
-                        int srcB = (int)(sourcePixel & 0xFF);
-
-                        // Fast path: white source = fully transparent, skip
-                        if (srcR == 255 && srcG == 255 && srcB == 255)
-                            continue;
-
-                        // Extract color RGB (the desired text color from halftone)
-                        int colorR = (int)((halftonePixel >> 16) & 0xFF);
-                        int colorG = (int)((halftonePixel >> 8) & 0xFF);
-                        int colorB = (int)(halftonePixel & 0xFF);
-
-                        // Extract dest RGB
-                        int dstR = (int)((destPixel >> 16) & 0xFF);
-                        int dstG = (int)((destPixel >> 8) & 0xFF);
-                        int dstB = (int)(destPixel & 0xFF);
-
-                        // Per-channel alpha: 255 - source (black=255 opaque, white=0 transparent)
-                        int alphaR = 255 - srcR;
-                        int alphaG = 255 - srcG;
-                        int alphaB = 255 - srcB;
-
-                        // Blend: result = color * alpha/255 + dest * (255 - alpha)/255
-                        int outR = (colorR * alphaR + dstR * (255 - alphaR)) / 255;
-                        int outG = (colorG * alphaG + dstG * (255 - alphaG)) / 255;
-                        int outB = (colorB * alphaB + dstB * (255 - alphaB)) / 255;
-
-                        destPixels[destIndex] = ((uint)outR << 16) | ((uint)outG << 8) | (uint)outB;
-                        continue;
-                    }
-
-                    // Standard halftone mask semantics for non-colored halftones:
+                    // Standard halftone mask semantics:
                     // Where halftone is black (0x000000), source passes through
                     // Where halftone is white (0xFFFFFF), result becomes white
                     // Formula: result = (source & ~halftone) | halftone
@@ -552,13 +557,14 @@ public static class BitBlt32Engine
         int x, int y, int width, int height,
         ReadOnlySpan<uint> halftonePixels, int halftoneWidth, int halftoneHeight)
     {
-        // Use CopyBits with nil source and halftone pattern
+        // Use CopyBits with nil source and halftone pattern (no color)
         CopyBits(
             destPixels, destWidth, destHeight, x, y,
             ReadOnlySpan<uint>.Empty, 0, 0, 0, 0,  // nil source
             width, height,
             0, 0, destWidth, destHeight,  // full clip
             halftonePixels, halftoneWidth, halftoneHeight,
+            null,  // no color
             CombinationRule.Copy);
     }
 }
