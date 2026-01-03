@@ -35018,23 +35018,20 @@ tokenize: aString
 	"First, find all comments (Scanner doesn't track positions)"
 	self findComments.
 
-	"Then scan all tokens"
+	"Then scan all tokens - track position via stream"
 	[scanner tokenType ~~ #doIt] whileTrue: [
-		self addCurrentToken.
+		self addCurrentTokenAt: stream position.
 		scanner scanToken].
 
 	"Sort by position (comments may be interleaved)"
 	tokens := tokens asSortedCollection: [:a :b | a start < b start].
 	^tokens asOrderedCollection!
 
-addCurrentToken
-	"Add the current scanner token to our collection."
+addCurrentTokenAt: streamPosition
+	"Add the current scanner token to our collection.
+	 Use stream position to accurately find token boundaries."
 	| type start end tokenValue |
 	type := self highlightTypeFor: scanner tokenType.
-	"Use scanner mark directly for 1-based string position."
-	start := scanner mark max: 1.
-
-	"Calculate end position based on token type and value"
 	tokenValue := scanner token.
 
 	"Character literals ($x) come through as #number with Character value"
@@ -35042,9 +35039,99 @@ addCurrentToken
 		[type == #number and: [tokenValue isKindOf: Character]])
 		ifTrue: [type := #character].
 
-	end := self calculateEndFor: tokenValue type: scanner tokenType startingAt: start.
+	"Stream position is after token+whitespace. Scanner reads 2 chars ahead.
+	 Use scanner mark for start, find actual end in source."
+	start := scanner mark max: 1.
+	end := self findTokenEndFor: tokenValue type: scanner tokenType from: start.
 
 	tokens add: (SyntaxToken type: type start: start end: end)!
+
+findTokenEndFor: tokenValue type: scannerType from: start
+	"Find the actual end of token in source string.
+	 This handles escaped quotes, radix numbers, etc. correctly."
+	| pos char |
+	pos := start.
+	pos > sourceString size ifTrue: [^start].
+
+	"For strings, scan until closing quote (handling escapes)"
+	scannerType == #string ifTrue: [
+		(sourceString at: pos) = $' ifFalse: [^start].
+		pos := pos + 1.
+		[pos <= sourceString size] whileTrue: [
+			char := sourceString at: pos.
+			char = $'
+				ifTrue: [
+					"Check for escaped quote"
+					(pos < sourceString size and: [(sourceString at: pos + 1) = $'])
+						ifTrue: [pos := pos + 2]
+						ifFalse: [^pos]]
+				ifFalse: [pos := pos + 1]].
+		^pos].
+
+	"For symbols #foo or #'foo', find end"
+	scannerType == #literal ifTrue: [
+		(tokenValue isKindOf: Symbol) ifTrue: [
+			(sourceString at: pos) = $# ifFalse: [^start].
+			pos := pos + 1.
+			pos > sourceString size ifTrue: [^pos - 1].
+			"Quoted symbol?"
+			(sourceString at: pos) = $'
+				ifTrue: [^self findTokenEndFor: nil type: #string from: pos]
+				ifFalse: [
+					"Unquoted symbol - scan identifier chars and colons"
+					[pos <= sourceString size and: [
+						char := sourceString at: pos.
+						char isAlphaNumeric or: [char = $_ or: [char = $:]]]]
+						whileTrue: [pos := pos + 1].
+					^pos - 1]]].
+
+	"For keywords, scan word chars plus trailing colon"
+	scannerType == #keyword ifTrue: [
+		[pos <= sourceString size and: [
+			char := sourceString at: pos.
+			char isAlphaNumeric or: [char = $_ or: [char = $:]]]]
+			whileTrue: [pos := pos + 1].
+		^pos - 1].
+
+	"For words (identifiers), scan alphanumeric"
+	scannerType == #word ifTrue: [
+		[pos <= sourceString size and: [
+			char := sourceString at: pos.
+			char isAlphaNumeric or: [char = $_]]]
+			whileTrue: [pos := pos + 1].
+		^pos - 1].
+
+	"For numbers, scan digits, radix prefix, decimal point, exponent"
+	scannerType == #number ifTrue: [
+		(tokenValue isKindOf: Character) ifTrue: [
+			"Character literal $x"
+			^start + 1].
+		[pos <= sourceString size and: [
+			char := sourceString at: pos.
+			char isDigit or: [char isLetter or: ['.-+er' includes: char]]]]
+			whileTrue: [pos := pos + 1].
+		^pos - 1].
+
+	"For binary selectors"
+	scannerType == #binary ifTrue: [
+		[pos <= sourceString size and: [
+			char := sourceString at: pos.
+			'+-*/\~<>=@%|&?!,' includes: char]]
+			whileTrue: [pos := pos + 1].
+		^pos - 1].
+
+	"Single character tokens"
+	(#(#leftBracket #rightBracket #leftParenthesis #rightParenthesis
+	   #period #semicolon #upArrow #leftArrow #verticalBar #colon)
+		includes: scannerType) ifTrue: [^start].
+
+	"Assignment :="
+	scannerType == #leftArrow ifTrue: [
+		(pos < sourceString size and: [(sourceString at: pos) = $: and: [(sourceString at: pos + 1) = $=]])
+			ifTrue: [^start + 1]].
+
+	"Default: single character"
+	^start!
 
 calculateEndFor: tokenValue type: scannerType startingAt: start
 	"Calculate the end position for a token.
