@@ -40803,9 +40803,14 @@ makeSelectorBoldIn: aClass
 		with: 2!
 runLengthFor: characterIndex
 	"Answer the count of characters remaining in run beginning with
-	characterIndex."
-
-	^runs runLengthAt: characterIndex! !
+	characterIndex. Consider both emphasis runs and color runs,
+	returning the shorter to ensure setStopConditions is called
+	when either changes."
+	| emphasisLength colorLength |
+	emphasisLength := runs runLengthAt: characterIndex.
+	colorRuns ifNil: [^emphasisLength].
+	colorLength := colorRuns runLengthAt: characterIndex.
+	^emphasisLength min: colorLength! !
 
 !Text methodsFor: 'attributes'!
 addAttribute: aTextAttribute from: start to: stop
