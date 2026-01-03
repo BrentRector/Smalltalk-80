@@ -35220,7 +35220,7 @@ type: aSymbol start: startPos end: endPos
 
 Object subclass: #SyntaxStyler
 	instanceVariableNames: 'colorMap'
-	classVariableNames: 'DefaultColorMap'
+	classVariableNames: 'ColorSets CurrentColorSetName DefaultColorMap'
 	poolDictionaries: ''
 	category: 'System-Compiler'!
 SyntaxStyler comment: 'I apply syntax highlighting to Smalltalk source code by mapping token types to TextColor attributes. I use ScannerHighlighter to tokenize the source and then apply colors based on a configurable color map.
@@ -35335,56 +35335,66 @@ styleMethod: sourceString inClass: aClass
 
 !SyntaxStyler class methodsFor: 'class initialization'!
 initialize
-	"Initialize the default color map using Pharo/Shout-style syntax colors.
-	 Based on modern Pharo Smalltalk IDE conventions.
+	"Initialize color sets and select Pharo as default.
 	 SyntaxStyler initialize"
-	DefaultColorMap := Dictionary new.
+	ColorSets := Dictionary new.
+	self initializePharoColors.
+	self initializeClassicColors.
+	self useColorSet: #Pharo!
+initializePharoColors
+	"Register Pharo/Shout-style syntax colors."
+	| colors |
+	colors := Dictionary new.
+	"Comments - forest green"
+	colors at: #comment put: (TextColor color: (Color r: 0.0 g: 0.56 b: 0.0)).
+	"Strings - magenta/red"
+	colors at: #string put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	"Symbols - blue"
+	colors at: #symbol put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.80)).
+	"Numbers - red"
+	colors at: #number put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	"Keywords - blue"
+	colors at: #keyword put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.80)).
+	"self/super/thisContext - red"
+	colors at: #self put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	colors at: #super put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	colors at: #thisContext put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	"true/false/nil - red"
+	colors at: #nil put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	colors at: #true put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	colors at: #false put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
+	"Globals - dark blue"
+	colors at: #global put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.55)).
+	self registerColorSet: colors named: #Pharo!
+initializeClassicColors
+	"Register classic Smalltalk-80 style colors (minimal coloring)."
+	| colors |
+	colors := Dictionary new.
+	"Comments - dark green"
+	colors at: #comment put: (TextColor color: (Color r: 0.0 g: 0.5 b: 0.0)).
+	"Strings - dark red"
+	colors at: #string put: (TextColor color: (Color r: 0.6 g: 0.0 b: 0.0)).
+	"Symbols - purple"
+	colors at: #symbol put: (TextColor color: (Color r: 0.5 g: 0.0 b: 0.5)).
+	self registerColorSet: colors named: #Classic! !
 
-	"Comments - forest green (Pharo style)"
-	DefaultColorMap at: #comment put: (TextColor color: (Color r: 0.0 g: 0.56 b: 0.0)).
-
-	"Strings - magenta/red (Pharo style)"
-	DefaultColorMap at: #string put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-
-	"Symbols - blue (Pharo style)"
-	DefaultColorMap at: #symbol put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.80)).
-
-	"Numbers - red (Pharo style)"
-	DefaultColorMap at: #number put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-
-	"Keywords (selectors with colons like ifTrue:, do:) - blue (Pharo style)"
-	DefaultColorMap at: #keyword put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.80)).
-
-	"Binary selectors (+, -, *, etc) - black (Pharo style)"
-	"DefaultColorMap at: #binary put: nil"
-
-	"self/super/thisContext - red (Pharo pseudo-variable style)"
-	DefaultColorMap at: #self put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	DefaultColorMap at: #super put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	DefaultColorMap at: #thisContext put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-
-	"true/false/nil - red (Pharo pseudo-variable style)"
-	DefaultColorMap at: #nil put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	DefaultColorMap at: #true put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-	DefaultColorMap at: #false put: (TextColor color: (Color r: 0.77 g: 0.10 b: 0.09)).
-
-	"Return arrow - black (Pharo style)"
-	"DefaultColorMap at: #return put: nil"
-
-	"Assignment arrow - black (Pharo style)"
-	"DefaultColorMap at: #assignment put: nil"
-
-	"Block brackets - no special color"
-	"DefaultColorMap at: #blockBracket put: nil"
-
-	"Globals (class names) - dark blue (Pharo style)"
-	DefaultColorMap at: #global put: (TextColor color: (Color r: 0.0 g: 0.0 b: 0.55)).
-
-	"Identifiers (locals, temps, args) - no special color (black)"
-	"DefaultColorMap at: #identifier put: nil"
-
-	"Separators and other syntax - no special color"
-	"#separator, #cascade, #tempBar, #paren, #colon, #default - use black"! !
+!SyntaxStyler class methodsFor: 'color set management'!
+colorSetNames
+	"Answer the names of all registered color sets."
+	^ColorSets keys asSortedCollection asArray!
+currentColorSetName
+	"Answer the name of the currently active color set."
+	^CurrentColorSetName!
+registerColorSet: aDictionary named: aSymbol
+	"Register a new color set with the given name."
+	ColorSets at: aSymbol put: aDictionary!
+useColorSet: aSymbol
+	"Switch to the named color set. Answer true if successful."
+	| colors |
+	colors := ColorSets at: aSymbol ifAbsent: [^false].
+	DefaultColorMap := colors.
+	CurrentColorSetName := aSymbol.
+	^true! !
 
 SyntaxStyler initialize!
 MouseMenuController subclass: #ScreenController
