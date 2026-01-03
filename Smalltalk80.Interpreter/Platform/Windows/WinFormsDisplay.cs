@@ -217,6 +217,7 @@ public class WinFormsDisplay : Form, IDisplay
             clipX, clipY, clipWidth, clipHeight,
             halftonePixels,
             halftoneWidth, halftoneHeight,
+            null,  // no color for direct BitBlt calls
             (CombinationRule)combinationRule);
     }
 
