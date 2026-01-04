@@ -114,12 +114,12 @@ JsonWriter stringify: (Dictionary new at: 'name' put: 'Alice'; yourself)
 - [ ] Regenerate coldstart bundle
 - [ ] Test with various JSON inputs
 
-### Phase 2: Windows Special Folders (C# Primitive)
+### Phase 2: Windows Special Folders ✅ ALREADY IMPLEMENTED
 **Document**: `docs/WINDOWS-SPECIAL-FOLDERS-IMPLEMENTATION.md`
 
-- [ ] Implement Primitive 160 (GetSpecialFolder)
-- [ ] Maps Symbol (#appData, #localAppData) → path string
-- [ ] Register in PrimitiveRegistry.cs
+- [x] Primitive 160 (GetSpecialFolder) in `FileInfoPrimitives.cs`
+- [x] Registered in `PrimitiveRegistry.cs`
+- [x] `WindowsPath` class with `specialFolder:`, convenience methods
 
 ### Phase 3: VS Code Theme Loading
 **Document**: `docs/WELL-KNOWN-PATHS-DESIGN.md`
@@ -169,7 +169,7 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 ### If continuing theme support roadmap:
 1. Regenerate coldstart bundle with JSON classes
 2. Test JSON parsing with simple inputs
-3. Implement Primitive 160 (Windows Special Folders)
+3. Implement VS Code theme loading (Phase 3) - Primitive 160 already done!
 
 ### If working on other features:
 1. Check `CLAUDE.md` for project status
