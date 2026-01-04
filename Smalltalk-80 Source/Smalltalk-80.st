@@ -35238,30 +35238,25 @@ tokenize: aString
 addCurrentTokenAt: streamPosition
 	"Add the current scanner token to our collection.
 	 Scanner now tracks token start (mark) and end (tokenEnd) directly."
-	| type start end tokenValue |
-	type := self highlightTypeFor: scanner tokenType.
-	tokenValue := scanner token.
+	| type start end scannerType tokenValue |
+	scannerType := scanner tokenType.
+	type := self highlightTypeFor: scannerType.
 
-	"Character literals ($x) come through as #number with Character value"
-	(scanner tokenType == #xCharacter or:
-		[type == #number and: [tokenValue isKindOf: Character]])
+	"Skip certain token types early"
+	scannerType == #xCharacter ifTrue: [type := #character].
+	scannerType == #literal ifTrue: [
+		tokenValue := scanner token.
+		(tokenValue class == Array) ifTrue: [^self].
+		(tokenValue class == Symbol and: [tokenValue size = 1]) ifTrue: [
+			('()[]' includes: tokenValue first) ifTrue: [^self]]].
+
+	"Character literals ($x) - check only if type is number"
+	(type == #number and: [scanner token class == Character])
 		ifTrue: [type := #character].
 
-	"Skip literal arrays - they cause position issues and their parens
-	 should just be black like regular parens"
-	(scanner tokenType == #literal and: [tokenValue isKindOf: Array])
-		ifTrue: [^self].
-
-	"Skip single-character 'literals' that are really punctuation"
-	(scanner tokenType == #literal and: [
-		(tokenValue isKindOf: Symbol) and: [tokenValue size = 1 and: [
-			'()[]' includes: tokenValue first]]])
-		ifTrue: [^self].
-
-	"Use Scanner's position tracking - no re-scanning needed"
+	"Use Scanner's position tracking"
 	start := scanner mark max: 1.
 	end := scanner tokenEnd max: start.
-
 	tokens add: (SyntaxToken type: type start: start end: end)!
 
 findTokenEndFor: tokenValue type: scannerType from: start
