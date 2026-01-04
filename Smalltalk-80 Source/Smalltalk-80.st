@@ -16424,11 +16424,15 @@ removeKey: key ifAbsent: aBlock
 	^element! !
 
 !Dictionary methodsFor: 'dictionary enumerating'!
-associationsDo: aBlock 
+associationsDo: aBlock
 	"Evaluate aBlock for each of the receiver's key/value associations."
 
 	super do: aBlock!
-keysDo: aBlock 
+keysAndValuesDo: aBlock
+	"Evaluate aBlock with each of the receiver's keys and values as arguments."
+
+	self associationsDo: [:assoc | aBlock value: assoc key value: assoc value]!
+keysDo: aBlock
 	"Evaluate aBlock for each of the receiver's keys."
 
 	self associationsDo: [:association | aBlock value: association key]! !
@@ -35806,10 +35810,10 @@ useColorSet: aSymbol
 	CurrentColorSetName := aSymbol.
 	"Build direct tokenType → TextColor cache"
 	CachedTypeColorMap := Dictionary new.
-	TokenToScopeMap associationsDo: [:assoc |
+	TokenToScopeMap keysAndValuesDo: [:tokenType :scope |
 		| textColor |
-		textColor := DefaultColorMap at: assoc value ifAbsent: [nil].
-		textColor ifNotNil: [CachedTypeColorMap at: assoc key put: textColor]].
+		textColor := DefaultColorMap at: scope ifAbsent: [nil].
+		textColor ifNotNil: [CachedTypeColorMap at: tokenType put: textColor]].
 	Transcript show: 'useColorSet: ', aSymbol printString, ' cache size: ', CachedTypeColorMap size printString; cr.
 	^true! !
 
