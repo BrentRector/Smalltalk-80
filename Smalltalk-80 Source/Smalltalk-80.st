@@ -7219,7 +7219,7 @@ then accept or CR'
 		initialAnswer: initialString.
 	^ aString!
 text
-	| text sourceCode |
+	| text sourceCode t0 t1 t2 |
 	textMode == #classDefinition ifTrue:
 		[className == nil
 			ifTrue: [^ (Class template: category) asText]
@@ -7229,8 +7229,14 @@ text
 			ifTrue: [^ self selectedClass sourceCodeTemplate asText]
 			ifFalse: [
 				"Apply syntax highlighting to method source code"
+				t0 := Time millisecondClockValue.
 				sourceCode := self selectedClass sourceCodeAt: selector.
-				^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass]].
+				t1 := Time millisecondClockValue.
+				Transcript show: 'sourceCodeAt: ', (t1 - t0) printString, 'ms'; cr.
+				text := SyntaxStyler styleMethod: sourceCode inClass: self selectedClass.
+				t2 := Time millisecondClockValue.
+				Transcript show: 'Browser text total: ', (t2 - t0) printString, 'ms'; cr.
+				^ text]].
 	textMode == #category ifTrue:
 		[^ 'category to add' asText].
 	textMode == #categories ifTrue:
@@ -35738,15 +35744,17 @@ styleMethod: sourceString inClass: aClass
 	"Answer a styled Text for a method in the given class.
 	 Makes the selector bold in addition to color highlighting.
 	 Optimized: uses token positions to find header end, avoiding Parser creation."
-	| text headerEnd t0 t1 |
+	| text headerEnd t0 t1 t2 |
 	t0 := Time millisecondClockValue.
 	headerEnd := 0.
 	text := self styleSource: sourceString methodHeaderEnd: [:pos | headerEnd := pos].
 	t1 := Time millisecondClockValue.
-	Transcript show: 'styleSource with headerEnd: ', (t1 - t0) printString, 'ms'; cr.
+	Transcript show: 'styleSource: ', (t1 - t0) printString, 'ms'; cr.
 	"Apply bold emphasis to method header (selector + arguments)"
 	headerEnd > 0 ifTrue: [
 		text emphasizeFrom: 1 to: (headerEnd min: sourceString size) with: 2].
+	t2 := Time millisecondClockValue.
+	Transcript show: 'emphasize: ', (t2 - t1) printString, 'ms, TOTAL: ', (t2 - t0) printString, 'ms'; cr.
 	^text! !
 
 !SyntaxStyler methodsFor: 'color mapping'!
