@@ -304,23 +304,36 @@ This was O(n) with n dictionary lookups, taking ~110ms.
 
 ## Complete Performance History
 
-| Run | Optimization | Browser Text Total | Improvement |
-|-----|--------------|-------------------|-------------|
-| 1 | Baseline | ~1700ms | - |
-| 2 | CachedTypeColorMap | ~1600ms | 6% |
-| 3 | Scanner.tokenEnd tracking | ~1500ms | 6% |
-| 4 | addCurrentTokenAt optimization | ~1450ms | 3% |
-| 5 | Replace sort with merge | ~1350ms | 7% |
-| 6 | Eliminate Parser in makeSelectorBold | ~1300ms | 4% |
-| 7 | (Analysis - composeAll bottleneck) | - | - |
-| 8 | emphasisRunLengthFor: (O(n²) fix) | ~1344ms | **Major** |
-| 9 | O(1) token-based color lookup | ~1344ms | - |
-| 10 | ScannerHighlighter optimization | ~1250ms | 7% |
-| 11 | Scanner captures comments | ~1200ms | 4% |
-| 12 | Eliminate merge (interleave) | ~1219ms | - |
-| 13 | Lazy color lookup + type cache | **1031ms** | **15%** |
+**Test Case**: `WindowsPath>>initializeFromString:` (~50 lines, 284 tokens)
 
-**Total Improvement: 1700ms → 1031ms = 39% faster**
+| Run | Optimization | Total Time | Notes |
+|-----|--------------|------------|-------|
+| 1 | Baseline | **~4-5 sec** | Styling ~1.7s + O(n²) composition ~2s + I/O |
+| 2 | CachedTypeColorMap | ~4.4s | -100ms in color lookup |
+| 3 | Scanner.tokenEnd tracking | ~4.2s | -200ms in tokenization |
+| 4 | addCurrentTokenAt optimization | ~4.0s | -200ms in token creation |
+| 5 | Replace sort with merge | ~3.8s | -220ms (O(n) vs O(n log n)) |
+| 6 | Eliminate Parser in makeSelectorBold | ~3.5s | -300ms |
+| 7 | (Analysis - identified composeAll) | - | Found O(n²) bottleneck |
+| 8 | **emphasisRunLengthFor:** | **~1.3s** | **Fixed O(n²) → O(n)** |
+| 9 | O(1) token-based color lookup | ~1.3s | Prep for display optimization |
+| 10 | ScannerHighlighter optimization | ~1.25s | -50ms timing overhead |
+| 11 | Scanner captures comments | ~1.2s | Eliminate findComments pass |
+| 12 | Eliminate merge (interleave) | ~1.2s | -100ms merge overhead |
+| 13 | Lazy color lookup + type cache | **~1.0s** | -110ms color assignment |
+
+**Total Improvement: ~4.5 sec → ~1.0 sec = 78% faster (4.5x speedup)**
+
+### The Critical Fix: Run 8
+
+The biggest single improvement was `emphasisRunLengthFor:` which fixed an O(n²) algorithm in text composition:
+
+| Component | Before Fix | After Fix | Improvement |
+|-----------|------------|-----------|-------------|
+| Paragraph composeAll | ~1700-2000ms | ~200ms | **90% faster** |
+| Per-line composition | ~23ms/line | ~3ms/line | **87% faster** |
+
+**Root cause**: `Text>>runLengthFor:` checked both emphasis AND color runs for every character. With 284 color runs and ~2000 characters, this caused ~568,000 wasted comparisons. The fix: composition only needs emphasis (for font selection), not colors.
 
 ---
 
