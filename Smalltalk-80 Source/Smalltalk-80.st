@@ -29443,10 +29443,14 @@ rule
 rule: ruleInteger 
 	"Set the rule according to which character display behaves."
 	rule _ ruleInteger.!
-text: aText 
+text: aText
 	"Set the argument, aText, to be the text for the receiver."
+	| t0 t1 |
 	text _ aText.
-	self composeAll! !
+	t0 := Time millisecondClockValue.
+	self composeAll.
+	t1 := Time millisecondClockValue.
+	Transcript show: 'Paragraph composeAll: ', (t1 - t0) printString, 'ms'; cr! !
 
 !Paragraph methodsFor: 'displaying'!
 displayAt: aPoint
