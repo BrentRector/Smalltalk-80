@@ -35806,10 +35806,10 @@ useColorSet: aSymbol
 	CurrentColorSetName := aSymbol.
 	"Build direct tokenType → TextColor cache"
 	CachedTypeColorMap := Dictionary new.
-	TokenToScopeMap keysAndValuesDo: [:tokenType :scope |
+	TokenToScopeMap associationsDo: [:assoc |
 		| textColor |
-		textColor := DefaultColorMap at: scope ifAbsent: [nil].
-		textColor ifNotNil: [CachedTypeColorMap at: tokenType put: textColor]].
+		textColor := DefaultColorMap at: assoc value ifAbsent: [nil].
+		textColor ifNotNil: [CachedTypeColorMap at: assoc key put: textColor]].
 	Transcript show: 'useColorSet: ', aSymbol printString, ' cache size: ', CachedTypeColorMap size printString; cr.
 	^true! !
 
