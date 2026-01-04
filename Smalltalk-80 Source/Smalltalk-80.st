@@ -35614,17 +35614,20 @@ styleSource: sourceString
 	sortedTokens := tokens.
 	t3 := Time millisecondClockValue.
 
-	"Build runs directly - much faster than per-character array"
-	runs := OrderedCollection new.
-	values := OrderedCollection new.
+	"Build runs directly - pre-size collections to avoid growing"
+	runs := OrderedCollection new: tokens size * 2.
+	values := OrderedCollection new: tokens size * 2.
 	pos := 1.
 
 	loopTime := Time millisecondClockValue.
 	sortedTokens do: [:token |
-		| textColor start end |
+		| textColor start end colorValue |
 		textColor := self colorForType: token type.
-		start := token start max: 1.
-		end := (token end min: size) max: start.
+		start := token start.
+		start < 1 ifTrue: [start := 1].
+		end := token end.
+		end > size ifTrue: [end := size].
+		end < start ifTrue: [end := start].
 
 		"Add gap before token (nil = default color)"
 		start > pos ifTrue: [
@@ -35633,8 +35636,9 @@ styleSource: sourceString
 
 		"Add token's color run"
 		textColor ifNotNil: [
+			colorValue := textColor color.
 			runs add: end - start + 1.
-			values add: textColor color.
+			values add: colorValue.
 			pos := end + 1]
 		ifNil: [
 			"No color for this token type - skip, will be covered by nil run"
