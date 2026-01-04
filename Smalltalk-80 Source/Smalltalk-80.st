@@ -35576,7 +35576,7 @@ Instance Variables:
 styleSource: sourceString
 	"Answer a Text with syntax highlighting applied.
 	 Optimized: builds runs directly from sorted tokens - O(m) where m is token count."
-	| text tokens size sortedTokens runs values pos t0 t1 t2 t3 |
+	| text tokens size sortedTokens runs values pos t0 t1 t2 t3 loopTime t4 t5 |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
 	t0 := Time millisecondClockValue.
 	size := sourceString size.
@@ -35596,7 +35596,6 @@ styleSource: sourceString
 	values := OrderedCollection new.
 	pos := 1.
 
-	| loopTime t4 t5 |
 	loopTime := Time millisecondClockValue.
 	sortedTokens do: [:token |
 		| textColor start end |
