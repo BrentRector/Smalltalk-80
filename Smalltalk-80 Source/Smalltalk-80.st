@@ -35547,7 +35547,7 @@ type: aSymbol start: startPos end: endPos
 
 Object subclass: #SyntaxStyler
 	instanceVariableNames: 'colorMap'
-	classVariableNames: 'ColorSets CurrentColorSetName DefaultColorMap TokenToScopeMap'
+	classVariableNames: 'ColorSets CurrentColorSetName DefaultColorMap TokenToScopeMap CachedTypeColorMap'
 	poolDictionaries: ''
 	category: 'System-Compiler'!
 SyntaxStyler comment: 'I apply syntax highlighting to Smalltalk source code using a two-level mapping:
@@ -35643,17 +35643,15 @@ styleMethod: sourceString inClass: aClass
 !SyntaxStyler methodsFor: 'color mapping'!
 colorForType: tokenType
 	"Answer the TextColor for the given token type, or nil for default (black).
-	 Uses two-level lookup: token type → TextMate scope → color."
-	| scope |
-	"First map token type to TextMate scope"
-	scope := TokenToScopeMap at: tokenType ifAbsent: [^nil].
-	scope ifNil: [^nil].
-	"Then look up color for scope in current theme"
+	 Uses cached direct lookup for performance."
 	colorMap ifNotNil: [
-		(colorMap includesKey: scope) ifTrue: [
-			^colorMap at: scope]].
-	DefaultColorMap ifNil: [^nil].
-	^DefaultColorMap at: scope ifAbsent: [nil]!
+		"Instance has custom colorMap - use two-level lookup"
+		| scope |
+		scope := TokenToScopeMap at: tokenType ifAbsent: [^nil].
+		^colorMap at: scope ifAbsent: [nil]].
+	"Use cached direct tokenType → TextColor mapping"
+	CachedTypeColorMap ifNil: [^nil].
+	^CachedTypeColorMap at: tokenType ifAbsent: [nil]!
 
 colorMap: aDictionary
 	"Set a custom color map for this styler instance (scope → color)."
@@ -35800,11 +35798,18 @@ registerColorSet: aDictionary named: aSymbol
 	"Register a new color set with the given name."
 	ColorSets at: aSymbol put: aDictionary!
 useColorSet: aSymbol
-	"Switch to the named color set. Answer true if successful."
+	"Switch to the named color set. Answer true if successful.
+	 Also rebuilds the cached tokenType → TextColor map for performance."
 	| colors |
 	colors := ColorSets at: aSymbol ifAbsent: [^false].
 	DefaultColorMap := colors.
 	CurrentColorSetName := aSymbol.
+	"Build direct tokenType → TextColor cache"
+	CachedTypeColorMap := Dictionary new.
+	TokenToScopeMap keysAndValuesDo: [:tokenType :scope |
+		| textColor |
+		textColor := DefaultColorMap at: scope ifAbsent: [nil].
+		textColor ifNotNil: [CachedTypeColorMap at: tokenType put: textColor]].
 	^true! !
 
 SyntaxStyler initialize!
