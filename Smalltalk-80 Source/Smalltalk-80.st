@@ -16946,8 +16946,10 @@ displayLines: linesInterval in: aParagraph clippedBy: visibleRectangle
 	lineY _ destY _
 					aParagraph topAtLineIndex: linesInterval first.
 	displaying _ self doesDisplaying.
-	linesInterval do: 
-		[:lineIndex | 
+	"Reset token index for O(1) color lookup - must be done before display pass"
+	aParagraph text resetTokenIndex.
+	linesInterval do:
+		[:lineIndex |
 		runX _ destX _ leftMargin _
 			aParagraph leftMarginForDisplayForLine: lineIndex.
 		line _ aParagraph lineAt: lineIndex.
@@ -17026,7 +17028,7 @@ paddedSpace
 	^false!
 setStopConditions
 	"Set the font and the stop conditions for the current run.
-	 Also handles text color from TextColor attributes."
+	 Also handles text color using O(1) token-based lookup when available."
 	| fontIndex displayFont textColor |
 	font _ textStyle fontAt: (text emphasisAt: lastIndex).
 	super setStopConditions.
@@ -17035,8 +17037,11 @@ setStopConditions
 		put: (textStyle alignment = Justified
 				ifTrue: [#paddedSpace]
 				ifFalse: [nil]).
-	"Check for text color attribute - use Color directly (not halftone Form)"
-	textColor := text colorAt: lastIndex.
+	"Get color - prefer token-based O(1) lookup, fall back to colorRuns"
+	textColor := text tokenColorAt: lastIndex.
+	textColor ifNil: [
+		"No token color - try colorRuns for backward compatibility"
+		textColor := text colorAt: lastIndex].
 	textColor ifNil: [
 		"No color - use black (default text color)"
 		color := Color black]
@@ -35582,16 +35587,17 @@ tokenize: aString
 	^self new tokenize: aString; yourself! !
 
 Object subclass: #SyntaxToken
-	instanceVariableNames: 'type start end'
+	instanceVariableNames: 'type start end color'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'System-Compiler'!
-SyntaxToken comment: 'I represent a syntax token with its position in source code. I am produced by ScannerHighlighter for syntax highlighting.
+SyntaxToken comment: 'I represent a syntax token with its position and color in source code. I am produced by ScannerHighlighter for syntax highlighting, and SyntaxStyler assigns colors.
 
 Instance Variables:
     type    Symbol - the highlight category (#keyword, #string, #comment, etc.)
     start   Integer - 1-based start position in source
-    end     Integer - 1-based end position in source (inclusive)'!
+    end     Integer - 1-based end position in source (inclusive)
+    color   Color or nil - the display color for this token (nil = default black)'!
 
 
 !SyntaxToken methodsFor: 'accessing'!
@@ -35609,7 +35615,15 @@ end
 
 length
 	"Answer the length of this token."
-	^end - start + 1! !
+	^end - start + 1!
+
+color
+	"Answer the display color for this token, or nil for default (black)."
+	^color!
+
+color: aColorOrNil
+	"Set the display color for this token."
+	color := aColorOrNil! !
 
 !SyntaxToken methodsFor: 'comparing'!
 = aSyntaxToken
@@ -35685,8 +35699,9 @@ styleSource: sourceString
 styleSource: sourceString methodHeaderEnd: headerEndBlock
 	"Answer a Text with syntax highlighting applied.
 	 If headerEndBlock is not nil, evaluate it with the method header end position.
-	 Optimized: builds runs directly from sorted tokens - O(m) where m is token count."
-	| text tokens size sortedTokens runs values pos t0 t1 t2 t3 loopTime t4 t5 highlighter |
+	 OPTIMIZED: Assigns colors directly to tokens, stores on Text for O(1) lookup.
+	 DisplayScanner uses tokenColorAt: instead of colorAt: for fast rendering."
+	| text tokens size sortedTokens t0 t1 t2 t3 loopTime t4 highlighter |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
 	t0 := Time millisecondClockValue.
 	size := sourceString size.
@@ -35695,7 +35710,7 @@ styleSource: sourceString methodHeaderEnd: headerEndBlock
 	highlighter := ScannerHighlighter tokenize: sourceString.
 	tokens := highlighter tokens.
 	t2 := Time millisecondClockValue.
-	Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr.
+	Transcript ifNotNil: [Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr].
 	tokens isEmpty ifTrue: [
 		headerEndBlock ifNotNil: [headerEndBlock value: 0].
 		^text].
@@ -35706,49 +35721,20 @@ styleSource: sourceString methodHeaderEnd: headerEndBlock
 	sortedTokens := tokens.
 	t3 := Time millisecondClockValue.
 
-	"Build runs directly - pre-size collections to avoid growing"
-	runs := OrderedCollection new: tokens size * 2.
-	values := OrderedCollection new: tokens size * 2.
-	pos := 1.
-
+	"Assign colors directly to tokens - O(n) single pass"
 	loopTime := Time millisecondClockValue.
 	sortedTokens do: [:token |
-		| textColor start end colorValue |
+		| textColor colorValue |
 		textColor := self colorForType: token type.
-		start := token start.
-		start < 1 ifTrue: [start := 1].
-		end := token end.
-		end > size ifTrue: [end := size].
-		end < start ifTrue: [end := start].
-
-		"Add gap before token (nil = default color)"
-		start > pos ifTrue: [
-			runs add: start - pos.
-			values add: nil].
-
-		"Add token's color run"
 		textColor ifNotNil: [
 			colorValue := textColor color.
-			runs add: end - start + 1.
-			values add: colorValue.
-			pos := end + 1]
-		ifNil: [
-			"No color for this token type - skip, will be covered by nil run"
-			pos < start ifTrue: [pos := start]]].
+			token color: colorValue]].
 	t4 := Time millisecondClockValue.
-	Transcript show: '  loop: ', (t4 - loopTime) printString, 'ms'; cr.
+	Transcript ifNotNil: [Transcript show: '  assign colors: ', (t4 - loopTime) printString, 'ms'; cr].
 
-	"Add final nil run if needed"
-	pos <= size ifTrue: [
-		runs add: size - pos + 1.
-		values add: nil].
-
-	"Set colorRuns directly"
-	runs isEmpty ifFalse: [
-		text setColorRuns: (RunArray runs: runs asArray values: values asArray)].
-	t5 := Time millisecondClockValue.
-	Transcript show: '  setColorRuns: ', (t5 - t4) printString, 'ms'; cr.
-	Transcript show: 'Build runs total: ', (t5 - t3) printString, 'ms'; cr.
+	"Store tokens on Text for O(1) color lookup in DisplayScanner"
+	text setTokens: sortedTokens.
+	Transcript ifNotNil: [Transcript show: 'Style total: ', (t4 - t3) printString, 'ms'; cr].
 	^text!
 
 styleMethod: sourceString inClass: aClass
@@ -41408,15 +41394,17 @@ writeCloneWithout: aSet
 SystemTracer initialize!
 
 ArrayedCollection subclass: #Text
-	instanceVariableNames: 'string runs colorRuns '
+	instanceVariableNames: 'string runs colorRuns tokens currentTokenIndex'
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '
 	category: 'Collections-Text'!
 Text comment: 'Instance Variables:
 	string:		A String of Characters
 	runs:		A RunArray of integer emphasis codes (for font selection)
-	colorRuns:	A RunArray of Color objects (nil = default black)
-					
+	colorRuns:	A RunArray of Color objects (nil = default black) - DEPRECATED, use tokens
+	tokens:		OrderedCollection of SyntaxToken with colors - O(1) color lookup
+	currentTokenIndex: Integer - cached index for sequential access optimization
+
 The emphasis codes indicate abstract changes in character appearance.  Actual display is performed in the presence of a TextStyle which indicates, for each abstract code, an actual font to be used'!
 
 
@@ -41515,9 +41503,14 @@ runLengthFor: characterIndex
 	"Answer the count of characters remaining in run beginning with
 	characterIndex. Consider both emphasis runs and color runs,
 	returning the shorter to ensure setStopConditions is called
-	when either changes."
+	when either changes.
+	OPTIMIZED: Uses O(1) token-based lookup when tokens are available."
 	| emphasisLength colorLength |
 	emphasisLength := runs runLengthAt: characterIndex.
+	"Prefer token-based O(1) lookup over colorRuns O(n) lookup"
+	tokens ifNotNil: [
+		colorLength := self tokenRunLengthFor: characterIndex.
+		^emphasisLength min: colorLength].
 	colorRuns ifNil: [^emphasisLength].
 	colorLength := colorRuns runLengthAt: characterIndex.
 	^emphasisLength min: colorLength!
@@ -41543,7 +41536,71 @@ colorAt: characterIndex
 	"Answer the Color at characterIndex, or nil if no color (default black)."
 	self size = 0 ifTrue: [^nil].
 	colorRuns ifNil: [^nil].
-	^colorRuns at: characterIndex! !
+	^colorRuns at: characterIndex!
+
+tokens
+	"Answer the tokens array, or nil if not set."
+	^tokens!
+
+setTokens: anOrderedCollection
+	"Set the tokens for O(1) color lookup. Also resets the cache index."
+	tokens := anOrderedCollection.
+	currentTokenIndex := 1!
+
+resetTokenIndex
+	"Reset the cached token index for a new sequential scan."
+	currentTokenIndex := 1!
+
+tokenColorAt: characterIndex
+	"Answer the Color at characterIndex using token-based O(1) lookup.
+	 Assumes sequential access pattern (DisplayScanner scans left-to-right).
+	 Returns nil for default (black) color."
+	| token |
+	tokens ifNil: [^nil].
+	tokens isEmpty ifTrue: [^nil].
+	currentTokenIndex ifNil: [currentTokenIndex := 1].
+
+	"Advance through tokens until we find one containing characterIndex"
+	[currentTokenIndex <= tokens size] whileTrue: [
+		token := tokens at: currentTokenIndex.
+		"If we're past this token, advance to next"
+		characterIndex > token end ifTrue: [
+			currentTokenIndex := currentTokenIndex + 1]
+		ifFalse: [
+			"Check if characterIndex is within this token"
+			(characterIndex >= token start and: [characterIndex <= token end])
+				ifTrue: [^token color]
+				ifFalse: [
+					"characterIndex is before this token - in a gap, return nil"
+					^nil]]].
+	"Past all tokens"
+	^nil!
+
+tokenRunLengthFor: characterIndex
+	"Answer the count of characters remaining until the next color change.
+	 Uses O(1) token lookup instead of O(n) RunArray lookup.
+	 Works with tokenColorAt: to ensure runs break at color boundaries."
+	| token nextToken currentColor nextColor |
+	tokens ifNil: [^self size - characterIndex + 1].
+	tokens isEmpty ifTrue: [^self size - characterIndex + 1].
+	currentTokenIndex ifNil: [currentTokenIndex := 1].
+
+	"Advance to find token containing characterIndex"
+	[currentTokenIndex <= tokens size] whileTrue: [
+		token := tokens at: currentTokenIndex.
+		characterIndex > token end ifTrue: [
+			currentTokenIndex := currentTokenIndex + 1]
+		ifFalse: [
+			"Found the relevant token or gap"
+			(characterIndex >= token start and: [characterIndex <= token end])
+				ifTrue: [
+					"Inside this token - return distance to token end"
+					^token end - characterIndex + 1]
+				ifFalse: [
+					"In a gap before this token - return distance to token start"
+					^token start - characterIndex]]].
+	"Past all tokens - return to end of text"
+	^self size - characterIndex + 1! !
 
 !Text methodsFor: 'printing'!
 printOn: aStream 
