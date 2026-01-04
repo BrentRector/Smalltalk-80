@@ -7230,9 +7230,7 @@ text
 			ifFalse: [
 				"Apply syntax highlighting to method source code"
 				sourceCode := self selectedClass sourceCodeAt: selector.
-				"TODO: Syntax highlighting disabled for performance testing"
-				"^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass"
-				^ sourceCode asText]].
+				^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass]].
 	textMode == #category ifTrue:
 		[^ 'category to add' asText].
 	textMode == #categories ifTrue:
@@ -38467,7 +38465,7 @@ basicAt: index put: aCharacter
 	(aCharacter isKindOf: Character)
 		ifTrue: [self errorNonIntegerIndex]
 		ifFalse: [self error: 'Strings only store Characters']!
-findString: subString startingAt: start 
+findString: subString startingAt: start
 	"Answer the index of subString within the receiver, starting at start. If the receiver does not contain subString, answer 0."
 
 	| aCharacter index |
@@ -38481,6 +38479,14 @@ findString: subString startingAt: start
 				[index = subString size ifTrue: [^startIndex].
 				index _ index+1]]].
 	^0!
+indexOf: aCharacter startingAt: startIndex
+	"Answer the index of the first occurrence of aCharacter within the receiver,
+	starting the search at startIndex. If not found, answer 0.
+	Optimized with primitive for performance."
+
+	<primitive: 108>
+	"Fall back to inherited method if primitive fails"
+	^super indexOf: aCharacter startingAt: startIndex!
 replaceFrom: start to: stop with: replacement startingAt: repStart 
 	"This destructively replaces elements from start to stop in the receiver
 	starting at index, repStart, in the collection, replacement.  Answer the

@@ -165,4 +165,58 @@ public static class StringPrimitives
             return PrimitiveResult.Ok(context.Receiver);
         }
     }
+
+    /// <summary>
+    /// Primitive 108: String indexOf:startingAt:
+    /// Fast character search in string. Returns 1-based index or 0 if not found.
+    /// </summary>
+    public class IndexOf : IPrimitive
+    {
+        public PrimitiveResult Execute(PrimitiveExecutionContext context)
+        {
+            if (context.Arguments.Length != 2) return PrimitiveResult.Fail(context.Metadata!);
+            if (context.Receiver.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            // First arg is the character to find
+            var charArg = context.Arguments[0];
+            if (charArg.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
+
+            // Check if it's a Character object (class index for Character)
+            var charClass = context.HeapManager.GetClass(charArg);
+            var characterClassOop = context.RuntimeServices?.GetGlobal("Character") ?? default;
+            if (charClass != characterClassOop)
+                return PrimitiveResult.Fail(context.Metadata!);
+
+            // Character stores its value in first instance variable
+            var charValueOop = context.HeapManager.GetInstanceVariable(charArg, 0);
+            if (!charValueOop.IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
+            byte searchByte = (byte)charValueOop.AsSmallInteger();
+
+            // Second arg is the start index (1-based)
+            if (!context.Arguments[1].IsSmallInteger)
+                return PrimitiveResult.Fail(context.Metadata!);
+            int startIndex = context.Arguments[1].AsSmallInteger();
+
+            // Get string size
+            int size = context.HeapManager.GetIndexedSize(context.Receiver);
+
+            // Convert to 0-based and validate
+            int start0 = startIndex - 1;
+            if (start0 < 0) start0 = 0;
+            if (start0 >= size)
+                return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(0));
+
+            // Fast search
+            for (int i = start0; i < size; i++)
+            {
+                if (context.HeapManager.GetIndexedByte(context.Receiver, i) == searchByte)
+                {
+                    return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(i + 1)); // 1-based
+                }
+            }
+
+            return PrimitiveResult.Ok(SmalltalkOOP.FromSmallInteger(0)); // Not found
+        }
+    }
 }
