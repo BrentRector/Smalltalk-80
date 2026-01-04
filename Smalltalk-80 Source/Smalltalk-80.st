@@ -34864,7 +34864,7 @@ newFrom: anArray
 	values add: currentValue.
 	^self runs: runs asArray values: values asArray! !
 Object subclass: #Scanner
-	instanceVariableNames: 'source mark hereChar aheadChar token tokenType currentComment buffer typeTable '
+	instanceVariableNames: 'source mark tokenEnd hereChar aheadChar token tokenType currentComment buffer typeTable '
 	classVariableNames: 'EndChar TypeTable '
 	poolDictionaries: ''
 	category: 'System-Compiler'!
@@ -34951,6 +34951,8 @@ scanToken
 	(tokenType at: 1) = $x "x as first letter"
 		ifTrue: [self perform: tokenType "means perform to compute token & type"]
 		ifFalse: [token _ self step asSymbol "else just unique the first char"].
+	"Capture token end position (stream position minus 2-char lookahead, minus 1 for last char)"
+	tokenEnd _ source position - 3 max: mark.
 	^token!
 step
 	| c |
@@ -35069,6 +35071,9 @@ xSingleQuote
 mark
 	"Answer the position where the current token began."
 	^mark!
+tokenEnd
+	"Answer the position where the current token ended."
+	^tokenEnd!
 
 token
 	"Answer the current token value."
@@ -35232,7 +35237,7 @@ tokenize: aString
 
 addCurrentTokenAt: streamPosition
 	"Add the current scanner token to our collection.
-	 Use stream position to accurately find token boundaries."
+	 Scanner now tracks token start (mark) and end (tokenEnd) directly."
 	| type start end tokenValue |
 	type := self highlightTypeFor: scanner tokenType.
 	tokenValue := scanner token.
@@ -35253,10 +35258,9 @@ addCurrentTokenAt: streamPosition
 			'()[]' includes: tokenValue first]]])
 		ifTrue: [^self].
 
-	"Stream position is after token+whitespace. Scanner reads 2 chars ahead.
-	 Use scanner mark for start, find actual end in source."
+	"Use Scanner's position tracking - no re-scanning needed"
 	start := scanner mark max: 1.
-	end := self findTokenEndFor: tokenValue type: scanner tokenType from: start.
+	end := scanner tokenEnd max: start.
 
 	tokens add: (SyntaxToken type: type start: start end: end)!
 
