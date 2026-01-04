@@ -35488,7 +35488,70 @@ merge: list1 with: list2
 !ScannerHighlighter methodsFor: 'accessing'!
 tokens
 	"Answer the collection of syntax tokens."
-	^tokens! !
+	^tokens!
+
+findMethodHeaderEnd
+	"Find the end position of the method header (selector + arguments) in tokens.
+	 Returns 0 if no tokens. Used to avoid creating a Parser just for selector bolding.
+
+	 Method header patterns:
+	   Unary:   identifier                      (e.g., 'size')
+	   Binary:  binary identifier               (e.g., '+ aNumber')
+	   Keyword: (keyword identifier)+           (e.g., 'at: index put: value')"
+	| i n token firstType |
+	n := tokens size.
+	n = 0 ifTrue: [^0].
+
+	"Skip leading comments"
+	i := 1.
+	[i <= n and: [(tokens at: i) type == #comment]] whileTrue: [i := i + 1].
+	i > n ifTrue: [^0].
+
+	token := tokens at: i.
+	firstType := token type.
+
+	"Unary method: first identifier (that's not a pseudo-variable)"
+	(firstType == #identifier or: [firstType == #global]) ifTrue: [
+		^token end].
+
+	"Binary method: binary operator + argument name"
+	firstType == #binary ifTrue: [
+		i := i + 1.
+		"Skip comments"
+		[i <= n and: [(tokens at: i) type == #comment]] whileTrue: [i := i + 1].
+		i > n ifTrue: [^token end].
+		"Next should be argument identifier"
+		token := tokens at: i.
+		(token type == #identifier or: [token type == #global]) ifTrue: [
+			^token end].
+		^(tokens at: i - 1) end].
+
+	"Keyword method: alternating keyword/identifier pairs"
+	firstType == #keyword ifTrue: [
+		| lastEnd |
+		lastEnd := token end.
+		[i <= n] whileTrue: [
+			token := tokens at: i.
+			token type == #comment ifTrue: [i := i + 1]
+			ifFalse: [
+				token type == #keyword ifTrue: [
+					lastEnd := token end.
+					i := i + 1.
+					"Skip comments"
+					[i <= n and: [(tokens at: i) type == #comment]] whileTrue: [i := i + 1].
+					"Next should be argument identifier"
+					i <= n ifTrue: [
+						token := tokens at: i.
+						(token type == #identifier or: [token type == #global]) ifTrue: [
+							lastEnd := token end.
+							i := i + 1]
+						ifFalse: [^lastEnd]]
+					ifFalse: [^lastEnd]]
+				ifFalse: [^lastEnd]]].
+		^lastEnd].
+
+	"Default: return end of first token"
+	^(tokens at: 1) end! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 ScannerHighlighter class
@@ -35497,8 +35560,9 @@ ScannerHighlighter class
 
 !ScannerHighlighter class methodsFor: 'instance creation'!
 tokenize: aString
-	"Convenience method to tokenize a string."
-	^self new tokenize: aString! !
+	"Convenience method to tokenize a string. Returns the highlighter instance.
+	 Call 'tokens' to get the tokens, 'findMethodHeaderEnd' for method header position."
+	^self new tokenize: aString; yourself! !
 
 Object subclass: #SyntaxToken
 	instanceVariableNames: 'type start end'
@@ -35599,16 +35663,27 @@ Instance Variables:
 styleSource: sourceString
 	"Answer a Text with syntax highlighting applied.
 	 Optimized: builds runs directly from sorted tokens - O(m) where m is token count."
-	| text tokens size sortedTokens runs values pos t0 t1 t2 t3 loopTime t4 t5 |
+	^self styleSource: sourceString methodHeaderEnd: nil!
+
+styleSource: sourceString methodHeaderEnd: headerEndBlock
+	"Answer a Text with syntax highlighting applied.
+	 If headerEndBlock is not nil, evaluate it with the method header end position.
+	 Optimized: builds runs directly from sorted tokens - O(m) where m is token count."
+	| text tokens size sortedTokens runs values pos t0 t1 t2 t3 loopTime t4 t5 highlighter |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
 	t0 := Time millisecondClockValue.
 	size := sourceString size.
 	text := Text fromString: sourceString.
 	t1 := Time millisecondClockValue.
-	tokens := ScannerHighlighter tokenize: sourceString.
+	highlighter := ScannerHighlighter tokenize: sourceString.
+	tokens := highlighter tokens.
 	t2 := Time millisecondClockValue.
 	Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr.
-	tokens isEmpty ifTrue: [^text].
+	tokens isEmpty ifTrue: [
+		headerEndBlock ifNotNil: [headerEndBlock value: 0].
+		^text].
+	"Pass header end position to caller if requested"
+	headerEndBlock ifNotNil: [headerEndBlock value: highlighter findMethodHeaderEnd].
 
 	"Tokens already sorted by tokenize: - no need to sort again"
 	sortedTokens := tokens.
@@ -35661,13 +35736,17 @@ styleSource: sourceString
 
 styleMethod: sourceString inClass: aClass
 	"Answer a styled Text for a method in the given class.
-	 Makes the selector bold in addition to color highlighting."
-	| text t0 t1 |
-	text := self styleSource: sourceString.
+	 Makes the selector bold in addition to color highlighting.
+	 Optimized: uses token positions to find header end, avoiding Parser creation."
+	| text headerEnd t0 t1 |
 	t0 := Time millisecondClockValue.
-	text makeSelectorBoldIn: aClass.
+	headerEnd := 0.
+	text := self styleSource: sourceString methodHeaderEnd: [:pos | headerEnd := pos].
 	t1 := Time millisecondClockValue.
-	Transcript show: 'makeSelectorBold: ', (t1 - t0) printString, 'ms'; cr.
+	Transcript show: 'styleSource with headerEnd: ', (t1 - t0) printString, 'ms'; cr.
+	"Apply bold emphasis to method header (selector + arguments)"
+	headerEnd > 0 ifTrue: [
+		text emphasizeFrom: 1 to: (headerEnd min: sourceString size) with: 2].
 	^text! !
 
 !SyntaxStyler methodsFor: 'color mapping'!

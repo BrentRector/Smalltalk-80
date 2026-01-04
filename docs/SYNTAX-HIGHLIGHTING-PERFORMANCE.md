@@ -97,6 +97,29 @@
 1. **scan: 250ms** - Scanner.scanToken internals. Would require C# primitive to optimize further.
 2. **loop: 312ms** - Building color runs. Still ~1.1ms per token.
 3. **Timing overhead** - The diagnostic Transcript calls add measurable overhead.
+4. **makeSelectorBoldIn: (investigating)** - Creates a new Parser just to find selector end position.
+
+---
+
+### Run 6: Investigating hidden delay (IN PROGRESS)
+**Observation**: User reported 0.5-1 second delay AFTER Transcript messages before styled text appears.
+
+**Analysis**: `Text>>makeSelectorBoldIn:` creates a brand new `Parser` object just to find where the method selector ends:
+```smalltalk
+makeSelectorBoldIn: aClass
+    | parser |
+    (parser _ aClass parserClass new) parseSelector: string.
+    self emphasizeFrom: 1 to: (parser endOfLastToken min: string size) with: 2
+```
+
+This is wasteful because:
+- The `ScannerHighlighter` already scanned the entire method and has all token positions
+- Creating a Parser also creates a new Scanner internally
+- The parse work duplicates what was already done
+
+**Planned Fix**: Identify selector end position from the tokens during the build runs phase, eliminating the need for `makeSelectorBoldIn:` to create a Parser.
+
+---
 
 ## Key Optimizations Made
 
