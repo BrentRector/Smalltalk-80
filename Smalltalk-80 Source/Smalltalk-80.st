@@ -34886,17 +34886,20 @@ newFrom: anArray
 	values add: currentValue.
 	^self runs: runs asArray values: values asArray! !
 Object subclass: #Scanner
-	instanceVariableNames: 'source mark tokenEnd hereChar aheadChar token tokenType currentComment buffer typeTable '
+	instanceVariableNames: 'source mark tokenEnd hereChar aheadChar token tokenType currentComment commentPositions buffer typeTable '
 	classVariableNames: 'EndChar TypeTable '
 	poolDictionaries: ''
 	category: 'System-Compiler'!
-Scanner comment: 'I scan a stream picking out Smalltalk syntactic tokens.  I look one character ahead.  I put each token found into token and its type (a Symbol) into tokenType.  At the end of stream or a doit symbol, I pretend to see an endless sequence of doits.'!
+Scanner comment: 'I scan a stream picking out Smalltalk syntactic tokens.  I look one character ahead.  I put each token found into token and its type (a Symbol) into tokenType.  At the end of stream or a doit symbol, I pretend to see an endless sequence of doits.
+
+commentPositions tracks {start, end} pairs for all comments encountered during scanning, enabling syntax highlighting without a separate comment-finding pass.'!
 
 
 !Scanner methodsFor: 'initialize-release'!
 initScanner
 	buffer _ WriteStream on: (String new: 40).
-	typeTable _ TypeTable!
+	typeTable _ TypeTable.
+	commentPositions _ OrderedCollection new!
 on: inputStream 
 	"Bind the input stream, fill the character buffers"
 	source _ inputStream.
@@ -35011,16 +35014,20 @@ xDollar
 	token _ self step.
 	tokenType _ #number "really should be Char, but rest of compiler doesn't know"!
 xDoubleQuote
-	"collect comment"
+	"collect comment and record position for syntax highlighting"
 
-	| aStream |
+	| aStream commentStart commentEnd |
+	commentStart := mark.  "Position of opening quote"
 	aStream _ WriteStream on: (String new: 32).
 	self step.
 	[aStream nextPut: self step. hereChar == $"]
-		whileFalse: 
+		whileFalse:
 			[(hereChar = EndChar and: [source atEnd])
 				ifTrue: [^self offEnd: 'Unmatched comment quote']].
 	self step.
+	commentEnd := source position - 2.  "Position of closing quote"
+	"Record position for syntax highlighting"
+	commentPositions add: (Array with: commentStart with: commentEnd).
 	currentComment == nil
 		ifTrue: [currentComment _ OrderedCollection with: aStream contents]
 		ifFalse: [currentComment add: aStream contents].
@@ -35108,6 +35115,11 @@ tokenType
 currentComment
 	"Answer the collection of comment strings accumulated during scanning."
 	^currentComment!
+
+commentPositions
+	"Answer the collection of {start, end} pairs for comments found during scanning.
+	 Used by ScannerHighlighter for syntax highlighting without a separate pass."
+	^commentPositions!
 
 source
 	"Answer the source stream being scanned."
@@ -35222,8 +35234,8 @@ Instance Variables:
 !ScannerHighlighter methodsFor: 'tokenizing'!
 tokenize: aString
 	"Answer a collection of SyntaxToken objects for the source string.
-	 OPTIMIZED: Interleaves comments during scan - no merge needed."
-	| stream t0 t1 estimatedTokens commentList commentIdx commentCount nextCommentStart |
+	 OPTIMIZED: Gets comments from Scanner (no separate findComments pass)."
+	| stream t0 t1 estimatedTokens scannerTokens commentTokens positions |
 	sourceString := aString.
 	aString isEmpty ifTrue: [^OrderedCollection new].
 
@@ -35234,36 +35246,29 @@ tokenize: aString
 	"Estimate token count for pre-sizing (roughly 1 token per 7 chars)"
 	estimatedTokens := (aString size // 7) max: 16.
 
-	"Find all comments first (fast indexOf: scan)"
-	tokens := OrderedCollection new: estimatedTokens // 4.
-	self findComments.
-	commentList := tokens asArray.  "Array for faster indexed access"
-	commentCount := commentList size.
-	commentIdx := 1.
-	nextCommentStart := commentCount > 0
-		ifTrue: [(commentList at: 1) start]
-		ifFalse: [SmallInteger maxVal].
-
-	"Scan all tokens - interleave comments inline"
+	"Scan all tokens - Scanner collects comment positions as it goes"
 	tokens := OrderedCollection new: estimatedTokens.
 	t1 := Time millisecondClockValue.
 	[scanner tokenType ~~ #doIt] whileTrue: [
-		| tokenStart |
-		tokenStart := scanner mark.
-		"Insert any comments that appear before this token"
-		[nextCommentStart < tokenStart] whileTrue: [
-			tokens add: (commentList at: commentIdx).
-			commentIdx := commentIdx + 1.
-			nextCommentStart := commentIdx <= commentCount
-				ifTrue: [(commentList at: commentIdx) start]
-				ifFalse: [SmallInteger maxVal]].
 		self addCurrentToken.
 		scanner scanToken].
+	scannerTokens := tokens.
 
-	"Add any remaining comments at end"
-	[commentIdx <= commentCount] whileTrue: [
-		tokens add: (commentList at: commentIdx).
-		commentIdx := commentIdx + 1].
+	"Get comments from Scanner (collected during scan - no extra pass needed!)"
+	positions := scanner commentPositions.
+	positions isEmpty ifTrue: [
+		Transcript ifNotNil: [Transcript show: '  tokenize: ', (Time millisecondClockValue - t1) printString, 'ms n:', tokens size printString; cr].
+		^tokens].
+
+	"Build comment tokens from Scanner's positions"
+	commentTokens := Array new: positions size.
+	1 to: positions size do: [:i |
+		| pair |
+		pair := positions at: i.
+		commentTokens at: i put: (SyntaxToken type: #comment start: (pair at: 1) end: (pair at: 2))].
+
+	"Merge - both lists are already sorted"
+	tokens := self merge: commentTokens with: scannerTokens.
 
 	Transcript ifNotNil: [Transcript show: '  tokenize: ', (Time millisecondClockValue - t1) printString, 'ms n:', tokens size printString; cr].
 	^tokens!
