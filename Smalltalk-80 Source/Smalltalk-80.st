@@ -35638,17 +35638,16 @@ tokenize: aString
 	^self new tokenize: aString; yourself! !
 
 Object subclass: #SyntaxToken
-	instanceVariableNames: 'type start end color'
+	instanceVariableNames: 'type start end'
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'System-Compiler'!
-SyntaxToken comment: 'I represent a syntax token with its position and color in source code. I am produced by ScannerHighlighter for syntax highlighting, and SyntaxStyler assigns colors.
+SyntaxToken comment: 'I represent a syntax token with its position in source code. I am produced by ScannerHighlighter for syntax highlighting. Color is looked up lazily from token type via SyntaxStyler colorForType:.
 
 Instance Variables:
     type    Symbol - the highlight category (#keyword, #string, #comment, etc.)
     start   Integer - 1-based start position in source
-    end     Integer - 1-based end position in source (inclusive)
-    color   Color or nil - the display color for this token (nil = default black)'!
+    end     Integer - 1-based end position in source (inclusive)'!
 
 
 !SyntaxToken methodsFor: 'accessing'!
@@ -35666,15 +35665,7 @@ end
 
 length
 	"Answer the length of this token."
-	^end - start + 1!
-
-color
-	"Answer the display color for this token, or nil for default (black)."
-	^color!
-
-color: aColorOrNil
-	"Set the display color for this token."
-	color := aColorOrNil! !
+	^end - start + 1! !
 
 !SyntaxToken methodsFor: 'comparing'!
 = aSyntaxToken
@@ -35750,12 +35741,11 @@ styleSource: sourceString
 styleSource: sourceString methodHeaderEnd: headerEndBlock
 	"Answer a Text with syntax highlighting applied.
 	 If headerEndBlock is not nil, evaluate it with the method header end position.
-	 OPTIMIZED: Assigns colors directly to tokens, stores on Text for O(1) lookup.
-	 DisplayScanner uses tokenColorAt: instead of colorAt: for fast rendering."
-	| text tokens size sortedTokens t0 t1 t2 t3 loopTime t4 highlighter |
+	 OPTIMIZED: Lazy color lookup - tokenColorAt: gets color from token type at display time.
+	 DisplayScanner uses tokenColorAt: instead of colorAt: for O(1) rendering."
+	| text tokens t0 t1 t2 highlighter |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
 	t0 := Time millisecondClockValue.
-	size := sourceString size.
 	text := Text fromString: sourceString.
 	t1 := Time millisecondClockValue.
 	highlighter := ScannerHighlighter tokenize: sourceString.
@@ -35768,24 +35758,10 @@ styleSource: sourceString methodHeaderEnd: headerEndBlock
 	"Pass header end position to caller if requested"
 	headerEndBlock ifNotNil: [headerEndBlock value: highlighter findMethodHeaderEnd].
 
-	"Tokens already sorted by tokenize: - no need to sort again"
-	sortedTokens := tokens.
-	t3 := Time millisecondClockValue.
-
-	"Assign colors directly to tokens - O(n) single pass"
-	loopTime := Time millisecondClockValue.
-	sortedTokens do: [:token |
-		| textColor colorValue |
-		textColor := self colorForType: token type.
-		textColor ifNotNil: [
-			colorValue := textColor color.
-			token color: colorValue]].
-	t4 := Time millisecondClockValue.
-	Transcript ifNotNil: [Transcript show: '  assign colors: ', (t4 - loopTime) printString, 'ms'; cr].
-
-	"Store tokens on Text for O(1) color lookup in DisplayScanner"
-	text setTokens: sortedTokens.
-	Transcript ifNotNil: [Transcript show: 'Style total: ', (t4 - t3) printString, 'ms'; cr].
+	"Store tokens on Text for O(1) lazy color lookup in DisplayScanner.
+	 No color assignment loop needed - tokenColorAt: looks up color from token type."
+	text setTokens: tokens.
+	Transcript ifNotNil: [Transcript show: 'Style total: ', (Time millisecondClockValue - t2) printString, 'ms'; cr].
 	^text!
 
 styleMethod: sourceString inClass: aClass
@@ -35848,6 +35824,16 @@ styleSource: sourceString
 styleMethod: sourceString inClass: aClass
 	"Convenience method to style a method with class context."
 	^self new styleMethod: sourceString inClass: aClass! !
+
+!SyntaxStyler class methodsFor: 'color lookup'!
+colorForType: tokenType
+	"Answer the Color for the given token type, or nil for default (black).
+	 Uses cached direct lookup for O(1) performance.
+	 Called by Text>>tokenColorAt: for lazy color lookup at display time."
+	| textColor |
+	CachedTypeColorMap ifNil: [^nil].
+	textColor := CachedTypeColorMap at: tokenType ifAbsent: [^nil].
+	^textColor color! !
 
 !SyntaxStyler class methodsFor: 'class initialization'!
 initialize
@@ -41445,7 +41431,7 @@ writeCloneWithout: aSet
 SystemTracer initialize!
 
 ArrayedCollection subclass: #Text
-	instanceVariableNames: 'string runs colorRuns tokens currentTokenIndex'
+	instanceVariableNames: 'string runs colorRuns tokens currentTokenIndex cachedTokenType cachedTokenColor'
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '
 	category: 'Collections-Text'!
@@ -41453,8 +41439,10 @@ Text comment: 'Instance Variables:
 	string:		A String of Characters
 	runs:		A RunArray of integer emphasis codes (for font selection)
 	colorRuns:	A RunArray of Color objects (nil = default black) - DEPRECATED, use tokens
-	tokens:		OrderedCollection of SyntaxToken with colors - O(1) color lookup
+	tokens:		OrderedCollection of SyntaxToken - O(1) sequential color lookup
 	currentTokenIndex: Integer - cached index for sequential access optimization
+	cachedTokenType: Symbol - last looked up token type (avoids repeated dictionary lookups)
+	cachedTokenColor: Color - color for cachedTokenType
 
 The emphasis codes indicate abstract changes in character appearance.  Actual display is performed in the presence of a TextStyle which indicates, for each abstract code, an actual font to be used'!
 
@@ -41594,19 +41582,25 @@ tokens
 	^tokens!
 
 setTokens: anOrderedCollection
-	"Set the tokens for O(1) color lookup. Also resets the cache index."
+	"Set the tokens for O(1) color lookup. Also resets the cache."
 	tokens := anOrderedCollection.
-	currentTokenIndex := 1!
+	currentTokenIndex := 1.
+	cachedTokenType := nil.
+	cachedTokenColor := nil!
 
 resetTokenIndex
-	"Reset the cached token index for a new sequential scan."
-	currentTokenIndex := 1!
+	"Reset the cached token index and type cache for a new sequential scan."
+	currentTokenIndex := 1.
+	cachedTokenType := nil.
+	cachedTokenColor := nil!
 
 tokenColorAt: characterIndex
 	"Answer the Color at characterIndex using token-based O(1) lookup.
 	 Assumes sequential access pattern (DisplayScanner scans left-to-right).
-	 Returns nil for default (black) color."
-	| token |
+	 Returns nil for default (black) color.
+	 OPTIMIZED: Lazy color lookup with type caching - avoids dictionary lookup
+	 when consecutive tokens have the same type."
+	| token tokenType |
 	tokens ifNil: [^nil].
 	tokens isEmpty ifTrue: [^nil].
 	currentTokenIndex ifNil: [currentTokenIndex := 1].
@@ -41620,7 +41614,14 @@ tokenColorAt: characterIndex
 		ifFalse: [
 			"Check if characterIndex is within this token"
 			(characterIndex >= token start and: [characterIndex <= token end])
-				ifTrue: [^token color]
+				ifTrue: [
+					"Use cached color if same token type (avoids dictionary lookup)"
+					tokenType := token type.
+					tokenType == cachedTokenType ifTrue: [^cachedTokenColor].
+					"Different type - lookup and cache"
+					cachedTokenType := tokenType.
+					cachedTokenColor := SyntaxStyler colorForType: tokenType.
+					^cachedTokenColor]
 				ifFalse: [
 					"characterIndex is before this token - in a gap, return nil"
 					^nil]]].
