@@ -35191,21 +35191,27 @@ Instance Variables:
 !ScannerHighlighter methodsFor: 'tokenizing'!
 tokenize: aString
 	"Answer a collection of SyntaxToken objects for the source string."
-	| stream |
+	| stream t0 t1 t2 t3 |
 	sourceString := aString.
 	tokens := OrderedCollection new.
 	aString isEmpty ifTrue: [^tokens].
 
+	t0 := Time millisecondClockValue.
 	stream := ReadStream on: aString.
 	scanner := Scanner new initScanner; scan: stream.
+	t1 := Time millisecondClockValue.
 
 	"First, find all comments (Scanner doesn't track positions)"
 	self findComments.
+	t2 := Time millisecondClockValue.
 
 	"Then scan all tokens - track position via stream"
 	[scanner tokenType ~~ #doIt] whileTrue: [
 		self addCurrentTokenAt: stream position.
 		scanner scanToken].
+	t3 := Time millisecondClockValue.
+
+	Transcript show: '  Scanner init: ', (t1 - t0) printString, 'ms, findComments: ', (t2 - t1) printString, 'ms, tokenLoop: ', (t3 - t2) printString, 'ms'; cr.
 
 	"Sort by position (comments may be interleaved)"
 	tokens := tokens asSortedCollection: [:a :b | a start < b start].
@@ -35561,15 +35567,21 @@ Instance Variables:
 styleSource: sourceString
 	"Answer a Text with syntax highlighting applied.
 	 Optimized: builds runs directly from sorted tokens - O(m) where m is token count."
-	| text tokens size sortedTokens runs values pos |
+	| text tokens size sortedTokens runs values pos t0 t1 t2 t3 |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
+	t0 := Time millisecondClockValue.
 	size := sourceString size.
 	text := Text fromString: sourceString.
+	t1 := Time millisecondClockValue.
 	tokens := ScannerHighlighter tokenize: sourceString.
+	t2 := Time millisecondClockValue.
+	Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr.
 	tokens isEmpty ifTrue: [^text].
 
 	"Sort tokens by start position"
 	sortedTokens := tokens asSortedCollection: [:a :b | a start <= b start].
+	t3 := Time millisecondClockValue.
+	Transcript show: 'Sort: ', (t3 - t2) printString, 'ms'; cr.
 
 	"Build runs directly - much faster than per-character array"
 	runs := OrderedCollection new.
@@ -35604,6 +35616,7 @@ styleSource: sourceString
 	"Set colorRuns directly"
 	runs isEmpty ifFalse: [
 		text setColorRuns: (RunArray runs: runs asArray values: values asArray)].
+	Transcript show: 'Build runs: ', (Time millisecondClockValue - t3) printString, 'ms'; cr.
 	^text!
 
 styleMethod: sourceString inClass: aClass
