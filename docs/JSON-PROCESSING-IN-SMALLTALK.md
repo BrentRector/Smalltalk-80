@@ -510,8 +510,9 @@ JsonWriter raises errors for unsupported types:
 
 ## Implementation Checklist
 
-- [ ] Add `JsonReader` class to `Smalltalk-80.st`
-- [ ] Add `JsonWriter` class to `Smalltalk-80.st`
+- [x] Add `JsonReader` class to `Smalltalk-80.st`
+- [x] Add `JsonWriter` class to `Smalltalk-80.st`
+- [ ] Regenerate coldstart bundle (requires .NET SDK)
 - [ ] Test with various JSON inputs:
   - [ ] Objects: `{"key": "value"}`
   - [ ] Arrays: `[1, 2, 3]`

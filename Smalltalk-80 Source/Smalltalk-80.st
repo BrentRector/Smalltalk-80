@@ -44437,6 +44437,231 @@ with: aCollection from: firstIndex to: lastIndex
 
 	^self basicNew with: (aCollection copyFrom: firstIndex to: lastIndex)! !
 
+"JSON Processing Classes"
+Object subclass: #JsonReader
+	instanceVariableNames: 'stream'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'System-JSON'!
+
+JsonReader comment:
+'I parse JSON text into Smalltalk objects.
+
+JSON value types map to:
+  object  -> Dictionary
+  array   -> Array
+  string  -> String
+  number  -> Integer or Float (via Number readFrom:)
+  true    -> true
+  false   -> false
+  null    -> nil
+
+Usage:
+  JsonReader parse: ''{"name": "Alice", "age": 30}''
+    => a Dictionary(''name''->''Alice'' ''age''->30)'!
+
+
+!JsonReader class methodsFor: 'instance creation'!
+on: aReadStream
+	"Create a JsonReader on the given stream."
+	^self new stream: aReadStream!
+parse: aString
+	"Parse JSON string and return Smalltalk object."
+	^(self on: aString readStream) parseValue! !
+
+!JsonReader methodsFor: 'accessing'!
+stream: aReadStream
+	stream _ aReadStream! !
+
+!JsonReader methodsFor: 'parsing - values'!
+parseValue
+	"Parse any JSON value."
+	| char |
+	self skipWhitespace.
+	stream atEnd ifTrue: [^nil].
+	char _ stream peek.
+	char = $" ifTrue: [^self parseString].
+	char = ${ ifTrue: [^self parseObject].
+	char = $[ ifTrue: [^self parseArray].
+	char = $- ifTrue: [^self parseNumber].
+	char isDigit ifTrue: [^self parseNumber].
+	char = $t ifTrue: [^self parseTrue].
+	char = $f ifTrue: [^self parseFalse].
+	char = $n ifTrue: [^self parseNull].
+	self error: 'Unexpected character: ', char asString!
+parseNumber
+	"Parse JSON number using existing Number class.
+	 Number readFrom: handles integers, floats, and exponents."
+	^Number readFrom: stream!
+parseString
+	"Parse JSON string with escape handling."
+	| result char |
+	stream next.  "consume opening quote"
+	result _ WriteStream on: (String new: 32).
+	[stream atEnd] whileFalse: [
+		char _ stream next.
+		char = $" ifTrue: [^result contents].
+		char = $\
+			ifTrue: [result nextPut: self parseEscape]
+			ifFalse: [result nextPut: char]].
+	self error: 'Unterminated string'!
+parseEscape
+	"Parse escape sequence after backslash."
+	| char |
+	char _ stream next.
+	char = $n ifTrue: [^Character lf].
+	char = $t ifTrue: [^Character tab].
+	char = $r ifTrue: [^Character cr].
+	char = $" ifTrue: [^$"].
+	char = $\ ifTrue: [^$\].
+	char = $/ ifTrue: [^$/].
+	char = $b ifTrue: [^Character backspace].
+	char = $f ifTrue: [^Character newPage].
+	char = $u ifTrue: [^self parseUnicodeEscape].
+	self error: 'Unknown escape: \', char asString!
+parseUnicodeEscape
+	"Parse \uXXXX unicode escape."
+	| hex codePoint |
+	hex _ stream next: 4.
+	codePoint _ Integer readFrom: hex readStream base: 16.
+	^Character value: codePoint!
+parseTrue
+	"Parse 'true' literal."
+	(stream next: 4) = 'true' ifFalse: [self error: 'Expected true'].
+	^true!
+parseFalse
+	"Parse 'false' literal."
+	(stream next: 5) = 'false' ifFalse: [self error: 'Expected false'].
+	^false!
+parseNull
+	"Parse 'null' literal."
+	(stream next: 4) = 'null' ifFalse: [self error: 'Expected null'].
+	^nil! !
+
+!JsonReader methodsFor: 'parsing - structures'!
+parseObject
+	"Parse JSON object as Dictionary."
+	| dict key value |
+	stream next.  "consume {"
+	dict _ Dictionary new.
+	self skipWhitespace.
+	stream peek = $} ifTrue: [stream next. ^dict].  "empty object"
+	[true] whileTrue: [
+		self skipWhitespace.
+		stream peek = $" ifFalse: [self error: 'Expected string key'].
+		key _ self parseString.
+		self skipWhitespace.
+		stream next = $: ifFalse: [self error: 'Expected colon'].
+		value _ self parseValue.
+		dict at: key put: value.
+		self skipWhitespace.
+		stream peek = $} ifTrue: [stream next. ^dict].
+		stream peek = $, ifTrue: [stream next] ifFalse: [self error: 'Expected , or }']]!
+parseArray
+	"Parse JSON array as Array."
+	| items value |
+	stream next.  "consume ["
+	items _ OrderedCollection new.
+	self skipWhitespace.
+	stream peek = $] ifTrue: [stream next. ^items asArray].  "empty array"
+	[true] whileTrue: [
+		value _ self parseValue.
+		items add: value.
+		self skipWhitespace.
+		stream peek = $] ifTrue: [stream next. ^items asArray].
+		stream peek = $, ifTrue: [stream next] ifFalse: [self error: 'Expected , or ]']]! !
+
+!JsonReader methodsFor: 'private'!
+skipWhitespace
+	"Skip whitespace characters."
+	[stream atEnd not and: [stream peek isSeparator]]
+		whileTrue: [stream next]! !
+
+Object subclass: #JsonWriter
+	instanceVariableNames: 'stream'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'System-JSON'!
+
+JsonWriter comment:
+'I generate JSON text from Smalltalk objects.
+
+Supported object types:
+  Dictionary -> object
+  Array/OrderedCollection -> array
+  String/Symbol -> string
+  Number -> number
+  true/false -> true/false
+  nil -> null
+
+Usage:
+  JsonWriter stringify: (Dictionary new at: ''name'' put: ''Alice''; yourself)
+    => ''{"name":"Alice"}'''!
+
+
+!JsonWriter class methodsFor: 'instance creation'!
+on: aWriteStream
+	^self new stream: aWriteStream!
+stringify: anObject
+	"Convert Smalltalk object to JSON string."
+	| ws |
+	ws _ WriteStream on: (String new: 256).
+	(self on: ws) writeValue: anObject.
+	^ws contents! !
+
+!JsonWriter methodsFor: 'accessing'!
+stream: aWriteStream
+	stream _ aWriteStream! !
+
+!JsonWriter methodsFor: 'writing'!
+writeValue: anObject
+	"Write any Smalltalk value as JSON."
+	anObject isNil ifTrue: [^stream nextPutAll: 'null'].
+	anObject == true ifTrue: [^stream nextPutAll: 'true'].
+	anObject == false ifTrue: [^stream nextPutAll: 'false'].
+	anObject isString ifTrue: [^self writeString: anObject].
+	anObject isSymbol ifTrue: [^self writeString: anObject].
+	anObject isNumber ifTrue: [^self writeNumber: anObject].
+	(anObject isKindOf: Dictionary) ifTrue: [^self writeObject: anObject].
+	(anObject isKindOf: Collection) ifTrue: [^self writeArray: anObject].
+	self error: 'Cannot serialize: ', anObject class name!
+writeString: aString
+	"Write string with proper escaping."
+	stream nextPut: $".
+	aString do: [:char |
+		char = $" ifTrue: [stream nextPutAll: '\"']
+		ifFalse: [char = $\ ifTrue: [stream nextPutAll: '\\']
+		ifFalse: [char = Character lf ifTrue: [stream nextPutAll: '\n']
+		ifFalse: [char = Character cr ifTrue: [stream nextPutAll: '\r']
+		ifFalse: [char = Character tab ifTrue: [stream nextPutAll: '\t']
+		ifFalse: [stream nextPut: char]]]]]].
+	stream nextPut: $"!
+writeNumber: aNumber
+	"Write number. Integer or Float."
+	stream nextPutAll: aNumber printString!
+writeObject: aDictionary
+	"Write dictionary as JSON object."
+	| first |
+	stream nextPut: ${.
+	first _ true.
+	aDictionary keysAndValuesDo: [:key :value |
+		first ifFalse: [stream nextPut: $,].
+		first _ false.
+		self writeString: key asString.
+		stream nextPut: $:.
+		self writeValue: value].
+	stream nextPut: $}!
+writeArray: aCollection
+	"Write collection as JSON array."
+	| first |
+	stream nextPut: $[.
+	first _ true.
+	aCollection do: [:item |
+		first ifFalse: [stream nextPut: $,].
+		first _ false.
+		self writeValue: item].
+	stream nextPut: $]! !
+
 "Test class for class variable debugging"
 Object subclass: #ClassVarTest
 	instanceVariableNames: ''

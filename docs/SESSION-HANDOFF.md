@@ -1,8 +1,8 @@
-# Session Handoff: 32bpp Graphics Pipeline Complete
+# Session Handoff: JSON Parser Implementation
 
-**Date**: 2026-01-02
-**Status**: 32bpp graphics pipeline functional with anti-aliased text support
-**Branch**: `claude/review-graphics-architecture-FssRQ`
+**Date**: 2026-01-04
+**Status**: JsonReader and JsonWriter classes implemented, pending coldstart regeneration
+**Branch**: `claude/session-handoff-continuation-pblzi`
 **Priority**: Enhancement
 **Master Plan**: `docs/32-BIT-IMPLEMENTATION-PLAN.md`
 
@@ -10,93 +10,88 @@
 
 ## Quick Summary
 
-This session completed the 32bpp graphics pipeline with full color preservation and anti-aliased text rendering. Key achievements:
+This session implemented the JSON parser as pure Smalltalk classes. Key achievements:
 
-1. **Scroll Overlap Fix**: BitBlt32Engine now handles overlapping memory copies correctly
-2. **XOR Caret Fix**: Inverted source for XOR operations to preserve 1bpp semantics
-3. **Font Baseline Alignment**: Fixed-pitch fonts now use uniform cell width
-4. **Paint Mode (Rule 16)**: Implemented multiply blend for anti-aliased text
-5. **Color Verification**: Blue text test confirmed colors flow through entire pipeline
-6. **Window Title**: Updated to "Smalltalk-2026"
+1. **JsonReader**: Full JSON parsing with all value types, escape sequences, and nested structures
+2. **JsonWriter**: JSON generation with proper escaping and type handling
+3. **Leveraged Existing Code**: Uses `Number readFrom:` for numbers, `Integer readFrom:base:` for unicode escapes
 
 ---
 
 ## Current State
 
 ### What Works
-- ✅ Build: 0 errors, 0 warnings
+- ✅ Build: 0 errors, 0 warnings (prior to this session)
 - ✅ Cold start: All 6 phases succeed
 - ✅ Init expressions: 286/286 succeed (100%)
-- ✅ System Browser: Fully functional with source code display
-- ✅ All 16 BitBlt combination rules working
-- ✅ **Rule 16 (Paint)**: Now handled in C# with multiply blend (was falling back to Smalltalk)
-- ✅ **32bpp font rendering**: Anti-aliased with explicit Format32bppArgb
-- ✅ **Color preservation**: Verified with blue text rendering
-- ✅ **Scroll operations**: Overlap handling prevents duplication artifacts
-- ✅ **XOR operations**: Caret/cursor displays correctly (inverted source fix)
+- ✅ System Browser: Fully functional with syntax highlighting (~1.0s display)
+- ✅ Syntax highlighting: 4.5x speedup (Phase 7 complete)
+- ✅ **JsonReader class**: Added to `Smalltalk-80.st`
+- ✅ **JsonWriter class**: Added to `Smalltalk-80.st`
 
-### Recent Commits (this session)
+### Pending
+- ⏳ **Regenerate coldstart bundle**: Requires .NET SDK environment
+- ⏳ **Test JSON parsing**: After coldstart regeneration
+
+### Recent Changes (this session)
 ```
-8291a14 Update window title to Smalltalk-2026
-51070cb TEST: Render font glyphs in blue to verify color preservation
-ad4cb48 Fix anti-aliasing: use multiply blend and explicit 32bpp format
-cd0ecb1 Implement grayscale alpha blending for paint mode (rule 16)
-f44ed0f Fix build: revert to GDI+ (TextRenderer requires net9.0-windows)
-8e31a2e Use TextRenderer (GDI) for consistent font baseline alignment
-5ac24c7 Fix fixed-pitch font alignment with uniform cell width
-6f44b8f Fix row iteration order for vertical overlap in CopyBitsOptimized
+- Added JsonReader class with:
+  - parseValue, parseString, parseNumber, parseObject, parseArray
+  - parseTrue, parseFalse, parseNull
+  - parseEscape, parseUnicodeEscape
+  - skipWhitespace
+- Added JsonWriter class with:
+  - writeValue, writeString, writeNumber
+  - writeObject, writeArray
 ```
 
 ---
 
-## Key Technical Changes
+## Key Technical Details
 
-### 1. BitBlt32Engine Overlap Handling
+### JsonReader Class
 
-**Problem**: Scrolling list panes showed duplicate entries due to overlapping source/dest regions.
+**Location**: `Smalltalk-80.st` (category: System-JSON)
 
-**Solution**: Detect scroll direction and iterate rows accordingly:
-```csharp
-bool copyBottomToTop = destY > sourceY;
-if (copyBottomToTop) {
-    for (int y = height - 1; y >= 0; y--) { ... }
-} else {
-    for (int y = 0; y < height; y++) { ... }
-}
+**JSON Type Mapping**:
+| JSON Type | Smalltalk Type |
+|-----------|----------------|
+| object    | Dictionary     |
+| array     | Array          |
+| string    | String         |
+| number    | Integer or Float |
+| true      | true           |
+| false     | false          |
+| null      | nil            |
+
+**Escape Sequences Supported**:
+- `\n`, `\t`, `\r`, `\b`, `\f` - control characters
+- `\"`, `\\`, `\/` - literal characters
+- `\uXXXX` - unicode code points
+
+**Usage**:
+```smalltalk
+JsonReader parse: '{"name": "Alice", "age": 30}'
+    => a Dictionary('name'->'Alice' 'age'->30)
 ```
 
-### 2. Paint Mode Multiply Blend
+### JsonWriter Class
 
-**Problem**: Original paint mode (rule 16) used OR operations designed for 1bpp. In 32bpp, black=0x000000 so OR-ing produces wrong results.
+**Location**: `Smalltalk-80.st` (category: System-JSON)
 
-**Solution**: Implement multiply blend which is the correct operation for anti-aliased content on white background:
-```csharp
-// BlendPaint: result = src * dest / 255 (per channel)
-// - White source (255) = transparent (dest unchanged)
-// - Black source (0) = opaque (result = 0)
-// - Gray source = proportional darkening
-int outR = (srcR * dstR) / 255;
-int outG = (srcG * dstG) / 255;
-int outB = (srcB * dstB) / 255;
+**Supported Types**:
+- Dictionary → object
+- Array/OrderedCollection → array
+- String/Symbol → string
+- Number → number
+- true/false → true/false
+- nil → null
+
+**Usage**:
+```smalltalk
+JsonWriter stringify: (Dictionary new at: 'name' put: 'Alice'; yourself)
+    => '{"name":"Alice"}'
 ```
-
-### 3. XOR Source Inversion
-
-**Problem**: In 1bpp, black=1 (all bits set). XOR with 1 inverts destination. In 32bpp, black=0x000000. XOR with 0 does nothing.
-
-**Solution**: Invert source before XOR:
-```csharp
-destPixels[offset] ^= ~sourcePixels[offset];
-```
-
-### 4. Fixed-Pitch Font Rendering
-
-**Problem**: Individual character measurements with MeasureString returned varying widths, causing baseline misalignment.
-
-**Solution**:
-- Use uniform cell width from representative character ('M')
-- Build xTable as `i * cellWidth` for all characters
-- Use `TextRenderingHint.AntiAlias` and `Format32bppArgb` for proper grayscale output
 
 ---
 
@@ -104,22 +99,38 @@ destPixels[offset] ^= ~sourcePixels[offset];
 
 | File | Changes |
 |------|---------|
-| `BitBlt32Engine.cs` | Overlap handling for all fast paths, multiply blend for rule 16 |
-| `CombinationRule.cs` | Added `Paint = 16` enum value |
-| `GraphicsPrimitives.cs` | Accept rule 16 in primitive (was failing at >15) |
-| `WinFormsFontBridge.cs` | Uniform cell width, Format32bppArgb, AntiAlias hint |
-| `Program.cs` | Window title changed to "Smalltalk-2026" |
+| `Smalltalk-80 Source/Smalltalk-80.st` | Added JsonReader and JsonWriter classes |
+| `docs/JSON-PROCESSING-IN-SMALLTALK.md` | Updated implementation checklist |
 
 ---
 
-## Remaining Work
+## Roadmap: Full Theme Support
 
-### Immediate
-1. **Change font color back to black** - Currently blue for testing
-2. **Selection highlight polish** - Yellow-on-blue looks odd with multiply blend
+### Phase 1: JSON Processing ✅ IMPLEMENTED
+**Document**: `docs/JSON-PROCESSING-IN-SMALLTALK.md`
 
-### Future (32-bit Word Migration)
-The 32-bit word migration (HeapManager `ushort[]` → `uint[]`) is still planned but not started. See `docs/32-BIT-IMPLEMENTATION-PLAN.md` for the phased approach.
+- [x] Add `JsonReader` class
+- [x] Add `JsonWriter` class
+- [ ] Regenerate coldstart bundle
+- [ ] Test with various JSON inputs
+
+### Phase 2: Windows Special Folders (C# Primitive)
+**Document**: `docs/WINDOWS-SPECIAL-FOLDERS-IMPLEMENTATION.md`
+
+- [ ] Implement Primitive 160 (GetSpecialFolder)
+- [ ] Maps Symbol (#appData, #localAppData) → path string
+- [ ] Register in PrimitiveRegistry.cs
+
+### Phase 3: VS Code Theme Loading
+**Document**: `docs/WELL-KNOWN-PATHS-DESIGN.md`
+
+- [ ] Theme directory: `%APPDATA%\Smalltalk-80\themes\`
+- [ ] Parse VS Code JSON theme format
+- [ ] `SyntaxStyler>>loadThemeNamed:` and `useThemeNamed:`
+
+### Phase 4: Runtime Theme Switching
+- [ ] `SyntaxStyler>>availableThemes`
+- [ ] Theme selection in Preferences menu
 
 ---
 
@@ -129,9 +140,6 @@ The 32-bit word migration (HeapManager `ushort[]` → `uint[]`) is still planned
 **Symptom**: Interpreter crashes if mouse moves into window immediately after startup.
 **Workaround**: Wait 2-3 seconds before moving mouse.
 **Status**: Under investigation.
-
-### Anti-aliasing Subtlety
-Anti-aliased edges are present but subtle at normal font sizes (10-14px). Visible when zoomed. This is expected behavior for small fonts.
 
 ---
 
@@ -158,16 +166,17 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 
 ## For Next Session
 
-### If continuing graphics work:
-1. Change font color back to black in `WinFormsFontBridge.cs`
-2. Investigate selection highlight appearance
+### If continuing theme support roadmap:
+1. Regenerate coldstart bundle with JSON classes
+2. Test JSON parsing with simple inputs
+3. Implement Primitive 160 (Windows Special Folders)
 
-### If starting 32-bit word migration:
-1. Start with `docs/32-BIT-IMPLEMENTATION-PLAN.md` Phase 1.1
-2. Change `ushort[]` to `uint[]` in HeapManager
-3. Run regression tests after each phase
+### If working on other features:
+1. Check `CLAUDE.md` for project status
+2. Check `docs/32-BIT-IMPLEMENTATION-PLAN.md` for word migration plan
 
 ### Key Documentation:
 - `CLAUDE.md` - Project status and development guidelines
-- `docs/32-BIT-IMPLEMENTATION-PLAN.md` - Master plan for word migration
-- `docs/Graphics-Architecture.md` - Graphics system design
+- `docs/JSON-PROCESSING-IN-SMALLTALK.md` - JSON implementation spec
+- `docs/WINDOWS-SPECIAL-FOLDERS-IMPLEMENTATION.md` - Next phase
+- `docs/WELL-KNOWN-PATHS-DESIGN.md` - Theme file loading design
