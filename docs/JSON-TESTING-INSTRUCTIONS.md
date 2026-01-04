@@ -323,39 +323,38 @@ JsonTest runAll!
 
 ## Step 6: Compile and Run Tests
 
-### Recommended: Add init expression to coldstart
+The compiler accepts multiple source files on the command line.
 
-1. **Create the Tests directory if needed**:
-```bash
-mkdir -p "Smalltalk-80 Source/Tests"
+### Create a test runner file
+
+Create `Smalltalk-80 Source/Tests/JsonTestRunner.st` with the init expression:
+
+```smalltalk
+"Run JSON tests"
+JsonTest runAll!
 ```
 
-2. **Save the JsonTest class** from Step 4 to `Smalltalk-80 Source/Tests/JsonTest.st`
+### Compile with multiple source files
 
-3. **Concatenate source files with test and init expression**:
 ```bash
 cd "Smalltalk-80 Source"
 
-# Combine main source + test class + init expression
-cat Smalltalk-80.st Tests/JsonTest.st > Smalltalk-80-with-json-tests.st
-
-# Add the init expression that runs the tests
-echo '' >> Smalltalk-80-with-json-tests.st
-echo '"Run JSON tests"' >> Smalltalk-80-with-json-tests.st
-echo 'JsonTest runAll!' >> Smalltalk-80-with-json-tests.st
+# Compile main source + test class + test runner
+dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- \
+    "Smalltalk-80.st" \
+    "Tests/JsonTest.st" \
+    "Tests/JsonTestRunner.st"
 ```
 
-4. **Compile the combined source**:
+### Copy the coldstart bundle
+
 ```bash
-dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80-with-json-tests.st"
+cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstart.json \
+   ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_json_test.json
 ```
 
-5. **Copy the coldstart bundle**:
-```bash
-cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstart.json ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_json_test.json
-```
+### Run the interpreter
 
-6. **Run the interpreter with test bundle**:
 ```bash
 cd ../Smalltalk80.Interpreter
 dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_json_test.json
@@ -367,15 +366,18 @@ The interpreter will:
 - Display test results in the Transcript window
 - Continue to normal GUI operation
 
-### Quick One-Liner (after setup)
+### Quick Commands (from project root)
 
 ```bash
-cd "Smalltalk-80 Source" && \
-cat Smalltalk-80.st Tests/JsonTest.st > Smalltalk-80-with-json-tests.st && \
-echo -e '\n"Run JSON tests"\nJsonTest runAll!' >> Smalltalk-80-with-json-tests.st && \
-dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80-with-json-tests.st" && \
-cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstart.json ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_json_test.json && \
-cd ../Smalltalk80.Interpreter && \
+# Compile with tests
+cd "Smalltalk-80 Source"
+dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- \
+    "Smalltalk-80.st" "Tests/JsonTest.st" "Tests/JsonTestRunner.st"
+
+# Copy and run
+cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstart.json \
+   ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_json_test.json
+cd ../Smalltalk80.Interpreter
 dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_json_test.json
 ```
 
