@@ -35221,68 +35221,103 @@ Instance Variables:
 
 !ScannerHighlighter methodsFor: 'tokenizing'!
 tokenize: aString
-	"Answer a collection of SyntaxToken objects for the source string."
-	| stream t0 t1 t2 t3 t4 addTime scanTime tokenCount commentTokens scannerTokens |
+	"Answer a collection of SyntaxToken objects for the source string.
+	 OPTIMIZED: Removed per-token timing, pre-sized collections."
+	| stream t0 t1 t2 commentTokens scannerTokens estimatedTokens |
 	sourceString := aString.
 	aString isEmpty ifTrue: [^OrderedCollection new].
 
 	t0 := Time millisecondClockValue.
 	stream := ReadStream on: aString.
 	scanner := Scanner new initScanner; scan: stream.
-	t1 := Time millisecondClockValue.
 
-	"Find all comments (Scanner skips them) - store separately"
-	tokens := OrderedCollection new.
+	"Estimate token count for pre-sizing (roughly 1 token per 7 chars)"
+	estimatedTokens := (aString size // 7) max: 16.
+
+	"Find all comments (Scanner skips them)"
+	tokens := OrderedCollection new: estimatedTokens // 4.
 	self findComments.
 	commentTokens := tokens.
 
-	"Scan all tokens into separate collection"
-	tokens := OrderedCollection new.
-	t2 := Time millisecondClockValue.
-	addTime := 0. scanTime := 0. tokenCount := 0.
+	"Scan all tokens - pre-sized collection"
+	tokens := OrderedCollection new: estimatedTokens.
+	t1 := Time millisecondClockValue.
 	[scanner tokenType ~~ #doIt] whileTrue: [
-		| ta tb |
-		ta := Time millisecondClockValue.
-		self addCurrentTokenAt: stream position.
-		tb := Time millisecondClockValue.
-		addTime := addTime + (tb - ta).
-		scanner scanToken.
-		scanTime := scanTime + (Time millisecondClockValue - tb).
-		tokenCount := tokenCount + 1].
+		self addCurrentToken.
+		scanner scanToken].
 	scannerTokens := tokens.
-	t3 := Time millisecondClockValue.
+	t2 := Time millisecondClockValue.
 
-	Transcript show: '  tokenLoop: ', (t3 - t2) printString, 'ms (add:', addTime printString, ' scan:', scanTime printString, ' n:', tokenCount printString, ')'; cr.
+	Transcript ifNotNil: [Transcript show: '  tokenLoop: ', (t2 - t1) printString, 'ms n:', scannerTokens size printString; cr].
 
-	"Merge two sorted lists in O(n) instead of sorting O(n log n)"
+	"Merge two sorted lists in O(n)"
 	tokens := self merge: commentTokens with: scannerTokens.
-	t4 := Time millisecondClockValue.
-	Transcript show: '  merge: ', (t4 - t3) printString, 'ms'; cr.
+	Transcript ifNotNil: [Transcript show: '  merge: ', (Time millisecondClockValue - t2) printString, 'ms'; cr].
 	^tokens!
 
-addCurrentTokenAt: streamPosition
+addCurrentToken
 	"Add the current scanner token to our collection.
-	 Scanner now tracks token start (mark) and end (tokenEnd) directly."
-	| type start end scannerType tokenValue |
+	 OPTIMIZED: Reduced method calls, early exits, cached scanner access."
+	| type start end scannerType tokenValue tokenClass |
 	scannerType := scanner tokenType.
-	type := self highlightTypeFor: scannerType.
 
-	"Skip certain token types early"
-	scannerType == #xCharacter ifTrue: [type := #character].
+	"Fast path for common types - avoid highlightTypeFor: call"
+	scannerType == #word ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #identifier start: start end: end).
+		^self].
+	scannerType == #keyword ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #keyword start: start end: end).
+		^self].
+	scannerType == #binary ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #default start: start end: end).
+		^self].
+
+	"Handle special cases"
+	scannerType == #xCharacter ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #character start: start end: end).
+		^self].
+
+	"Literals need more checking"
 	scannerType == #literal ifTrue: [
 		tokenValue := scanner token.
-		(tokenValue class == Array) ifTrue: [^self].
-		(tokenValue class == Symbol and: [tokenValue size = 1]) ifTrue: [
-			('()[]' includes: tokenValue first) ifTrue: [^self]]].
+		tokenClass := tokenValue class.
+		"Skip arrays and single-char bracket symbols"
+		tokenClass == Array ifTrue: [^self].
+		(tokenClass == Symbol and: [tokenValue size = 1 and: [('()[]' includes: tokenValue first)]]) ifTrue: [^self].
+		"Determine literal type"
+		type := tokenClass == Symbol ifTrue: [#symbol]
+			ifFalse: [tokenClass == Character ifTrue: [#character]
+			ifFalse: [tokenValue isNumber ifTrue: [#number]
+			ifFalse: [#default]]].
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: type start: start end: end).
+		^self].
 
-	"Character literals ($x) - check only if type is number"
-	(type == #number and: [scanner token class == Character])
-		ifTrue: [type := #character].
+	"String"
+	scannerType == #string ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #string start: start end: end).
+		^self].
 
-	"Use Scanner's position tracking"
+	"Fallback for other types"
+	type := self highlightTypeFor: scannerType.
 	start := scanner mark max: 1.
 	end := scanner tokenEnd max: start.
 	tokens add: (SyntaxToken type: type start: start end: end)!
+
+addCurrentTokenAt: streamPosition
+	"DEPRECATED - use addCurrentToken instead"
+	^self addCurrentToken!
 
 findTokenEndFor: tokenValue type: scannerType from: start
 	"Find the actual end of token in source string.
