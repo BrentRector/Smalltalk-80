@@ -182,8 +182,8 @@ public static class StringPrimitives
             if (charArg.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
             // Check if it's a Character object (class index for Character)
-            var charClass = context.HeapManager.GetClass(charArg);
-            var characterClassOop = context.RuntimeServices?.GetGlobal("Character") ?? default;
+            var charClass = context.HeapManager.GetClassOOP(charArg);
+            var characterClassOop = context.RuntimeServices?.GetClass("Character") ?? default;
             if (charClass != characterClassOop)
                 return PrimitiveResult.Fail(context.Metadata!);
 
