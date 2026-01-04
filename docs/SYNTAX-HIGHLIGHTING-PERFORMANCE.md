@@ -133,7 +133,38 @@ This was wasteful because:
 | makeSelectorBold | **Eliminated** - no longer creates Parser |
 | Total delay after timing output | Should be significantly reduced |
 
-**Status**: Awaiting test results after coldstart regeneration.
+**Status**: Implemented, works correctly.
+
+---
+
+### Run 7: Paragraph composeAll is the bottleneck (IDENTIFIED)
+
+**Detailed Timing** (73-line method with 284 tokens):
+| Component | Time | Notes |
+|-----------|------|-------|
+| sourceCodeAt | 359ms | File I/O |
+| Tokenize | 703ms | Scanner + merge |
+| Build runs | 359ms | Color runs creation |
+| styleSource | 1296ms | Total styling |
+| emphasize | 79ms | Bold selector |
+| Browser text total | 1890ms | |
+| **composeAll loop** | **1704ms** | 73 lines = **23ms/line** |
+| Paragraph composeAll | 1782ms | |
+
+**Root Cause**: `CompositionScanner composeLine:fromCharacterIndex:inParagraph:` is slow with colored text.
+
+For each character, composition must:
+1. Get the character from text
+2. Look up emphasis from RunArray
+3. Look up color from colorRuns RunArray
+4. Get font based on emphasis
+5. Get character width
+
+With 284 color runs, the RunArray lookups for each of ~2000 characters are expensive.
+
+**Total Time**: ~3.4 seconds (styling 1.3s + composition 1.8s)
+
+**Next Steps**: Investigate CompositionScanner optimization or caching for RunArray lookups.
 
 ---
 
