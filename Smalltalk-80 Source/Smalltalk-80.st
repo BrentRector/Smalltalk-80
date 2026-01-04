@@ -29502,7 +29502,7 @@ computeBoundingBox
 composeAll
 	"Compose a collection of characters into a collection of lines."
 
-	| startIndex stopIndex lineIndex maximumRightX compositionScanner |
+	| startIndex stopIndex lineIndex maximumRightX compositionScanner t0 t1 loopTime |
 	lines _ Array new: 32.
 	lastLine _ 0.
 	maximumRightX _ 0.
@@ -29512,17 +29512,24 @@ composeAll
 			^maximumRightX].
 	startIndex _ lineIndex _ 1.
 	stopIndex _ text size.
+	t0 := Time millisecondClockValue.
 	compositionScanner _ CompositionScanner new in: self.
-	[startIndex > stopIndex] whileFalse: 
-		[self lineAt: lineIndex 
-				put: (compositionScanner composeLine: lineIndex 
-										fromCharacterIndex: startIndex 
+	t1 := Time millisecondClockValue.
+	loopTime := 0.
+	[startIndex > stopIndex] whileFalse:
+		[| lt0 |
+		lt0 := Time millisecondClockValue.
+		self lineAt: lineIndex
+				put: (compositionScanner composeLine: lineIndex
+										fromCharacterIndex: startIndex
 										inParagraph: self).
+		loopTime := loopTime + (Time millisecondClockValue - lt0).
 		 maximumRightX _ compositionScanner rightX max: maximumRightX.
 		 startIndex _ (lines at: lineIndex) last + 1.
 		 lineIndex _ lineIndex + 1].
 	self updateCompositionHeight.
 	self trimLinesTo: lineIndex - 1.
+	Transcript show: '  composeAll: scanner:', (t1-t0) printString, 'ms lines:', (lineIndex-1) printString, ' loop:', loopTime printString, 'ms'; cr.
 	^maximumRightX!
 recomposeIn: compositionRect clippingBox: clippingRect 
 	"Set the composition rectangle for the receiver so that the lines wrap
