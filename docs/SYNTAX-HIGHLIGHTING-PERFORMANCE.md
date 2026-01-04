@@ -101,10 +101,10 @@
 
 ---
 
-### Run 6: Investigating hidden delay (IN PROGRESS)
+### Run 6: Eliminate makeSelectorBoldIn: Parser creation (IMPLEMENTED)
 **Observation**: User reported 0.5-1 second delay AFTER Transcript messages before styled text appears.
 
-**Analysis**: `Text>>makeSelectorBoldIn:` creates a brand new `Parser` object just to find where the method selector ends:
+**Root Cause**: `Text>>makeSelectorBoldIn:` creates a brand new `Parser` object just to find where the method selector ends:
 ```smalltalk
 makeSelectorBoldIn: aClass
     | parser |
@@ -112,12 +112,28 @@ makeSelectorBoldIn: aClass
     self emphasizeFrom: 1 to: (parser endOfLastToken min: string size) with: 2
 ```
 
-This is wasteful because:
+This was wasteful because:
 - The `ScannerHighlighter` already scanned the entire method and has all token positions
 - Creating a Parser also creates a new Scanner internally
 - The parse work duplicates what was already done
 
-**Planned Fix**: Identify selector end position from the tokens during the build runs phase, eliminating the need for `makeSelectorBoldIn:` to create a Parser.
+**Fix Implemented**:
+1. Added `ScannerHighlighter>>findMethodHeaderEnd` - finds selector+args end position from tokens
+2. Modified `ScannerHighlighter class>>tokenize:` to return the highlighter instance
+3. Added `SyntaxStyler>>styleSource:methodHeaderEnd:` to pass header end position via block
+4. Updated `styleMethod:inClass:` to use token positions instead of creating a Parser
+
+**Method Header Pattern Recognition**:
+- Unary: first identifier token (e.g., `size`)
+- Binary: binary operator + argument identifier (e.g., `+ aNumber`)
+- Keyword: alternating keyword/identifier pairs (e.g., `at: index put: value`)
+
+| Component | Expected Improvement |
+|-----------|---------------------|
+| makeSelectorBold | **Eliminated** - no longer creates Parser |
+| Total delay after timing output | Should be significantly reduced |
+
+**Status**: Awaiting test results after coldstart regeneration.
 
 ---
 
