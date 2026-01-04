@@ -181,11 +181,10 @@ public static class StringPrimitives
             var charArg = context.Arguments[0];
             if (charArg.IsSmallInteger) return PrimitiveResult.Fail(context.Metadata!);
 
-            // Check if it's a Character object (class index for Character)
+            // Check if it's a Character object using cached class OOP
             var charClass = context.HeapManager.GetClassOOP(charArg);
-            var characterClassOop = context.RuntimeServices?.GetClass("Character") ?? default;
-            if (charClass != characterClassOop)
-                return PrimitiveResult.Fail(context.Metadata!);
+            if (charClass != context.Metadata!.CharacterClassOOP)
+                return PrimitiveResult.Fail(context.Metadata);
 
             // Character stores its value in first instance variable
             var charValueOop = context.HeapManager.GetInstanceVariable(charArg, 0);
