@@ -35578,10 +35578,9 @@ styleSource: sourceString
 	Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr.
 	tokens isEmpty ifTrue: [^text].
 
-	"Sort tokens by start position"
-	sortedTokens := tokens asSortedCollection: [:a :b | a start <= b start].
+	"Tokens already sorted by tokenize: - no need to sort again"
+	sortedTokens := tokens.
 	t3 := Time millisecondClockValue.
-	Transcript show: 'Sort: ', (t3 - t2) printString, 'ms'; cr.
 
 	"Build runs directly - much faster than per-character array"
 	runs := OrderedCollection new.
