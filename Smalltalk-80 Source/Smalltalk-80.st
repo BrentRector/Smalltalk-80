@@ -35222,8 +35222,8 @@ Instance Variables:
 !ScannerHighlighter methodsFor: 'tokenizing'!
 tokenize: aString
 	"Answer a collection of SyntaxToken objects for the source string.
-	 OPTIMIZED: Removed per-token timing, pre-sized collections."
-	| stream t0 t1 t2 commentTokens scannerTokens estimatedTokens |
+	 OPTIMIZED: Interleaves comments during scan - no merge needed."
+	| stream t0 t1 estimatedTokens commentList commentIdx commentCount nextCommentStart |
 	sourceString := aString.
 	aString isEmpty ifTrue: [^OrderedCollection new].
 
@@ -35234,25 +35234,38 @@ tokenize: aString
 	"Estimate token count for pre-sizing (roughly 1 token per 7 chars)"
 	estimatedTokens := (aString size // 7) max: 16.
 
-	"Find all comments (Scanner skips them)"
+	"Find all comments first (fast indexOf: scan)"
 	tokens := OrderedCollection new: estimatedTokens // 4.
 	self findComments.
-	commentTokens := tokens.
+	commentList := tokens asArray.  "Array for faster indexed access"
+	commentCount := commentList size.
+	commentIdx := 1.
+	nextCommentStart := commentCount > 0
+		ifTrue: [(commentList at: 1) start]
+		ifFalse: [SmallInteger maxVal].
 
-	"Scan all tokens - pre-sized collection"
+	"Scan all tokens - interleave comments inline"
 	tokens := OrderedCollection new: estimatedTokens.
 	t1 := Time millisecondClockValue.
 	[scanner tokenType ~~ #doIt] whileTrue: [
+		| tokenStart |
+		tokenStart := scanner mark.
+		"Insert any comments that appear before this token"
+		[nextCommentStart < tokenStart] whileTrue: [
+			tokens add: (commentList at: commentIdx).
+			commentIdx := commentIdx + 1.
+			nextCommentStart := commentIdx <= commentCount
+				ifTrue: [(commentList at: commentIdx) start]
+				ifFalse: [SmallInteger maxVal]].
 		self addCurrentToken.
 		scanner scanToken].
-	scannerTokens := tokens.
-	t2 := Time millisecondClockValue.
 
-	Transcript ifNotNil: [Transcript show: '  tokenLoop: ', (t2 - t1) printString, 'ms n:', scannerTokens size printString; cr].
+	"Add any remaining comments at end"
+	[commentIdx <= commentCount] whileTrue: [
+		tokens add: (commentList at: commentIdx).
+		commentIdx := commentIdx + 1].
 
-	"Merge two sorted lists in O(n)"
-	tokens := self merge: commentTokens with: scannerTokens.
-	Transcript ifNotNil: [Transcript show: '  merge: ', (Time millisecondClockValue - t2) printString, 'ms'; cr].
+	Transcript ifNotNil: [Transcript show: '  tokenize: ', (Time millisecondClockValue - t1) printString, 'ms n:', tokens size printString; cr].
 	^tokens!
 
 addCurrentToken
