@@ -35191,7 +35191,7 @@ Instance Variables:
 !ScannerHighlighter methodsFor: 'tokenizing'!
 tokenize: aString
 	"Answer a collection of SyntaxToken objects for the source string."
-	| stream t0 t1 t2 t3 |
+	| stream t0 t1 t2 t3 t4 addTime scanTime tokenCount |
 	sourceString := aString.
 	tokens := OrderedCollection new.
 	aString isEmpty ifTrue: [^tokens].
@@ -35206,15 +35206,24 @@ tokenize: aString
 	t2 := Time millisecondClockValue.
 
 	"Then scan all tokens - track position via stream"
+	addTime := 0. scanTime := 0. tokenCount := 0.
 	[scanner tokenType ~~ #doIt] whileTrue: [
+		| ta tb |
+		ta := Time millisecondClockValue.
 		self addCurrentTokenAt: stream position.
-		scanner scanToken].
+		tb := Time millisecondClockValue.
+		addTime := addTime + (tb - ta).
+		scanner scanToken.
+		scanTime := scanTime + (Time millisecondClockValue - tb).
+		tokenCount := tokenCount + 1].
 	t3 := Time millisecondClockValue.
 
-	Transcript show: '  Scanner init: ', (t1 - t0) printString, 'ms, findComments: ', (t2 - t1) printString, 'ms, tokenLoop: ', (t3 - t2) printString, 'ms'; cr.
+	Transcript show: '  tokenLoop: ', (t3 - t2) printString, 'ms (add:', addTime printString, ' scan:', scanTime printString, ' n:', tokenCount printString, ')'; cr.
 
 	"Sort by position (comments may be interleaved)"
 	tokens := tokens asSortedCollection: [:a :b | a start < b start].
+	t4 := Time millisecondClockValue.
+	Transcript show: '  sort: ', (t4 - t3) printString, 'ms'; cr.
 	^tokens asOrderedCollection!
 
 addCurrentTokenAt: streamPosition
@@ -35587,6 +35596,8 @@ styleSource: sourceString
 	values := OrderedCollection new.
 	pos := 1.
 
+	| loopTime t4 t5 |
+	loopTime := Time millisecondClockValue.
 	sortedTokens do: [:token |
 		| textColor start end |
 		textColor := self colorForType: token type.
@@ -35606,6 +35617,8 @@ styleSource: sourceString
 		ifNil: [
 			"No color for this token type - skip, will be covered by nil run"
 			pos < start ifTrue: [pos := start]]].
+	t4 := Time millisecondClockValue.
+	Transcript show: '  loop: ', (t4 - loopTime) printString, 'ms'; cr.
 
 	"Add final nil run if needed"
 	pos <= size ifTrue: [
@@ -35615,7 +35628,9 @@ styleSource: sourceString
 	"Set colorRuns directly"
 	runs isEmpty ifFalse: [
 		text setColorRuns: (RunArray runs: runs asArray values: values asArray)].
-	Transcript show: 'Build runs: ', (Time millisecondClockValue - t3) printString, 'ms'; cr.
+	t5 := Time millisecondClockValue.
+	Transcript show: '  setColorRuns: ', (t5 - t4) printString, 'ms'; cr.
+	Transcript show: 'Build runs total: ', (t5 - t3) printString, 'ms'; cr.
 	^text!
 
 styleMethod: sourceString inClass: aClass
