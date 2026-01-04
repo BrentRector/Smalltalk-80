@@ -164,7 +164,36 @@ With 284 color runs, the RunArray lookups for each of ~2000 characters are expen
 
 **Total Time**: ~3.4 seconds (styling 1.3s + composition 1.8s)
 
-**Next Steps**: Investigate CompositionScanner optimization or caching for RunArray lookups.
+---
+
+### Run 8: Separate emphasisRunLengthFor: for composition (IMPLEMENTED)
+
+**Root Cause Analysis**: `Text>>runLengthFor:` checks BOTH emphasis runs AND color runs:
+```smalltalk
+runLengthFor: characterIndex
+    emphasisLength := runs runLengthAt: characterIndex.
+    colorRuns ifNil: [^emphasisLength].
+    colorLength := colorRuns runLengthAt: characterIndex.  "<-- O(runs) per call!"
+    ^emphasisLength min: colorLength
+```
+
+With 284 color runs and ~2000 characters, `colorRuns runLengthAt:` is called ~2000 times, each scanning through up to 284 runs = **~568,000 comparisons** wasted!
+
+**Key Insight**: CompositionScanner only uses emphasis (font selection) - it never uses color. The color lookup is pure waste during composition.
+
+**Fix Implemented**:
+1. Added `Text>>emphasisRunLengthFor:` - returns only emphasis run length, O(1)
+2. Updated `CompositionScanner` to use `emphasisRunLengthFor:` instead of `runLengthFor:`
+3. Updated `CharacterBlockScanner` similarly (also doesn't need colors)
+
+| Component | Expected Improvement |
+|-----------|---------------------|
+| composeAll loop | **~1704ms → ~50ms** (estimated 97% faster) |
+| Composition only checks emphasis | O(emphasis runs) instead of O(color runs) |
+
+**Status**: Implemented, needs testing on Windows.
+
+**Next Steps**: For DisplayScanner (which does need colors), consider pre-expanding colorRuns to an Array for O(1) lookup, or using token-based color retrieval.
 
 ---
 
@@ -175,6 +204,7 @@ With 284 color runs, the RunArray lookups for each of ~2000 characters are expen
 3. **addCurrentTokenAt optimization** - Reduced message sends, use `class ==` vs `isKindOf:`
 4. **Merge vs Sort** - O(n) merge of two sorted lists instead of O(n log n) heap sort
 5. **Dictionary>>keysAndValuesDo:** - Added modern Smalltalk method for cleaner iteration
+6. **emphasisRunLengthFor:** - Composition uses emphasis-only run length, avoiding O(n²) color run lookups
 
 ## Architecture Improvements
 

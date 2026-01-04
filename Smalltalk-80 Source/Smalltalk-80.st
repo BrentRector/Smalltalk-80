@@ -9526,7 +9526,7 @@ endOfRun
 		[runStopIndex < characterIndex and: [runStopIndex < text size]])
 			or:	[characterIndex == nil and: [lastIndex < line last]])
 		ifTrue:	["We're really at the end of a real run."
-				runLength _ (text runLengthFor: (lastIndex _ lastIndex + 1)).
+				runLength _ (text emphasisRunLengthFor: (lastIndex _ lastIndex + 1)).
 				characterIndex ~~ nil
 					ifTrue:	[lineStop _ characterIndex	"scanning for index"]
 					ifFalse:	[lineStop _ line last			"scanning for point"].
@@ -9672,7 +9672,7 @@ buildCharacterBlockIn: aParagraph
 	lastIndex _ line first.
 
 	self setStopConditions.		"also sets font"
-	runLength _ (text runLengthFor: line first).
+	runLength _ (text emphasisRunLengthFor: line first).
 	characterIndex ~~ nil
 		ifTrue:	[lineStop _ characterIndex	"scanning for index"]
 		ifFalse:	[lineStop _ line last].
@@ -13241,7 +13241,7 @@ composeLine: lineIndex fromCharacterIndex: startIndex inParagraph: aParagraph
 	rightMargin _ aParagraph rightMarginForComposition.
 	leftMargin >= rightMargin ifTrue:
 		[self error: 'No room between margins to compose'].
-	runLength _ text runLengthFor: startIndex.
+	runLength _ text emphasisRunLengthFor: startIndex.
 	runStopIndex _ (lastIndex _ startIndex) + (runLength - 1).
 	line _ 
 		TextLineInterval
@@ -13320,7 +13320,7 @@ endOfRun
 			spaceX _ destX.
 			line paddingWidth: rightMargin - destX.
 			^true]
-	ifFalse:	[runLength _ (text runLengthFor: (lastIndex _ lastIndex + 1)).
+	ifFalse:	[runLength _ (text emphasisRunLengthFor: (lastIndex _ lastIndex + 1)).
 			runStopIndex _ lastIndex + (runLength - 1).
 			self setStopConditions.
 			^false]!
@@ -41520,7 +41520,13 @@ runLengthFor: characterIndex
 	emphasisLength := runs runLengthAt: characterIndex.
 	colorRuns ifNil: [^emphasisLength].
 	colorLength := colorRuns runLengthAt: characterIndex.
-	^emphasisLength min: colorLength! !
+	^emphasisLength min: colorLength!
+emphasisRunLengthFor: characterIndex
+	"Answer the count of characters remaining in emphasis run beginning with
+	characterIndex. Ignores color runs - use for composition where only
+	font/emphasis matters, not color. This is O(1) for typical text with
+	few emphasis changes, vs O(runs) for runLengthFor: with many color runs."
+	^runs runLengthAt: characterIndex! !
 
 !Text methodsFor: 'attributes'!
 addAttribute: aTextAttribute from: start to: stop
