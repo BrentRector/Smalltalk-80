@@ -7229,14 +7229,8 @@ text
 			ifTrue: [^ self selectedClass sourceCodeTemplate asText]
 			ifFalse: [
 				"Apply syntax highlighting to method source code"
-				t0 := Time millisecondClockValue.
 				sourceCode := self selectedClass sourceCodeAt: selector.
-				t1 := Time millisecondClockValue.
-				Transcript show: 'sourceCodeAt: ', (t1 - t0) printString, 'ms'; cr.
-				text := SyntaxStyler styleMethod: sourceCode inClass: self selectedClass.
-				t2 := Time millisecondClockValue.
-				Transcript show: 'Browser text total: ', (t2 - t0) printString, 'ms'; cr.
-				^ text]].
+				^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass]].
 	textMode == #category ifTrue:
 		[^ 'category to add' asText].
 	textMode == #categories ifTrue:
@@ -29450,12 +29444,8 @@ rule: ruleInteger
 	rule _ ruleInteger.!
 text: aText
 	"Set the argument, aText, to be the text for the receiver."
-	| t0 t1 |
 	text _ aText.
-	Transcript ifNotNil: [t0 := Time millisecondClockValue].
-	self composeAll.
-	Transcript ifNotNil: [t1 := Time millisecondClockValue.
-		Transcript show: 'Paragraph composeAll: ', (t1 - t0) printString, 'ms'; cr]! !
+	self composeAll! !
 
 !Paragraph methodsFor: 'displaying'!
 displayAt: aPoint
@@ -29507,7 +29497,7 @@ computeBoundingBox
 composeAll
 	"Compose a collection of characters into a collection of lines."
 
-	| startIndex stopIndex lineIndex maximumRightX compositionScanner t0 t1 loopTime doTiming |
+	| startIndex stopIndex lineIndex maximumRightX compositionScanner |
 	lines _ Array new: 32.
 	lastLine _ 0.
 	maximumRightX _ 0.
@@ -29517,24 +29507,17 @@ composeAll
 			^maximumRightX].
 	startIndex _ lineIndex _ 1.
 	stopIndex _ text size.
-	doTiming := Transcript notNil.
-	doTiming ifTrue: [t0 := Time millisecondClockValue].
 	compositionScanner _ CompositionScanner new in: self.
-	doTiming ifTrue: [t1 := Time millisecondClockValue. loopTime := 0].
 	[startIndex > stopIndex] whileFalse:
-		[| lt0 |
-		doTiming ifTrue: [lt0 := Time millisecondClockValue].
-		self lineAt: lineIndex
+		[self lineAt: lineIndex
 				put: (compositionScanner composeLine: lineIndex
 										fromCharacterIndex: startIndex
 										inParagraph: self).
-		doTiming ifTrue: [loopTime := loopTime + (Time millisecondClockValue - lt0)].
 		 maximumRightX _ compositionScanner rightX max: maximumRightX.
 		 startIndex _ (lines at: lineIndex) last + 1.
 		 lineIndex _ lineIndex + 1].
 	self updateCompositionHeight.
 	self trimLinesTo: lineIndex - 1.
-	doTiming ifTrue: [Transcript show: '  composeAll: scanner:', (t1-t0) printString, 'ms lines:', (lineIndex-1) printString, ' loop:', loopTime printString, 'ms'; cr].
 	^maximumRightX!
 recomposeIn: compositionRect clippingBox: clippingRect 
 	"Set the composition rectangle for the receiver so that the lines wrap
@@ -35235,11 +35218,10 @@ Instance Variables:
 tokenize: aString
 	"Answer a collection of SyntaxToken objects for the source string.
 	 OPTIMIZED: Single pass - comments interleaved from Scanner, no merge needed."
-	| stream t0 t1 estimatedTokens commentPositions lastCommentIdx |
+	| stream estimatedTokens commentPositions lastCommentIdx |
 	sourceString := aString.
 	aString isEmpty ifTrue: [^OrderedCollection new].
 
-	t0 := Time millisecondClockValue.
 	stream := ReadStream on: aString.
 	scanner := Scanner new initScanner; scan: stream.
 
@@ -35250,7 +35232,6 @@ tokenize: aString
 	commentPositions := scanner commentPositions.
 
 	"Scan all tokens - interleave comments as Scanner discovers them"
-	t1 := Time millisecondClockValue.
 	[scanner tokenType ~~ #doIt] whileTrue: [
 		"Insert any comments discovered since last token"
 		[lastCommentIdx < commentPositions size] whileTrue: [
@@ -35268,7 +35249,6 @@ tokenize: aString
 		tokens add: (SyntaxToken type: #comment start: (pair at: 1) end: (pair at: 2)).
 		lastCommentIdx := lastCommentIdx + 1].
 
-	Transcript ifNotNil: [Transcript show: '  tokenize: ', (Time millisecondClockValue - t1) printString, 'ms n:', tokens size printString; cr].
 	^tokens!
 
 addCurrentToken
@@ -35743,15 +35723,11 @@ styleSource: sourceString methodHeaderEnd: headerEndBlock
 	 If headerEndBlock is not nil, evaluate it with the method header end position.
 	 OPTIMIZED: Lazy color lookup - tokenColorAt: gets color from token type at display time.
 	 DisplayScanner uses tokenColorAt: instead of colorAt: for O(1) rendering."
-	| text tokens t0 t1 t2 highlighter |
+	| text tokens highlighter |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
-	t0 := Time millisecondClockValue.
 	text := Text fromString: sourceString.
-	t1 := Time millisecondClockValue.
 	highlighter := ScannerHighlighter tokenize: sourceString.
 	tokens := highlighter tokens.
-	t2 := Time millisecondClockValue.
-	Transcript ifNotNil: [Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr].
 	tokens isEmpty ifTrue: [
 		headerEndBlock ifNotNil: [headerEndBlock value: 0].
 		^text].
@@ -35761,24 +35737,18 @@ styleSource: sourceString methodHeaderEnd: headerEndBlock
 	"Store tokens on Text for O(1) lazy color lookup in DisplayScanner.
 	 No color assignment loop needed - tokenColorAt: looks up color from token type."
 	text setTokens: tokens.
-	Transcript ifNotNil: [Transcript show: 'Style total: ', (Time millisecondClockValue - t2) printString, 'ms'; cr].
 	^text!
 
 styleMethod: sourceString inClass: aClass
 	"Answer a styled Text for a method in the given class.
 	 Makes the selector bold in addition to color highlighting.
 	 Optimized: uses token positions to find header end, avoiding Parser creation."
-	| text headerEnd t0 t1 t2 |
-	t0 := Time millisecondClockValue.
+	| text headerEnd |
 	headerEnd := 0.
 	text := self styleSource: sourceString methodHeaderEnd: [:pos | headerEnd := pos].
-	t1 := Time millisecondClockValue.
-	Transcript show: 'styleSource: ', (t1 - t0) printString, 'ms'; cr.
 	"Apply bold emphasis to method header (selector + arguments)"
 	headerEnd > 0 ifTrue: [
 		text emphasizeFrom: 1 to: (headerEnd min: sourceString size) with: 2].
-	t2 := Time millisecondClockValue.
-	Transcript show: 'emphasize: ', (t2 - t1) printString, 'ms, TOTAL: ', (t2 - t0) printString, 'ms'; cr.
 	^text! !
 
 !SyntaxStyler methodsFor: 'color mapping'!
@@ -39254,14 +39224,10 @@ display
 				ifTrue: [controller recomputeSelection]].
 	super display!
 displayView
-	| t0 t1 |
-	Transcript ifNotNil: [t0 := Time millisecondClockValue].
 	self clearInside.
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller display]
-		ifFalse: [displayContents display].
-	Transcript ifNotNil: [t1 := Time millisecondClockValue.
-		Transcript show: 'displayView: ', (t1 - t0) printString, 'ms'; cr]!
+		ifFalse: [displayContents display]!
 positionDisplayContents
 	"Presumably the text being displayed changed so that the wrapping box and clipping box should be reset."
 
@@ -39272,15 +39238,11 @@ positionDisplayContents
 !StringHolderView methodsFor: 'model access'!
 editString: aString
 	"The paragraph to be displayed is created from the characters in aString."
-	| t0 t1 |
-	Transcript ifNotNil: [t0 := Time millisecondClockValue].
 	displayContents _ Paragraph
 				withText: aString asText
 				style: TextStyle default copy
 				compositionRectangle: (self insetDisplayBox insetBy: self paragraphInset)
 				clippingRectangle: self insetDisplayBox.
-	Transcript ifNotNil: [t1 := Time millisecondClockValue.
-		Transcript show: 'Paragraph compose: ', (t1 - t0) printString, 'ms'; cr].
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller changeParagraph: displayContents]!
 model: aLockedModel 
