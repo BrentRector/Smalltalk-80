@@ -39220,10 +39220,14 @@ display
 				ifTrue: [controller recomputeSelection]].
 	super display!
 displayView
+	| t0 t1 |
+	t0 := Time millisecondClockValue.
 	self clearInside.
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller display]
-		ifFalse: [displayContents display]!
+		ifFalse: [displayContents display].
+	t1 := Time millisecondClockValue.
+	Transcript show: 'displayView: ', (t1 - t0) printString, 'ms'; cr!
 positionDisplayContents
 	"Presumably the text being displayed changed so that the wrapping box and clipping box should be reset."
 
@@ -39232,14 +39236,17 @@ positionDisplayContents
 		clippingBox: self insetDisplayBox! !
 
 !StringHolderView methodsFor: 'model access'!
-editString: aString 
+editString: aString
 	"The paragraph to be displayed is created from the characters in aString."
-
+	| t0 t1 |
+	t0 := Time millisecondClockValue.
 	displayContents _ Paragraph
 				withText: aString asText
 				style: TextStyle default copy
 				compositionRectangle: (self insetDisplayBox insetBy: self paragraphInset)
 				clippingRectangle: self insetDisplayBox.
+	t1 := Time millisecondClockValue.
+	Transcript show: 'Paragraph compose: ', (t1 - t0) printString, 'ms'; cr.
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller changeParagraph: displayContents]!
 model: aLockedModel 
