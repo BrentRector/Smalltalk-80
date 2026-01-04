@@ -29447,10 +29447,10 @@ text: aText
 	"Set the argument, aText, to be the text for the receiver."
 	| t0 t1 |
 	text _ aText.
-	t0 := Time millisecondClockValue.
+	Transcript ifNotNil: [t0 := Time millisecondClockValue].
 	self composeAll.
-	t1 := Time millisecondClockValue.
-	Transcript ifNotNil: [Transcript show: 'Paragraph composeAll: ', (t1 - t0) printString, 'ms'; cr]! !
+	Transcript ifNotNil: [t1 := Time millisecondClockValue.
+		Transcript show: 'Paragraph composeAll: ', (t1 - t0) printString, 'ms'; cr]! !
 
 !Paragraph methodsFor: 'displaying'!
 displayAt: aPoint
@@ -29502,7 +29502,7 @@ computeBoundingBox
 composeAll
 	"Compose a collection of characters into a collection of lines."
 
-	| startIndex stopIndex lineIndex maximumRightX compositionScanner t0 t1 loopTime |
+	| startIndex stopIndex lineIndex maximumRightX compositionScanner t0 t1 loopTime doTiming |
 	lines _ Array new: 32.
 	lastLine _ 0.
 	maximumRightX _ 0.
@@ -29512,24 +29512,24 @@ composeAll
 			^maximumRightX].
 	startIndex _ lineIndex _ 1.
 	stopIndex _ text size.
-	t0 := Time millisecondClockValue.
+	doTiming := Transcript notNil.
+	doTiming ifTrue: [t0 := Time millisecondClockValue].
 	compositionScanner _ CompositionScanner new in: self.
-	t1 := Time millisecondClockValue.
-	loopTime := 0.
+	doTiming ifTrue: [t1 := Time millisecondClockValue. loopTime := 0].
 	[startIndex > stopIndex] whileFalse:
 		[| lt0 |
-		lt0 := Time millisecondClockValue.
+		doTiming ifTrue: [lt0 := Time millisecondClockValue].
 		self lineAt: lineIndex
 				put: (compositionScanner composeLine: lineIndex
 										fromCharacterIndex: startIndex
 										inParagraph: self).
-		loopTime := loopTime + (Time millisecondClockValue - lt0).
+		doTiming ifTrue: [loopTime := loopTime + (Time millisecondClockValue - lt0)].
 		 maximumRightX _ compositionScanner rightX max: maximumRightX.
 		 startIndex _ (lines at: lineIndex) last + 1.
 		 lineIndex _ lineIndex + 1].
 	self updateCompositionHeight.
 	self trimLinesTo: lineIndex - 1.
-	Transcript ifNotNil: [Transcript show: '  composeAll: scanner:', (t1-t0) printString, 'ms lines:', (lineIndex-1) printString, ' loop:', loopTime printString, 'ms'; cr].
+	doTiming ifTrue: [Transcript show: '  composeAll: scanner:', (t1-t0) printString, 'ms lines:', (lineIndex-1) printString, ' loop:', loopTime printString, 'ms'; cr].
 	^maximumRightX!
 recomposeIn: compositionRect clippingBox: clippingRect 
 	"Set the composition rectangle for the receiver so that the lines wrap
@@ -39232,13 +39232,13 @@ display
 	super display!
 displayView
 	| t0 t1 |
-	t0 := Time millisecondClockValue.
+	Transcript ifNotNil: [t0 := Time millisecondClockValue].
 	self clearInside.
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller display]
 		ifFalse: [displayContents display].
-	t1 := Time millisecondClockValue.
-	Transcript ifNotNil: [Transcript show: 'displayView: ', (t1 - t0) printString, 'ms'; cr]!
+	Transcript ifNotNil: [t1 := Time millisecondClockValue.
+		Transcript show: 'displayView: ', (t1 - t0) printString, 'ms'; cr]!
 positionDisplayContents
 	"Presumably the text being displayed changed so that the wrapping box and clipping box should be reset."
 
@@ -39250,14 +39250,14 @@ positionDisplayContents
 editString: aString
 	"The paragraph to be displayed is created from the characters in aString."
 	| t0 t1 |
-	t0 := Time millisecondClockValue.
+	Transcript ifNotNil: [t0 := Time millisecondClockValue].
 	displayContents _ Paragraph
 				withText: aString asText
 				style: TextStyle default copy
 				compositionRectangle: (self insetDisplayBox insetBy: self paragraphInset)
 				clippingRectangle: self insetDisplayBox.
-	t1 := Time millisecondClockValue.
-	Transcript ifNotNil: [Transcript show: 'Paragraph compose: ', (t1 - t0) printString, 'ms'; cr].
+	Transcript ifNotNil: [t1 := Time millisecondClockValue.
+		Transcript show: 'Paragraph compose: ', (t1 - t0) printString, 'ms'; cr].
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller changeParagraph: displayContents]!
 model: aLockedModel 
