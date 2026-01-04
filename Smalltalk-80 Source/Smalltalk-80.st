@@ -16946,8 +16946,10 @@ displayLines: linesInterval in: aParagraph clippedBy: visibleRectangle
 	lineY _ destY _
 					aParagraph topAtLineIndex: linesInterval first.
 	displaying _ self doesDisplaying.
-	linesInterval do: 
-		[:lineIndex | 
+	"Reset token index for O(1) color lookup - must be done before display pass"
+	aParagraph text resetTokenIndex.
+	linesInterval do:
+		[:lineIndex |
 		runX _ destX _ leftMargin _
 			aParagraph leftMarginForDisplayForLine: lineIndex.
 		line _ aParagraph lineAt: lineIndex.
@@ -17026,7 +17028,7 @@ paddedSpace
 	^false!
 setStopConditions
 	"Set the font and the stop conditions for the current run.
-	 Also handles text color from TextColor attributes."
+	 Also handles text color using O(1) token-based lookup when available."
 	| fontIndex displayFont textColor |
 	font _ textStyle fontAt: (text emphasisAt: lastIndex).
 	super setStopConditions.
@@ -17035,8 +17037,11 @@ setStopConditions
 		put: (textStyle alignment = Justified
 				ifTrue: [#paddedSpace]
 				ifFalse: [nil]).
-	"Check for text color attribute - use Color directly (not halftone Form)"
-	textColor := text colorAt: lastIndex.
+	"Get color - prefer token-based O(1) lookup, fall back to colorRuns"
+	textColor := text tokenColorAt: lastIndex.
+	textColor ifNil: [
+		"No token color - try colorRuns for backward compatibility"
+		textColor := text colorAt: lastIndex].
 	textColor ifNil: [
 		"No color - use black (default text color)"
 		color := Color black]
@@ -34881,17 +34886,20 @@ newFrom: anArray
 	values add: currentValue.
 	^self runs: runs asArray values: values asArray! !
 Object subclass: #Scanner
-	instanceVariableNames: 'source mark tokenEnd hereChar aheadChar token tokenType currentComment buffer typeTable '
+	instanceVariableNames: 'source mark tokenEnd hereChar aheadChar token tokenType currentComment commentPositions buffer typeTable '
 	classVariableNames: 'EndChar TypeTable '
 	poolDictionaries: ''
 	category: 'System-Compiler'!
-Scanner comment: 'I scan a stream picking out Smalltalk syntactic tokens.  I look one character ahead.  I put each token found into token and its type (a Symbol) into tokenType.  At the end of stream or a doit symbol, I pretend to see an endless sequence of doits.'!
+Scanner comment: 'I scan a stream picking out Smalltalk syntactic tokens.  I look one character ahead.  I put each token found into token and its type (a Symbol) into tokenType.  At the end of stream or a doit symbol, I pretend to see an endless sequence of doits.
+
+commentPositions tracks {start, end} pairs for all comments encountered during scanning, enabling syntax highlighting without a separate comment-finding pass.'!
 
 
 !Scanner methodsFor: 'initialize-release'!
 initScanner
 	buffer _ WriteStream on: (String new: 40).
-	typeTable _ TypeTable!
+	typeTable _ TypeTable.
+	commentPositions _ OrderedCollection new!
 on: inputStream 
 	"Bind the input stream, fill the character buffers"
 	source _ inputStream.
@@ -35006,16 +35014,20 @@ xDollar
 	token _ self step.
 	tokenType _ #number "really should be Char, but rest of compiler doesn't know"!
 xDoubleQuote
-	"collect comment"
+	"collect comment and record position for syntax highlighting"
 
-	| aStream |
+	| aStream commentStart commentEnd |
+	commentStart := mark.  "Position of opening quote"
 	aStream _ WriteStream on: (String new: 32).
 	self step.
 	[aStream nextPut: self step. hereChar == $"]
-		whileFalse: 
+		whileFalse:
 			[(hereChar = EndChar and: [source atEnd])
 				ifTrue: [^self offEnd: 'Unmatched comment quote']].
 	self step.
+	commentEnd := source position - 2.  "Position of closing quote"
+	"Record position for syntax highlighting"
+	commentPositions add: (Array with: commentStart with: commentEnd).
 	currentComment == nil
 		ifTrue: [currentComment _ OrderedCollection with: aStream contents]
 		ifFalse: [currentComment add: aStream contents].
@@ -35103,6 +35115,11 @@ tokenType
 currentComment
 	"Answer the collection of comment strings accumulated during scanning."
 	^currentComment!
+
+commentPositions
+	"Answer the collection of {start, end} pairs for comments found during scanning.
+	 Used by ScannerHighlighter for syntax highlighting without a separate pass."
+	^commentPositions!
 
 source
 	"Answer the source stream being scanned."
@@ -35216,68 +35233,107 @@ Instance Variables:
 
 !ScannerHighlighter methodsFor: 'tokenizing'!
 tokenize: aString
-	"Answer a collection of SyntaxToken objects for the source string."
-	| stream t0 t1 t2 t3 t4 addTime scanTime tokenCount commentTokens scannerTokens |
+	"Answer a collection of SyntaxToken objects for the source string.
+	 OPTIMIZED: Single pass - comments interleaved from Scanner, no merge needed."
+	| stream t0 t1 estimatedTokens commentPositions lastCommentIdx |
 	sourceString := aString.
 	aString isEmpty ifTrue: [^OrderedCollection new].
 
 	t0 := Time millisecondClockValue.
 	stream := ReadStream on: aString.
 	scanner := Scanner new initScanner; scan: stream.
+
+	"Estimate token count for pre-sizing (roughly 1 token per 7 chars)"
+	estimatedTokens := (aString size // 7) max: 16.
+	tokens := OrderedCollection new: estimatedTokens.
+	lastCommentIdx := 0.
+	commentPositions := scanner commentPositions.
+
+	"Scan all tokens - interleave comments as Scanner discovers them"
 	t1 := Time millisecondClockValue.
-
-	"Find all comments (Scanner skips them) - store separately"
-	tokens := OrderedCollection new.
-	self findComments.
-	commentTokens := tokens.
-
-	"Scan all tokens into separate collection"
-	tokens := OrderedCollection new.
-	t2 := Time millisecondClockValue.
-	addTime := 0. scanTime := 0. tokenCount := 0.
 	[scanner tokenType ~~ #doIt] whileTrue: [
-		| ta tb |
-		ta := Time millisecondClockValue.
-		self addCurrentTokenAt: stream position.
-		tb := Time millisecondClockValue.
-		addTime := addTime + (tb - ta).
-		scanner scanToken.
-		scanTime := scanTime + (Time millisecondClockValue - tb).
-		tokenCount := tokenCount + 1].
-	scannerTokens := tokens.
-	t3 := Time millisecondClockValue.
+		"Insert any comments discovered since last token"
+		[lastCommentIdx < commentPositions size] whileTrue: [
+			| pair |
+			pair := commentPositions at: lastCommentIdx + 1.
+			tokens add: (SyntaxToken type: #comment start: (pair at: 1) end: (pair at: 2)).
+			lastCommentIdx := lastCommentIdx + 1].
+		self addCurrentToken.
+		scanner scanToken].
 
-	Transcript show: '  tokenLoop: ', (t3 - t2) printString, 'ms (add:', addTime printString, ' scan:', scanTime printString, ' n:', tokenCount printString, ')'; cr.
+	"Add any trailing comments after last token"
+	[lastCommentIdx < commentPositions size] whileTrue: [
+		| pair |
+		pair := commentPositions at: lastCommentIdx + 1.
+		tokens add: (SyntaxToken type: #comment start: (pair at: 1) end: (pair at: 2)).
+		lastCommentIdx := lastCommentIdx + 1].
 
-	"Merge two sorted lists in O(n) instead of sorting O(n log n)"
-	tokens := self merge: commentTokens with: scannerTokens.
-	t4 := Time millisecondClockValue.
-	Transcript show: '  merge: ', (t4 - t3) printString, 'ms'; cr.
+	Transcript ifNotNil: [Transcript show: '  tokenize: ', (Time millisecondClockValue - t1) printString, 'ms n:', tokens size printString; cr].
 	^tokens!
 
-addCurrentTokenAt: streamPosition
+addCurrentToken
 	"Add the current scanner token to our collection.
-	 Scanner now tracks token start (mark) and end (tokenEnd) directly."
-	| type start end scannerType tokenValue |
+	 OPTIMIZED: Reduced method calls, early exits, cached scanner access."
+	| type start end scannerType tokenValue tokenClass |
 	scannerType := scanner tokenType.
-	type := self highlightTypeFor: scannerType.
 
-	"Skip certain token types early"
-	scannerType == #xCharacter ifTrue: [type := #character].
+	"Fast path for common types - avoid highlightTypeFor: call"
+	scannerType == #word ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #identifier start: start end: end).
+		^self].
+	scannerType == #keyword ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #keyword start: start end: end).
+		^self].
+	scannerType == #binary ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #default start: start end: end).
+		^self].
+
+	"Handle special cases"
+	scannerType == #xCharacter ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #character start: start end: end).
+		^self].
+
+	"Literals need more checking"
 	scannerType == #literal ifTrue: [
 		tokenValue := scanner token.
-		(tokenValue class == Array) ifTrue: [^self].
-		(tokenValue class == Symbol and: [tokenValue size = 1]) ifTrue: [
-			('()[]' includes: tokenValue first) ifTrue: [^self]]].
+		tokenClass := tokenValue class.
+		"Skip arrays and single-char bracket symbols"
+		tokenClass == Array ifTrue: [^self].
+		(tokenClass == Symbol and: [tokenValue size = 1 and: [('()[]' includes: tokenValue first)]]) ifTrue: [^self].
+		"Determine literal type"
+		type := tokenClass == Symbol ifTrue: [#symbol]
+			ifFalse: [tokenClass == Character ifTrue: [#character]
+			ifFalse: [tokenValue isNumber ifTrue: [#number]
+			ifFalse: [#default]]].
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: type start: start end: end).
+		^self].
 
-	"Character literals ($x) - check only if type is number"
-	(type == #number and: [scanner token class == Character])
-		ifTrue: [type := #character].
+	"String"
+	scannerType == #string ifTrue: [
+		start := scanner mark.
+		end := scanner tokenEnd.
+		tokens add: (SyntaxToken type: #string start: start end: end).
+		^self].
 
-	"Use Scanner's position tracking"
+	"Fallback for other types"
+	type := self highlightTypeFor: scannerType.
 	start := scanner mark max: 1.
 	end := scanner tokenEnd max: start.
 	tokens add: (SyntaxToken type: type start: start end: end)!
+
+addCurrentTokenAt: streamPosition
+	"DEPRECATED - use addCurrentToken instead"
+	^self addCurrentToken!
 
 findTokenEndFor: tokenValue type: scannerType from: start
 	"Find the actual end of token in source string.
@@ -35586,7 +35642,7 @@ Object subclass: #SyntaxToken
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'System-Compiler'!
-SyntaxToken comment: 'I represent a syntax token with its position in source code. I am produced by ScannerHighlighter for syntax highlighting.
+SyntaxToken comment: 'I represent a syntax token with its position in source code. I am produced by ScannerHighlighter for syntax highlighting. Color is looked up lazily from token type via SyntaxStyler colorForType:.
 
 Instance Variables:
     type    Symbol - the highlight category (#keyword, #string, #comment, etc.)
@@ -35685,70 +35741,27 @@ styleSource: sourceString
 styleSource: sourceString methodHeaderEnd: headerEndBlock
 	"Answer a Text with syntax highlighting applied.
 	 If headerEndBlock is not nil, evaluate it with the method header end position.
-	 Optimized: builds runs directly from sorted tokens - O(m) where m is token count."
-	| text tokens size sortedTokens runs values pos t0 t1 t2 t3 loopTime t4 t5 highlighter |
+	 OPTIMIZED: Lazy color lookup - tokenColorAt: gets color from token type at display time.
+	 DisplayScanner uses tokenColorAt: instead of colorAt: for O(1) rendering."
+	| text tokens t0 t1 t2 highlighter |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
 	t0 := Time millisecondClockValue.
-	size := sourceString size.
 	text := Text fromString: sourceString.
 	t1 := Time millisecondClockValue.
 	highlighter := ScannerHighlighter tokenize: sourceString.
 	tokens := highlighter tokens.
 	t2 := Time millisecondClockValue.
-	Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr.
+	Transcript ifNotNil: [Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr].
 	tokens isEmpty ifTrue: [
 		headerEndBlock ifNotNil: [headerEndBlock value: 0].
 		^text].
 	"Pass header end position to caller if requested"
 	headerEndBlock ifNotNil: [headerEndBlock value: highlighter findMethodHeaderEnd].
 
-	"Tokens already sorted by tokenize: - no need to sort again"
-	sortedTokens := tokens.
-	t3 := Time millisecondClockValue.
-
-	"Build runs directly - pre-size collections to avoid growing"
-	runs := OrderedCollection new: tokens size * 2.
-	values := OrderedCollection new: tokens size * 2.
-	pos := 1.
-
-	loopTime := Time millisecondClockValue.
-	sortedTokens do: [:token |
-		| textColor start end colorValue |
-		textColor := self colorForType: token type.
-		start := token start.
-		start < 1 ifTrue: [start := 1].
-		end := token end.
-		end > size ifTrue: [end := size].
-		end < start ifTrue: [end := start].
-
-		"Add gap before token (nil = default color)"
-		start > pos ifTrue: [
-			runs add: start - pos.
-			values add: nil].
-
-		"Add token's color run"
-		textColor ifNotNil: [
-			colorValue := textColor color.
-			runs add: end - start + 1.
-			values add: colorValue.
-			pos := end + 1]
-		ifNil: [
-			"No color for this token type - skip, will be covered by nil run"
-			pos < start ifTrue: [pos := start]]].
-	t4 := Time millisecondClockValue.
-	Transcript show: '  loop: ', (t4 - loopTime) printString, 'ms'; cr.
-
-	"Add final nil run if needed"
-	pos <= size ifTrue: [
-		runs add: size - pos + 1.
-		values add: nil].
-
-	"Set colorRuns directly"
-	runs isEmpty ifFalse: [
-		text setColorRuns: (RunArray runs: runs asArray values: values asArray)].
-	t5 := Time millisecondClockValue.
-	Transcript show: '  setColorRuns: ', (t5 - t4) printString, 'ms'; cr.
-	Transcript show: 'Build runs total: ', (t5 - t3) printString, 'ms'; cr.
+	"Store tokens on Text for O(1) lazy color lookup in DisplayScanner.
+	 No color assignment loop needed - tokenColorAt: looks up color from token type."
+	text setTokens: tokens.
+	Transcript ifNotNil: [Transcript show: 'Style total: ', (Time millisecondClockValue - t2) printString, 'ms'; cr].
 	^text!
 
 styleMethod: sourceString inClass: aClass
@@ -35811,6 +35824,16 @@ styleSource: sourceString
 styleMethod: sourceString inClass: aClass
 	"Convenience method to style a method with class context."
 	^self new styleMethod: sourceString inClass: aClass! !
+
+!SyntaxStyler class methodsFor: 'color lookup'!
+colorForType: tokenType
+	"Answer the Color for the given token type, or nil for default (black).
+	 Uses cached direct lookup for O(1) performance.
+	 Called by Text>>tokenColorAt: for lazy color lookup at display time."
+	| textColor |
+	CachedTypeColorMap ifNil: [^nil].
+	textColor := CachedTypeColorMap at: tokenType ifAbsent: [^nil].
+	^textColor color! !
 
 !SyntaxStyler class methodsFor: 'class initialization'!
 initialize
@@ -41408,15 +41431,19 @@ writeCloneWithout: aSet
 SystemTracer initialize!
 
 ArrayedCollection subclass: #Text
-	instanceVariableNames: 'string runs colorRuns '
+	instanceVariableNames: 'string runs colorRuns tokens currentTokenIndex cachedTokenType cachedTokenColor'
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '
 	category: 'Collections-Text'!
 Text comment: 'Instance Variables:
 	string:		A String of Characters
 	runs:		A RunArray of integer emphasis codes (for font selection)
-	colorRuns:	A RunArray of Color objects (nil = default black)
-					
+	colorRuns:	A RunArray of Color objects (nil = default black) - DEPRECATED, use tokens
+	tokens:		OrderedCollection of SyntaxToken - O(1) sequential color lookup
+	currentTokenIndex: Integer - cached index for sequential access optimization
+	cachedTokenType: Symbol - last looked up token type (avoids repeated dictionary lookups)
+	cachedTokenColor: Color - color for cachedTokenType
+
 The emphasis codes indicate abstract changes in character appearance.  Actual display is performed in the presence of a TextStyle which indicates, for each abstract code, an actual font to be used'!
 
 
@@ -41515,9 +41542,14 @@ runLengthFor: characterIndex
 	"Answer the count of characters remaining in run beginning with
 	characterIndex. Consider both emphasis runs and color runs,
 	returning the shorter to ensure setStopConditions is called
-	when either changes."
+	when either changes.
+	OPTIMIZED: Uses O(1) token-based lookup when tokens are available."
 	| emphasisLength colorLength |
 	emphasisLength := runs runLengthAt: characterIndex.
+	"Prefer token-based O(1) lookup over colorRuns O(n) lookup"
+	tokens ifNotNil: [
+		colorLength := self tokenRunLengthFor: characterIndex.
+		^emphasisLength min: colorLength].
 	colorRuns ifNil: [^emphasisLength].
 	colorLength := colorRuns runLengthAt: characterIndex.
 	^emphasisLength min: colorLength!
@@ -41543,7 +41575,84 @@ colorAt: characterIndex
 	"Answer the Color at characterIndex, or nil if no color (default black)."
 	self size = 0 ifTrue: [^nil].
 	colorRuns ifNil: [^nil].
-	^colorRuns at: characterIndex! !
+	^colorRuns at: characterIndex!
+
+tokens
+	"Answer the tokens array, or nil if not set."
+	^tokens!
+
+setTokens: anOrderedCollection
+	"Set the tokens for O(1) color lookup. Also resets the cache."
+	tokens := anOrderedCollection.
+	currentTokenIndex := 1.
+	cachedTokenType := nil.
+	cachedTokenColor := nil!
+
+resetTokenIndex
+	"Reset the cached token index and type cache for a new sequential scan."
+	currentTokenIndex := 1.
+	cachedTokenType := nil.
+	cachedTokenColor := nil!
+
+tokenColorAt: characterIndex
+	"Answer the Color at characterIndex using token-based O(1) lookup.
+	 Assumes sequential access pattern (DisplayScanner scans left-to-right).
+	 Returns nil for default (black) color.
+	 OPTIMIZED: Lazy color lookup with type caching - avoids dictionary lookup
+	 when consecutive tokens have the same type."
+	| token tokenType |
+	tokens ifNil: [^nil].
+	tokens isEmpty ifTrue: [^nil].
+	currentTokenIndex ifNil: [currentTokenIndex := 1].
+
+	"Advance through tokens until we find one containing characterIndex"
+	[currentTokenIndex <= tokens size] whileTrue: [
+		token := tokens at: currentTokenIndex.
+		"If we're past this token, advance to next"
+		characterIndex > token end ifTrue: [
+			currentTokenIndex := currentTokenIndex + 1]
+		ifFalse: [
+			"Check if characterIndex is within this token"
+			(characterIndex >= token start and: [characterIndex <= token end])
+				ifTrue: [
+					"Use cached color if same token type (avoids dictionary lookup)"
+					tokenType := token type.
+					tokenType == cachedTokenType ifTrue: [^cachedTokenColor].
+					"Different type - lookup and cache"
+					cachedTokenType := tokenType.
+					cachedTokenColor := SyntaxStyler colorForType: tokenType.
+					^cachedTokenColor]
+				ifFalse: [
+					"characterIndex is before this token - in a gap, return nil"
+					^nil]]].
+	"Past all tokens"
+	^nil!
+
+tokenRunLengthFor: characterIndex
+	"Answer the count of characters remaining until the next color change.
+	 Uses O(1) token lookup instead of O(n) RunArray lookup.
+	 Works with tokenColorAt: to ensure runs break at color boundaries."
+	| token nextToken currentColor nextColor |
+	tokens ifNil: [^self size - characterIndex + 1].
+	tokens isEmpty ifTrue: [^self size - characterIndex + 1].
+	currentTokenIndex ifNil: [currentTokenIndex := 1].
+
+	"Advance to find token containing characterIndex"
+	[currentTokenIndex <= tokens size] whileTrue: [
+		token := tokens at: currentTokenIndex.
+		characterIndex > token end ifTrue: [
+			currentTokenIndex := currentTokenIndex + 1]
+		ifFalse: [
+			"Found the relevant token or gap"
+			(characterIndex >= token start and: [characterIndex <= token end])
+				ifTrue: [
+					"Inside this token - return distance to token end"
+					^token end - characterIndex + 1]
+				ifFalse: [
+					"In a gap before this token - return distance to token start"
+					^token start - characterIndex]]].
+	"Past all tokens - return to end of text"
+	^self size - characterIndex + 1! !
 
 !Text methodsFor: 'printing'!
 printOn: aStream 
