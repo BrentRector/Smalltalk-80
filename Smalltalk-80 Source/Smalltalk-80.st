@@ -35810,6 +35810,7 @@ useColorSet: aSymbol
 		| textColor |
 		textColor := DefaultColorMap at: scope ifAbsent: [nil].
 		textColor ifNotNil: [CachedTypeColorMap at: tokenType put: textColor]].
+	Transcript show: 'useColorSet: ', aSymbol printString, ' cache size: ', CachedTypeColorMap size printString; cr.
 	^true! !
 
 SyntaxStyler initialize!
