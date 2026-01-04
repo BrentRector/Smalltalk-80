@@ -7230,7 +7230,9 @@ text
 			ifFalse: [
 				"Apply syntax highlighting to method source code"
 				sourceCode := self selectedClass sourceCodeAt: selector.
-				^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass]].
+				"TODO: Syntax highlighting disabled for performance testing"
+				"^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass"
+				^ sourceCode asText]].
 	textMode == #category ifTrue:
 		[^ 'category to add' asText].
 	textMode == #categories ifTrue:
