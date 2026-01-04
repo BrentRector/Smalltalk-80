@@ -38,13 +38,17 @@ public class RuntimeObjectCreator(
             using var fontBridge = FontBridgeFactory.Create() as IDisposable;
             var bridge = fontBridge as IFontBridge ?? FontBridgeFactory.CreateNull();
 
-            // Create canonical font sizes (10, 12, 14)
-            // Lucida Console has better bitmap hinting for 1-bit rendering
+            // Create font sizes 11-20 for flexibility
+            // Consolas is designed for anti-aliased rendering without embedded bitmaps
+            // Starting at 11px for a compact default, scaling up for emphasis
             var fontDescriptors = new[]
             {
-                new FontDescriptor("Lucida Console", 10),
-                new FontDescriptor("Lucida Console", 12),
-                new FontDescriptor("Lucida Console", 14)
+                new FontDescriptor("Consolas", 11),
+                new FontDescriptor("Consolas", 12),
+                new FontDescriptor("Consolas", 14),
+                new FontDescriptor("Consolas", 16),
+                new FontDescriptor("Consolas", 18),
+                new FontDescriptor("Consolas", 20)
             };
 
             var strikeFontOOPs = new List<SmalltalkOOP>();

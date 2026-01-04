@@ -217,6 +217,7 @@ public class WinFormsDisplay : Form, IDisplay
             clipX, clipY, clipWidth, clipHeight,
             halftonePixels,
             halftoneWidth, halftoneHeight,
+            null,  // no color for direct BitBlt calls
             (CombinationRule)combinationRule);
     }
 
@@ -696,6 +697,16 @@ public class WinFormsDisplay : Form, IDisplay
     // Keyboard Input Handlers
     // ============================================================================
 
+    // Override to treat arrow keys as input keys (not navigation keys)
+    protected override bool IsInputKey(Keys keyData)
+    {
+        return keyData switch
+        {
+            Keys.Left or Keys.Right or Keys.Up or Keys.Down => true,
+            _ => base.IsInputKey(keyData)
+        };
+    }
+
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         int smalltalkCode = MapToSmalltalkCode(e.KeyCode);
@@ -739,6 +750,11 @@ public class WinFormsDisplay : Form, IDisplay
             Keys.RControlKey => 138,
             Keys.ControlKey => 138,
             Keys.Capital => 139,
+            // Arrow keys for cursor movement
+            Keys.Left => 188,
+            Keys.Right => 189,
+            Keys.Up => 190,
+            Keys.Down => 191,
             _ => 0
         };
     }

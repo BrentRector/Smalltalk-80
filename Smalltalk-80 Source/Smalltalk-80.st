@@ -251,7 +251,7 @@ Path class
 
 Path subclass: #WindowsPath
 	instanceVariableNames: 'driveLetter uncServer uncShare'
-	classVariableNames: 'Separator'
+	classVariableNames: 'Separator SpecialFolders'
 	poolDictionaries: ''
 	category: 'Files-Windows'!
 
@@ -293,8 +293,23 @@ This design gives callers control over when normalization occurs.'!
 !WindowsPath class methodsFor: 'class initialization'!
 
 initialize
-    "Initialize the path separator."
+    "Initialize the path separator. SpecialFolders uses lazy init."
     Separator _ $\.
+    SpecialFolders _ nil.
+    ^self!
+
+initializeSpecialFolders
+    "Populate SpecialFolders dictionary from primitive.
+     Called once on first access. Keys are symbols, values are path strings."
+    | keys |
+    SpecialFolders _ Dictionary new.
+    keys _ #(appData localAppData userProfile personal desktop
+              programFiles programFilesX86 commonAppData system
+              windows startup fonts).
+    keys do: [:key |
+        | path |
+        path _ self primitiveGetSpecialFolder: key.
+        path ifNotNil: [SpecialFolders at: key put: path]].
     ^self! !
 
 !WindowsPath class methodsFor: 'instance creation'!
@@ -311,6 +326,102 @@ isSeparator: aCharacter
     "Answer whether aCharacter is a path separator.
      Windows accepts both backslash and forward slash."
     ^aCharacter = $\ or: [aCharacter = $/]! !
+
+!WindowsPath class methodsFor: 'special folders - accessing'!
+
+specialFolder: aSymbol
+    "Answer the path string for aSymbol, or nil if unknown.
+     Lazily initializes SpecialFolders on first call.
+
+     Example: WindowsPath specialFolder: #appData
+              => 'C:\Users\johndoe\AppData\Roaming'"
+    SpecialFolders ifNil: [self initializeSpecialFolders].
+    ^SpecialFolders at: aSymbol ifAbsent: [nil]!
+
+specialFolderNames
+    "Answer a collection of all known special folder symbols."
+    ^#(appData localAppData userProfile personal desktop
+       programFiles programFilesX86 commonAppData system
+       windows startup fonts)!
+
+hasSpecialFolder: aSymbol
+    "Answer whether the special folder aSymbol is available on this system."
+    ^(self specialFolder: aSymbol) notNil! !
+
+!WindowsPath class methodsFor: 'special folders - convenience'!
+
+appDataPath
+    "Answer a WindowsPath for the user's roaming AppData folder.
+     This folder roams with the user profile in domain environments."
+    | path |
+    path _ self specialFolder: #appData.
+    path ifNil: [self error: 'AppData folder not available'].
+    ^self fromString: path!
+
+localAppDataPath
+    "Answer a WindowsPath for the user's local AppData folder.
+     This folder does NOT roam - use for machine-specific data."
+    | path |
+    path _ self specialFolder: #localAppData.
+    path ifNil: [self error: 'LocalAppData folder not available'].
+    ^self fromString: path!
+
+userProfilePath
+    "Answer a WindowsPath for the user's profile folder."
+    | path |
+    path _ self specialFolder: #userProfile.
+    path ifNil: [self error: 'UserProfile folder not available'].
+    ^self fromString: path!
+
+documentsPath
+    "Answer a WindowsPath for the user's Documents folder."
+    | path |
+    path _ self specialFolder: #personal.
+    path ifNil: [self error: 'Documents folder not available'].
+    ^self fromString: path!
+
+desktopPath
+    "Answer a WindowsPath for the user's Desktop folder."
+    | path |
+    path _ self specialFolder: #desktop.
+    path ifNil: [self error: 'Desktop folder not available'].
+    ^self fromString: path!
+
+commonAppDataPath
+    "Answer a WindowsPath for the shared application data folder.
+     Use for data shared between all users on this machine."
+    | path |
+    path _ self specialFolder: #commonAppData.
+    path ifNil: [self error: 'CommonAppData folder not available'].
+    ^self fromString: path! !
+
+!WindowsPath class methodsFor: 'special folders - application'!
+
+applicationPath: appName
+    "Answer a WindowsPath for an application's data folder under AppData.
+     Creates the path object but does NOT create the directory.
+
+     Example: WindowsPath applicationPath: 'Smalltalk-80'
+              => WindowsPath for 'C:\Users\johndoe\AppData\Roaming\Smalltalk-80'"
+    ^self appDataPath / appName!
+
+localApplicationPath: appName
+    "Answer a WindowsPath for an application's local data folder.
+     Use for machine-specific data that should not roam."
+    ^self localAppDataPath / appName!
+
+sharedApplicationPath: appName
+    "Answer a WindowsPath for an application's shared data folder.
+     Use for data shared between all users."
+    ^self commonAppDataPath / appName! !
+
+!WindowsPath class methodsFor: 'special folders - primitive'!
+
+primitiveGetSpecialFolder: aSymbol
+    "Primitive 160: Get path for a Windows special folder.
+     Answer the path string for aSymbol, or nil if unknown."
+    <primitive: 160>
+    ^nil  "Fallback if primitive fails"! !
 
 !WindowsPath methodsFor: 'initialization'!
 
@@ -5527,15 +5638,17 @@ buildSwitchesFor: aBinaryChoice	width: anInteger
 
 BinaryChoiceView initialize!
 Object subclass: #BitBlt
-	instanceVariableNames: 'destForm sourceForm halftoneForm combinationRule destX destY width height sourceX sourceY clipX clipY clipWidth clipHeight '
+	instanceVariableNames: 'destForm sourceForm halftoneForm combinationRule destX destY width height sourceX sourceY clipX clipY clipWidth clipHeight color '
 	classVariableNames: ''
 	poolDictionaries: ''
 	category: 'Graphics-Support'!
 BitBlt comment: 'The BitBlt operation copies bits from one rectangle within a Form (source) to another (dest).  The result is stored according to a combination rule which specifies one of the sixteen possibilities for how white and black should be combined.
 
-If halftoneForm is not nil, it is a halftone screen which masks (is ANDed with) the source during the operation.  Halftones are 16x16 bit Forms which are repeated indefinitely as needed by the BitBlt operation. with the two forms and a halftoneForm.
+If halftoneForm is not nil, it is a halftone screen which masks (is ANDed with) the source during the operation.  Halftones are 16x16 bit Forms which are repeated indefinitely as needed by the BitBlt operation.
 
 If sourceForm is nil, the halftone is taken by itself to be the source, as for filling with a constant pattern.
+
+If color is not nil, it specifies a Color object for solid color drawing operations (32bpp). This is the preferred way to specify colors rather than using halftoneForm.
 
 The clipping parameters specify a rectangle in the destination outside of which BitBlt will not make any changes'!
 
@@ -5629,10 +5742,19 @@ sourceY: anInteger
 	"Set the sourceY instance variable in BitBlt."
 
 	sourceY _ anInteger!
-width: anInteger 
+width: anInteger
 	"Set the width instance variable in BitBlt."
 
-	width _ anInteger! !
+	width _ anInteger!
+color
+	"Answer the color for solid color drawing operations (32bpp).
+	 This is the preferred way to specify colors rather than halftoneForm."
+	^color!
+color: aColor
+	"Set the color for solid color drawing operations (32bpp).
+	 aColor should be a Color or TranslucentColor object.
+	 This is the preferred way to specify colors rather than halftoneForm."
+	color _ aColor! !
 
 !BitBlt methodsFor: 'copying'!
 copyBits
@@ -5715,7 +5837,8 @@ copyBitsAgain
 	(self clipRect intersects: (destX@destY extent: width@height))
 		ifTrue: [self primitiveFailed]!
 paintBits
-	"Perform the paint operation, which may require two calls to BitBlt."
+	"Perform the paint operation, which may require two calls to BitBlt.
+	 32bpp: Use Form and instead of Form under so black pixels dominate."
 	| oldMask |
 
 	(halftoneForm == nil or: [halftoneForm == Form black]) ifFalse: 		"optimization"
@@ -5725,7 +5848,7 @@ paintBits
 		self copyBits. 			"first erase hole in dest"
 		halftoneForm _ oldMask].
 	halftoneForm == Form white ifFalse: 		"optimization"
-		[combinationRule _ Form under.
+		[combinationRule _ Form and.
 		self copyBits].
 	combinationRule _ Form paint. 	"restore rule"
 
@@ -5778,39 +5901,41 @@ exampleOne
 
 	"BitBlt exampleOne."!
 exampleTwo
-	"This is to test painting with a gray tone. It also tests that the seaming with gray 
-	patterns is correct in the microcode.  Lets you paint for awhile and then 
-	automatically stops."
+	"This is to test painting with a gray tone. It also tests that the seaming with gray
+	patterns is correct in the microcode.  Lets you paint for awhile and then
+	automatically stops.
+	32bpp: Use Form and instead of Form under so black pixels dominate."
 
 	| f pt aBitBlt |
 	"create a small black Form source as a brush."
 	f _ Form new extent: 20 @ 20.
 	f black.
-	"create a BitBlt which will OR gray into the display"
+	"create a BitBlt which will AND gray into the display (black dominates)"
 	aBitBlt _ BitBlt
 		destForm: Display
 		sourceForm: f
 		halftoneForm: Form gray
-		combinationRule: Form under
+		combinationRule: Form and
 		destOrigin: Sensor cursorPoint
 		sourceOrigin: 0 @ 0
 		extent: f extent
 		clipRect: Display computeBoundingBox.
 
 	"paint the gray Form on the screen for a while"
-	1 to: 5000 do: 
-		[:i | 
+	1 to: 5000 do:
+		[:i |
 		aBitBlt destOrigin: Sensor cursorPoint.
 		aBitBlt copyBits]
 
 	"BitBlt exampleTwo."! !
 
 !BitBlt class methodsFor: 'private'!
-exampleAt: originPoint rule: rule mask:  mask 
+exampleAt: originPoint rule: rule mask:  mask
 	"This builds a source and destination form and copies the source to the destination
-	using the specifed rule and mask.  It is called from the method named exampleOne."
+	using the specifed rule and mask.  It is called from the method named exampleOne.
+	32bpp: Use Form and instead of Form under so black border pixels dominate."
 
-	| s d border aBitBlt | 
+	| s d border aBitBlt |
 	border_Form new extent: 32@32.
 	border black.
 	border fill: (1@1 extent: 30@30) mask: Form white.
@@ -5822,9 +5947,9 @@ exampleAt: originPoint rule: rule mask:  mask
 	d fill: (0@0 corner: 32@16) mask: Form black.
 
 	s displayOn: Display at: originPoint.
-	border displayOn: Display at: originPoint rule: Form under.
+	border displayOn: Display at: originPoint rule: Form and.
 	d displayOn: Display at: originPoint + (s width @0).
-	border displayOn: Display at: originPoint + (s width @0) rule: Form under.
+	border displayOn: Display at: originPoint + (s width @0) rule: Form and.
 
 	d displayOn: Display at: originPoint + (s extent // (2 @ 1)).
 	aBitBlt _ BitBlt
@@ -5837,10 +5962,10 @@ exampleAt: originPoint rule: rule mask:  mask
 		extent: s extent
 		clipRect: Display computeBoundingBox.
 	aBitBlt copyBits.
-	border 
+	border
 		displayOn: Display at: originPoint + (s extent // (2 @ 1))
-		rule: Form under.
-   
+		rule: Form and.
+
 	"BitBlt exampleAt: 100@100 rule: 3 mask: Form gray."! !
 
 !BitBlt class methodsFor: 'instance creation'!
@@ -7094,7 +7219,7 @@ then accept or CR'
 		initialAnswer: initialString.
 	^ aString!
 text
-	| text |
+	| text sourceCode t0 t1 t2 |
 	textMode == #classDefinition ifTrue:
 		[className == nil
 			ifTrue: [^ (Class template: category) asText]
@@ -7102,8 +7227,16 @@ text
 	textMode == #methodDefinition ifTrue:
 		[selector == nil
 			ifTrue: [^ self selectedClass sourceCodeTemplate asText]
-			ifFalse: [^ (self selectedClass sourceCodeAt: selector) asText
-						makeSelectorBoldIn: self selectedClass]].
+			ifFalse: [
+				"Apply syntax highlighting to method source code"
+				t0 := Time millisecondClockValue.
+				sourceCode := self selectedClass sourceCodeAt: selector.
+				t1 := Time millisecondClockValue.
+				Transcript show: 'sourceCodeAt: ', (t1 - t0) printString, 'ms'; cr.
+				text := SyntaxStyler styleMethod: sourceCode inClass: self selectedClass.
+				t2 := Time millisecondClockValue.
+				Transcript show: 'Browser text total: ', (t2 - t0) printString, 'ms'; cr.
+				^ text]].
 	textMode == #category ifTrue:
 		[^ 'category to add' asText].
 	textMode == #categories ifTrue:
@@ -9033,6 +9166,9 @@ digitValue
 	^-1! !
 
 !Character methodsFor: 'testing'!
+isCharacter
+	"Answer whether the receiver is a Character."
+	^true!
 isAlphaNumeric
 	"Answer whether the receiver is a letter or a digit."
 	^self isLetter or: [self isDigit]!
@@ -9390,7 +9526,7 @@ endOfRun
 		[runStopIndex < characterIndex and: [runStopIndex < text size]])
 			or:	[characterIndex == nil and: [lastIndex < line last]])
 		ifTrue:	["We're really at the end of a real run."
-				runLength _ (text runLengthFor: (lastIndex _ lastIndex + 1)).
+				runLength _ (text emphasisRunLengthFor: (lastIndex _ lastIndex + 1)).
 				characterIndex ~~ nil
 					ifTrue:	[lineStop _ characterIndex	"scanning for index"]
 					ifFalse:	[lineStop _ line last			"scanning for point"].
@@ -9536,7 +9672,7 @@ buildCharacterBlockIn: aParagraph
 	lastIndex _ line first.
 
 	self setStopConditions.		"also sets font"
-	runLength _ (text runLengthFor: line first).
+	runLength _ (text emphasisRunLengthFor: line first).
 	characterIndex ~~ nil
 		ifTrue:	[lineStop _ characterIndex	"scanning for index"]
 		ifFalse:	[lineStop _ line last].
@@ -12184,6 +12320,22 @@ isEmpty
 	"Answer whether the receiver contains any elements."
 
 	^self size = 0!
+notEmpty
+	"Answer whether the receiver contains any elements."
+
+	^self size > 0!
+ifEmpty: aBlock
+	"Evaluate aBlock if I am empty, otherwise return self."
+	^self isEmpty ifTrue: [aBlock value] ifFalse: [self]!
+ifNotEmpty: aBlock
+	"Evaluate aBlock with myself if I am not empty, otherwise return self."
+	^self isEmpty ifTrue: [self] ifFalse: [aBlock value: self]!
+ifEmpty: emptyBlock ifNotEmpty: notEmptyBlock
+	"Evaluate emptyBlock if I am empty, otherwise evaluate notEmptyBlock with myself."
+	^self isEmpty ifTrue: [emptyBlock value] ifFalse: [notEmptyBlock value: self]!
+ifNotEmpty: notEmptyBlock ifEmpty: emptyBlock
+	"Evaluate notEmptyBlock with myself if I am not empty, otherwise evaluate emptyBlock."
+	^self isEmpty ifTrue: [emptyBlock value] ifFalse: [notEmptyBlock value: self]!
 occurrencesOf: anObject 
 	"Answer how many of the receiver's elements are equal to anObject."
 
@@ -13089,7 +13241,7 @@ composeLine: lineIndex fromCharacterIndex: startIndex inParagraph: aParagraph
 	rightMargin _ aParagraph rightMarginForComposition.
 	leftMargin >= rightMargin ifTrue:
 		[self error: 'No room between margins to compose'].
-	runLength _ text runLengthFor: startIndex.
+	runLength _ text emphasisRunLengthFor: startIndex.
 	runStopIndex _ (lastIndex _ startIndex) + (runLength - 1).
 	line _ 
 		TextLineInterval
@@ -13168,7 +13320,7 @@ endOfRun
 			spaceX _ destX.
 			line paddingWidth: rightMargin - destX.
 			^true]
-	ifFalse:	[runLength _ (text runLengthFor: (lastIndex _ lastIndex + 1)).
+	ifFalse:	[runLength _ (text emphasisRunLengthFor: (lastIndex _ lastIndex + 1)).
 			runStopIndex _ lastIndex + (runLength - 1).
 			self setStopConditions.
 			^false]!
@@ -16278,11 +16430,15 @@ removeKey: key ifAbsent: aBlock
 	^element! !
 
 !Dictionary methodsFor: 'dictionary enumerating'!
-associationsDo: aBlock 
+associationsDo: aBlock
 	"Evaluate aBlock for each of the receiver's key/value associations."
 
 	super do: aBlock!
-keysDo: aBlock 
+keysAndValuesDo: aBlock
+	"Evaluate aBlock with each of the receiver's keys and values as arguments."
+
+	self associationsDo: [:assoc | aBlock value: assoc key value: assoc value]!
+keysDo: aBlock
 	"Evaluate aBlock for each of the receiver's keys."
 
 	self associationsDo: [:association | aBlock value: association key]! !
@@ -16760,7 +16916,7 @@ moveTo: newLoc restoring: background
 			background fromDisplay: rect2.
 			self displayOn: Display at: newLoc].
 	^ background offset: newLoc! !CharacterScanner subclass: #DisplayScanner
-	instanceVariableNames: 'lineY runX '
+	instanceVariableNames: 'lineY runX defaultMask'
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '
 	category: 'Graphics-Support'!
@@ -16772,6 +16928,8 @@ Instance Variables
 	lineY	<Integer>  Top of line currently being displayed or scanned.  The textStyle lineGrid is added or subtracted to discover the top of the next line.  May differ from destY when fonts of differing height fall on the same line.
 
 	runX	<Integer>  Left of first character in the current run -- allows for creating underlining or similar emphasis.
+
+	defaultMask	<Form>  The default halftone mask (from Paragraph) used when no color is specified.
 '!
 
 
@@ -16867,15 +17025,24 @@ paddedSpace
 	lastIndex _ lastIndex + 1.
 	^false!
 setStopConditions
-	"Set the font and the stop conditions for the current run."
-	| fontIndex displayFont |
+	"Set the font and the stop conditions for the current run.
+	 Also handles text color from TextColor attributes."
+	| fontIndex displayFont textColor |
 	font _ textStyle fontAt: (text emphasisAt: lastIndex).
 	super setStopConditions.
-	stopConditions 
-		at: Space asInteger + 1 
+	stopConditions
+		at: Space asInteger + 1
 		put: (textStyle alignment = Justified
 				ifTrue: [#paddedSpace]
-				ifFalse: [nil])!
+				ifFalse: [nil]).
+	"Check for text color attribute - use Color directly (not halftone Form)"
+	textColor := text colorAt: lastIndex.
+	textColor ifNil: [
+		"No color - use black (default text color)"
+		color := Color black]
+	ifNotNil: [
+		"Color specified - use it directly"
+		color := textColor]!
 tab
 	"This awfulness attempts to handle leading and internal tabs in a justified line.  Leading tabs are considered legal and should be reflected on the display gracefully.  Internal tabs (when the line is justified) are considered at the very best a misguided use of the character, and are reflected on the display the best we can."
 
@@ -16961,7 +17128,8 @@ fontAscentDelta
 					ifFalse:	[^ textStyle baseline - currentFont ascent]].!
 initializeFromParagraph: aParagraph clippedBy: clippingRectangle
 
-	super initializeFromParagraph: aParagraph clippedBy: clippingRectangle! !Form subclass: #DisplayScreen
+	super initializeFromParagraph: aParagraph clippedBy: clippingRectangle.
+	defaultMask := halftoneForm! !Form subclass: #DisplayScreen
 	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
@@ -19958,7 +20126,10 @@ fill: aRectangle rule: anInteger mask: aForm
 
 !Form methodsFor: 'image manipulation'!
 convexShapeFill: aMask
-	"Fill the interior of the outtermost outlined region in the receiver.  The outlined region must not be concave by more than 90 degrees."
+	"Fill the interior of the outtermost outlined region in the receiver.
+	 The outlined region must not be concave by more than 90 degrees.
+	 32bpp: Use Form and instead of Form under so black pixels dominate
+	 during the smearing operations."
 
 	| destForm tempForm skew |
 	destForm _ Form extent: self extent.
@@ -19967,7 +20138,7 @@ convexShapeFill: aMask
 	skew _ 1.
 	[skew < width] whileTrue:
 		[tempForm displayOn: tempForm at: skew@0
-			clippingBox: tempForm boundingBox rule: Form under mask: nil.
+			clippingBox: tempForm boundingBox rule: Form and mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm.
 
@@ -19975,7 +20146,7 @@ convexShapeFill: aMask
 	skew _ 1.
 	[skew < width] whileTrue:
 		[tempForm displayOn: tempForm at: skew negated@0
-			clippingBox: tempForm boundingBox rule: Form under mask: nil.
+			clippingBox: tempForm boundingBox rule: Form and mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm at: 0@0
 		clippingBox: destForm boundingBox rule: Form over mask: nil.
@@ -19984,7 +20155,7 @@ convexShapeFill: aMask
 	skew _ 1.
 	[skew < height] whileTrue:
 		[tempForm displayOn: tempForm at: 0@skew
-			clippingBox: tempForm boundingBox rule: Form under mask: nil.
+			clippingBox: tempForm boundingBox rule: Form and mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm at: 0@0
 		clippingBox: destForm boundingBox rule: Form over mask: nil.
@@ -19993,7 +20164,7 @@ convexShapeFill: aMask
 	skew _ 1.
 	[skew < height] whileTrue:
 		[tempForm displayOn: tempForm at: 0@skew negated
-			clippingBox: tempForm boundingBox rule: Form under mask: nil.
+			clippingBox: tempForm boundingBox rule: Form and mask: nil.
 		skew _ skew+skew].
 	tempForm displayOn: destForm at: 0@0
 		clippingBox: destForm boundingBox rule: Form over mask: nil.
@@ -20194,7 +20365,8 @@ shapeFill: aMask interiorPoint: interiorPoint
 	InteriorPoint marks a location in the interior or the region.  A mark is
 	placed at this point as a seed, then the seed is smeared into a blob
 	until there is no change in the blob when it fills the region.
-	Uses the upper left corner of the display screen for computing the blob"
+	Uses the upper left corner of the display screen for computing the blob.
+	32bpp: Use Form and instead of Form under so black pixels dominate."
 
 	| dirs smearForm previousSmear all cycle noChange |
 	all _ self boundingBox.
@@ -20208,15 +20380,15 @@ shapeFill: aMask interiorPoint: interiorPoint
 		noChange _ previousSmear isAllWhite.
 		previousSmear copy: all from: 0@0 in: smearForm rule: Form over.
 		noChange]]
-		whileFalse: 
+		whileFalse:
 			[dirs do:
 				[:dir |    "smear in each of the four directions"
-				smearForm copy: all from: dir in: smearForm rule: Form under.
+				smearForm copy: all from: dir in: smearForm rule: Form and.
 				"After each smear, trim around the region border"
 				smearForm copy: all from: 0@0 in: self rule: Form erase]].
 	"Now paint the filled region in me with aMask"
 	smearForm displayOn: self at: 0@0 clippingBox: self boundingBox
-		rule: Form under mask: aMask!
+		rule: Form and mask: aMask!
 shrinkBy: scale 
 	"Answer a scaled-down copy of the receiver.  Each bit in the new form is a
 	sample taken from the upper-left bit of a rectangle of extent = scale in the
@@ -20626,6 +20798,16 @@ whitePixel
 	 Provides default if Form not yet initialized."
 	^WhitePixel ifNil: [16rFFFFFF]! !
 
+!Form class methodsFor: 'color masks'!
+colorMask: aColor
+	"Answer a 1x1 Form filled with the given Color.
+	 Used as halftoneForm for colored text rendering.
+	 Example: Form colorMask: Color blue"
+	| form |
+	form := Form extent: 1@1.
+	form bits at: 1 put: aColor asPixelValue.
+	^form! !
+
 !Form class methodsFor: 'examples'!
 exampleEdits
 	"In Form category editing are messages edit and bitEdit that make it possible to 
@@ -21014,10 +21196,11 @@ toggleyGridding
 			ygridOn _ true].
 	tool _ previousTool!
 underMode
-	"Sets the mode for the tools that copy the form onto the display to under.  
-	Leaves the tool set in its previous state."
+	"Sets the mode for the tools that copy the form onto the display to 'under'.
+	 Leaves the tool set in its previous state.
+	 32bpp: Use Form and instead of Form under so black pixels dominate."
 
-	mode _ Form under.
+	mode _ Form and.
 	tool _ previousTool! !
 
 !FormEditor methodsFor: 'menu messages'!
@@ -22189,6 +22372,7 @@ initialize
 	  (0 96 '`abcdefghijklmnopqrstuvwxyz{|}~')
 	  (0 127 (173))
 	  (0 140 (158 29 25 174 187 190))
+	  (0 188 (188 189 190 191))  "Arrow keys: left right up down"
 	  "Shift"
 	  (256 8 (8 9 30 255 255 13 255 255
 		255 255 255 255 255 255 255 255 255 255 255 160))
@@ -22205,6 +22389,7 @@ initialize
 	  (256 $a 'ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 	  (256 127 (173))
 	  (256 140 (22 29 25 238 253 254))
+	  (256 188 (188 189 190 191))  "Arrow keys with Shift"
 	  "Control"
 	  (512 8 (8 9 30 255 255 141 255 255
 		255 255 255 255 255 255 255 255 255 255 255 160))
@@ -22217,6 +22402,7 @@ initialize
 		138 17 18 19 11 21 134 145 151 178 167))
 	  (512 127 (173))
 	  (512 140 (222 229 225 174 187 190))
+	  (512 188 (188 189 190 191))  "Arrow keys with Control"
 	  "Shift+control"
 	  (768 8 (8 9 30 255 255 13 255 255
 		255 255 255 255 255 255 255 255 255 255 255 160))
@@ -22229,6 +22415,7 @@ initialize
 		202 210 239 211 240 197 198 209 215 242 231))
 	  (768 127 (173))
 	  (768 140 (22 24 25 238 253 254))
+	  (768 188 (188 189 190 191))  "Arrow keys with Shift+Control"
 	  "Upper case lock"
 	  (1024 8 (8 9 30 255 255 13 255 255
 		255 255 255 255 255 255 255 255 255 255 255 160))
@@ -22237,6 +22424,7 @@ initialize
 	  (1024 96 '`ABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~')
 	  (1024 127 (173))
 	  (1024 140 (158 29 25 174 187 190))
+	  (1024 188 (188 189 190 191))  "Arrow keys with Caps Lock"
 	 ) do:
 	  [:part |
 		base _ (part at: 1) + (part at: 2) asInteger.
@@ -24938,19 +25126,22 @@ displayView
 
 !ListView methodsFor: 'deEmphasizing'!
 deEmphasizeView
+	"32bpp: Use Form and instead of Form under.
+	 In 32bpp, AND with black (0) = black, AND with white = dest.
+	 This adds sparse black pixels from lightGray mask, creating dim effect."
 	| aRectangle newForm |
 	self deselect.
-	selection ~= 0 
+	selection ~= 0
 		ifTrue: [aRectangle _ (self selectionBox intersect: self clippingBox).
 				aRectangle _ aRectangle insetOriginBy: 0@-1 cornerBy: 0@0.
 				newForm _ Form fromDisplay: aRectangle.
 				newForm
 					displayOn: Display
 					at: (aRectangle topLeft + (1@0))
-					clippingBox: aRectangle 
-					rule: Form under 
+					clippingBox: aRectangle
+					rule: Form and
 					mask: Form black.
-				Display fill: aRectangle rule: Form under mask: Form lightGray]! !
+				Display fill: aRectangle rule: Form and mask: Form lightGray]! !
 
 !ListView methodsFor: 'controller access'!
 defaultControllerClass
@@ -27582,6 +27773,9 @@ yourself
 	"Answer self."! !
 
 !Object methodsFor: 'testing'!
+isCharacter
+	"Answer whether the receiver is a Character. Character overrides with ^true"
+	^false!
 isInteger
 	"Coerces Integers to true and everything else to false.  Integer
 	overrides with ^true"
@@ -28493,13 +28687,15 @@ copyBits: copyRect from: sourceForm at: destPoint clippingBox: clipRect rule: ru
 		rule: rule
 		mask: mask!
 displayOn: aDisplayMedium at: aDisplayPoint clippingBox: clipRectangle rule: ruleInteger mask: aForm
-	"This is the real display message, but it doesn't get used until the new display protocol is installed."
+	"This is the real display message, but it doesn't get used until the new display protocol is installed.
+	 32bpp: Use Form and instead of Form under so black figure pixels dominate."
 	shape displayOn: aDisplayMedium at: aDisplayPoint clippingBox: clipRectangle rule: Form erase mask: nil.
-	figure displayOn: aDisplayMedium at: aDisplayPoint clippingBox: clipRectangle rule: Form under mask: aForm!
-displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: ruleInteger mask: aForm 
-	"See comment in Form."
+	figure displayOn: aDisplayMedium at: aDisplayPoint clippingBox: clipRectangle rule: Form and mask: aForm!
+displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: ruleInteger mask: aForm
+	"See comment in Form.
+	 32bpp: Use Form and instead of Form under so black figure pixels dominate."
 	shape displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: Form erase mask: nil.
-	figure displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: Form under mask: aForm! !
+	figure displayOn: Display transformation: displayTransformation clippingBox: clipRectangle align: alignmentPoint with: relativePoint rule: Form and mask: aForm! !
 
 !OpaqueForm methodsFor: 'copying'!
 deepCopy
@@ -29247,10 +29443,14 @@ rule
 rule: ruleInteger 
 	"Set the rule according to which character display behaves."
 	rule _ ruleInteger.!
-text: aText 
+text: aText
 	"Set the argument, aText, to be the text for the receiver."
+	| t0 t1 |
 	text _ aText.
-	self composeAll! !
+	Transcript ifNotNil: [t0 := Time millisecondClockValue].
+	self composeAll.
+	Transcript ifNotNil: [t1 := Time millisecondClockValue.
+		Transcript show: 'Paragraph composeAll: ', (t1 - t0) printString, 'ms'; cr]! !
 
 !Paragraph methodsFor: 'displaying'!
 displayAt: aPoint
@@ -29302,7 +29502,7 @@ computeBoundingBox
 composeAll
 	"Compose a collection of characters into a collection of lines."
 
-	| startIndex stopIndex lineIndex maximumRightX compositionScanner |
+	| startIndex stopIndex lineIndex maximumRightX compositionScanner t0 t1 loopTime doTiming |
 	lines _ Array new: 32.
 	lastLine _ 0.
 	maximumRightX _ 0.
@@ -29312,17 +29512,24 @@ composeAll
 			^maximumRightX].
 	startIndex _ lineIndex _ 1.
 	stopIndex _ text size.
+	doTiming := Transcript notNil.
+	doTiming ifTrue: [t0 := Time millisecondClockValue].
 	compositionScanner _ CompositionScanner new in: self.
-	[startIndex > stopIndex] whileFalse: 
-		[self lineAt: lineIndex 
-				put: (compositionScanner composeLine: lineIndex 
-										fromCharacterIndex: startIndex 
+	doTiming ifTrue: [t1 := Time millisecondClockValue. loopTime := 0].
+	[startIndex > stopIndex] whileFalse:
+		[| lt0 |
+		doTiming ifTrue: [lt0 := Time millisecondClockValue].
+		self lineAt: lineIndex
+				put: (compositionScanner composeLine: lineIndex
+										fromCharacterIndex: startIndex
 										inParagraph: self).
+		doTiming ifTrue: [loopTime := loopTime + (Time millisecondClockValue - lt0)].
 		 maximumRightX _ compositionScanner rightX max: maximumRightX.
 		 startIndex _ (lines at: lineIndex) last + 1.
 		 lineIndex _ lineIndex + 1].
 	self updateCompositionHeight.
 	self trimLinesTo: lineIndex - 1.
+	doTiming ifTrue: [Transcript show: '  composeAll: scanner:', (t1-t0) printString, 'ms lines:', (lineIndex-1) printString, ' loop:', loopTime printString, 'ms'; cr].
 	^maximumRightX!
 recomposeIn: compositionRect clippingBox: clippingRect 
 	"Set the composition rectangle for the receiver so that the lines wrap
@@ -30576,6 +30783,46 @@ selectionAsStream
 		from: startBlock stringIndex
 		to: stopBlock stringIndex - 1! !
 
+!ParagraphEditor methodsFor: 'cursor movement'!
+cursorLeft: characterStream
+	"Move the cursor one character to the left."
+	| newIndex |
+	sensor keyboard.	"flush the key"
+	self closeTypeIn.
+	newIndex _ (startBlock stringIndex - 1) max: 1.
+	self selectAt: newIndex.
+	^true!
+cursorRight: characterStream
+	"Move the cursor one character to the right."
+	| newIndex |
+	sensor keyboard.	"flush the key"
+	self closeTypeIn.
+	newIndex _ (startBlock stringIndex + 1) min: paragraph text size + 1.
+	self selectAt: newIndex.
+	^true!
+cursorUp: characterStream
+	"Move the cursor up one line, trying to stay at the same horizontal position."
+	| targetPoint newBlock |
+	sensor keyboard.	"flush the key"
+	self closeTypeIn.
+	targetPoint _ startBlock topLeft - (0 @ paragraph textStyle lineGrid).
+	targetPoint y < paragraph compositionRectangle top
+		ifTrue: [^true].	"Already at top line"
+	newBlock _ paragraph characterBlockAtPoint: targetPoint.
+	self selectAt: newBlock stringIndex.
+	^true!
+cursorDown: characterStream
+	"Move the cursor down one line, trying to stay at the same horizontal position."
+	| targetPoint newBlock |
+	sensor keyboard.	"flush the key"
+	self closeTypeIn.
+	targetPoint _ startBlock topLeft + (0 @ paragraph textStyle lineGrid).
+	targetPoint y >= paragraph compositionRectangle bottom
+		ifTrue: [^true].	"Already at bottom line"
+	newBlock _ paragraph characterBlockAtPoint: targetPoint.
+	self selectAt: newBlock stringIndex.
+	^true! !
+
 !ParagraphEditor methodsFor: 'indicating'!
 flash
 	"Causes the view of he paragraph to complement twice in succession."
@@ -30699,10 +30946,16 @@ fit'
 			CTL-, CTLSHIFT-"
 		:i |	Keyboard at: i + 1 put: #changeEmphasis:].
 
-	#(213 7 218 249 219 15) do: 
+	#(213 7 218 249 219 15) do:
 		[:i | "ctl open brackets"
 		Keyboard at: i + 1 put: #enclose:].
 	Keyboard at: BS2 asciiValue + 1 put: #leaveBrackets:.
+
+	"Arrow keys for cursor movement (codes 188-191 from WinFormsDisplay)"
+	Keyboard at: 188 + 1 put: #cursorLeft:.
+	Keyboard at: 189 + 1 put: #cursorRight:.
+	Keyboard at: 190 + 1 put: #cursorUp:.
+	Keyboard at: 191 + 1 put: #cursorDown:.
 
 	"ParagraphEditor initialize."! !
 
@@ -31819,9 +32072,10 @@ hilbert: n side: s
 	self go: s; turn: a.
 	self hilbert: 0 - m side: s.
 	self turn: a
-	" 
-	(Pen new) hilbert: 3 side: 8. 
-	(Pen new sourceForm: Cursor wait) combinationRule: Form under; 
+	"
+	(Pen new) hilbert: 3 side: 8.
+	32bpp: Use Form and instead of Form under so black pixels dominate.
+	(Pen new sourceForm: Cursor wait) combinationRule: Form and;
 	hilbert: 3 side: 25.
 	"!
 hilberts: n 
@@ -31903,13 +32157,14 @@ new
 
 !Pen class methodsFor: 'examples'!
 example
-	"Draws a spiral in gray with a pen that is 4 pixels wide."
+	"Draws a spiral in gray with a pen that is 4 pixels wide.
+	 32bpp: Use Form and instead of Form under so black pixels dominate."
 
-	| bic |  
-	bic _ Pen new. 
+	| bic |
+	bic _ Pen new.
 	bic mask: Form gray.
 	bic defaultNib: 4.
-	bic combinationRule: Form under.
+	bic combinationRule: Form and.
 	1 to: 50 do: [:i | bic go: i*4. bic turn: 89]
 	"Pen example"! !
 Object subclass: #Color
@@ -31964,9 +32219,11 @@ asPixelValue
 	"Answer the 24-bit RGB pixel value.
 	 Alpha is implicit (treated as opaque during rendering).
 	 This keeps values within SmallInteger range."
-	^((self red * 255) rounded bitShift: 16) +
-	 ((self green * 255) rounded bitShift: 8) +
-	 (self blue * 255) rounded!
+	| r g b |
+	r := (self red * 255 + 0.5) truncated.
+	g := (self green * 255 + 0.5) truncated.
+	b := (self blue * 255 + 0.5) truncated.
+	^(r bitShift: 16) + (g bitShift: 8) + b!
 
 asFormColor
 	"Answer 1 (black) or 0 (white) based on luminance threshold.
@@ -31998,11 +32255,13 @@ printOn: aStream
 
 !Color methodsFor: 'private'!
 setRed: r green: g blue: b
-	"Set the RGB components from 0.0-1.0 float values"
+	"Set the RGB components from 0.0-1.0 float values.
+	 Values are clamped to [0.0, 1.0] and scaled to 10-bit integers (0-1023).
+	 Packed into 30-bit rgb value: RRRRRRRRRR GGGGGGGGGG BBBBBBBBBB"
 	| ri gi bi |
-	ri := ((r max: 0.0) min: 1.0) * 1023 rounded.
-	gi := ((g max: 0.0) min: 1.0) * 1023 rounded.
-	bi := ((b max: 0.0) min: 1.0) * 1023 rounded.
+	ri := (((r max: 0.0) min: 1.0) * 1023) truncated.
+	gi := (((g max: 0.0) min: 1.0) * 1023) truncated.
+	bi := (((b max: 0.0) min: 1.0) * 1023) truncated.
 	rgb := (ri bitShift: 20) + (gi bitShift: 10) + bi!
 
 privateSetRgb: anInteger
@@ -32167,6 +32426,243 @@ fromInteger: argbaInteger
 		b: (argbaInteger bitAnd: 255) / 255.0
 		alpha: ((argbaInteger bitShift: -24) bitAnd: 255) / 255.0! !
 Color initialize!
+Object subclass: #TextAttribute
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Text'!
+TextAttribute comment: 'I am an abstract class representing text attributes such as color, emphasis, or font changes. My subclasses implement specific attribute types. I provide polymorphism with integer emphasis codes used by the original Text implementation.
+
+Subclasses:
+    TextColor - text foreground color
+    TextEmphasis - bold, italic, underline, strikethrough'!
+
+
+!TextAttribute methodsFor: 'accessing'!
+emphasisCode
+	"Answer an integer emphasis code for backward compatibility.
+	 Subclasses that cannot be represented as integer codes answer 1 (normal)."
+	^1!
+
+color
+	"Answer the color for this attribute, or nil if not a color attribute"
+	^nil! !
+
+!TextAttribute methodsFor: 'testing'!
+isColor
+	"Answer whether this attribute represents a color"
+	^false!
+
+isEmphasis
+	"Answer whether this attribute represents emphasis (bold, italic, etc.)"
+	^false! !
+
+!TextAttribute methodsFor: 'merging'!
+dominates: another
+	"Answer whether the receiver should take precedence over another attribute.
+	 Used when combining runs of attributes."
+	^self class = another class!
+
+merge: another
+	"Merge another attribute with the receiver.
+	 Default behavior is receiver takes precedence."
+	^self! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+TextAttribute class
+	instanceVariableNames: ''!
+
+
+TextAttribute subclass: #TextColor
+	instanceVariableNames: 'color'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Text'!
+TextColor comment: 'I represent a text foreground color attribute. I wrap a Color object and provide integration with the Text emphasis system.
+
+Instance Variables:
+    color   Color - the foreground color for text'!
+
+
+!TextColor methodsFor: 'accessing'!
+color
+	"Answer the color for this attribute"
+	^color!
+
+emphasisCode
+	"Color attributes don't map to integer codes, return normal"
+	^1! !
+
+!TextColor methodsFor: 'testing'!
+isColor
+	"Answer whether this attribute represents a color"
+	^true! !
+
+!TextColor methodsFor: 'comparing'!
+= aTextColor
+	"Answer whether the receiver equals aTextColor"
+	self species = aTextColor species ifFalse: [^false].
+	^color = aTextColor color!
+
+hash
+	"Answer a hash value for the receiver"
+	^color hash! !
+
+!TextColor methodsFor: 'private'!
+color: aColor
+	"Set the color - private, use class-side creation"
+	color := aColor! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+TextColor class
+	instanceVariableNames: ''!
+
+
+!TextColor class methodsFor: 'instance creation'!
+color: aColor
+	"Answer a new TextColor for the given color"
+	^self new color: aColor!
+
+black
+	"Answer a TextColor for black text"
+	^self color: Color black!
+
+blue
+	"Answer a TextColor for blue text"
+	^self color: Color blue!
+
+red
+	"Answer a TextColor for red text"
+	^self color: Color red!
+
+green
+	"Answer a TextColor for green text"
+	^self color: (Color r: 0.0 g: 0.5 b: 0.0)!
+
+gray
+	"Answer a TextColor for gray text"
+	^self color: Color gray!
+
+cyan
+	"Answer a TextColor for cyan text"
+	^self color: Color cyan!
+
+magenta
+	"Answer a TextColor for magenta text"
+	^self color: Color magenta!
+
+orange
+	"Answer a TextColor for orange text"
+	^self color: (Color r: 1.0 g: 0.5 b: 0.0)!
+
+purple
+	"Answer a TextColor for purple text"
+	^self color: (Color r: 0.5 g: 0.0 b: 0.5)!
+
+brown
+	"Answer a TextColor for brown text"
+	^self color: (Color r: 0.6 g: 0.3 b: 0.0)! !
+
+
+TextAttribute subclass: #TextEmphasis
+	instanceVariableNames: 'emphasisCode'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'Collections-Text'!
+TextEmphasis comment: 'I represent a text emphasis attribute such as bold, italic, underline, or strikethrough. I store an integer emphasis code compatible with the original Text system.
+
+Emphasis codes (bitfield):
+    1 - bold
+    2 - italic
+    4 - underlined
+    8 - strikethrough
+
+Instance Variables:
+    emphasisCode    SmallInteger - the emphasis bitfield'!
+
+
+!TextEmphasis methodsFor: 'accessing'!
+emphasisCode
+	"Answer the integer emphasis code"
+	^emphasisCode! !
+
+!TextEmphasis methodsFor: 'testing'!
+isEmphasis
+	"Answer whether this attribute represents emphasis"
+	^true!
+
+isBold
+	"Answer whether this emphasis includes bold"
+	^(emphasisCode bitAnd: 1) ~= 0!
+
+isItalic
+	"Answer whether this emphasis includes italic"
+	^(emphasisCode bitAnd: 2) ~= 0!
+
+isUnderlined
+	"Answer whether this emphasis includes underline"
+	^(emphasisCode bitAnd: 4) ~= 0!
+
+isStruckOut
+	"Answer whether this emphasis includes strikethrough"
+	^(emphasisCode bitAnd: 8) ~= 0! !
+
+!TextEmphasis methodsFor: 'comparing'!
+= aTextEmphasis
+	"Answer whether the receiver equals aTextEmphasis"
+	self species = aTextEmphasis species ifFalse: [^false].
+	^emphasisCode = aTextEmphasis emphasisCode!
+
+hash
+	"Answer a hash value for the receiver"
+	^emphasisCode hash! !
+
+!TextEmphasis methodsFor: 'merging'!
+merge: aTextEmphasis
+	"Merge another emphasis with the receiver by combining bitfields"
+	aTextEmphasis isEmphasis
+		ifTrue: [^TextEmphasis code: (emphasisCode bitOr: aTextEmphasis emphasisCode)]
+		ifFalse: [^self]! !
+
+!TextEmphasis methodsFor: 'private'!
+code: anInteger
+	"Set the emphasis code - private, use class-side creation"
+	emphasisCode := anInteger! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+TextEmphasis class
+	instanceVariableNames: ''!
+
+
+!TextEmphasis class methodsFor: 'instance creation'!
+code: anInteger
+	"Answer a new TextEmphasis for the given code"
+	^self new code: anInteger!
+
+normal
+	"Answer a normal (no emphasis) attribute"
+	^self code: 0!
+
+bold
+	"Answer a bold emphasis attribute"
+	^self code: 1!
+
+italic
+	"Answer an italic emphasis attribute"
+	^self code: 2!
+
+boldItalic
+	"Answer a bold italic emphasis attribute"
+	^self code: 3!
+
+underlined
+	"Answer an underlined emphasis attribute"
+	^self code: 4!
+
+struckOut
+	"Answer a strikethrough emphasis attribute"
+	^self code: 8! !
+
 Object subclass: #Point
 	instanceVariableNames: 'x y '
 	classVariableNames: ''
@@ -34361,8 +34857,31 @@ runs: newRuns values: newValues
 	| instance |
 	instance _ self basicNew.
 	instance setRuns: newRuns setValues: newValues.
-	^instance! !Object subclass: #Scanner
-	instanceVariableNames: 'source mark hereChar aheadChar token tokenType currentComment buffer typeTable '
+	^instance!
+newFrom: anArray
+	"Answer a new RunArray created by compressing consecutive equal values in anArray.
+	 Example: #(a a a b b c) -> RunArray with runs #(3 2 1) values #(a b c)"
+	| runs values currentValue currentRun |
+	anArray isEmpty ifTrue: [^self new].
+	runs := OrderedCollection new.
+	values := OrderedCollection new.
+	currentValue := anArray first.
+	currentRun := 1.
+	2 to: anArray size do: [:i |
+		| value |
+		value := anArray at: i.
+		value = currentValue
+			ifTrue: [currentRun := currentRun + 1]
+			ifFalse: [
+				runs add: currentRun.
+				values add: currentValue.
+				currentValue := value.
+				currentRun := 1]].
+	runs add: currentRun.
+	values add: currentValue.
+	^self runs: runs asArray values: values asArray! !
+Object subclass: #Scanner
+	instanceVariableNames: 'source mark tokenEnd hereChar aheadChar token tokenType currentComment buffer typeTable '
 	classVariableNames: 'EndChar TypeTable '
 	poolDictionaries: ''
 	category: 'System-Compiler'!
@@ -34449,6 +34968,8 @@ scanToken
 	(tokenType at: 1) = $x "x as first letter"
 		ifTrue: [self perform: tokenType "means perform to compute token & type"]
 		ifFalse: [token _ self step asSymbol "else just unique the first char"].
+	"Capture token end position (stream position minus 2-char lookahead, minus 1 for last char)"
+	tokenEnd _ source position - 3 max: mark.
 	^token!
 step
 	| c |
@@ -34563,6 +35084,30 @@ xSingleQuote
 	token _ buffer contents.
 	tokenType _ #string! !
 
+!Scanner methodsFor: 'accessing'!
+mark
+	"Answer the position where the current token began."
+	^mark!
+tokenEnd
+	"Answer the position where the current token ended."
+	^tokenEnd!
+
+token
+	"Answer the current token value."
+	^token!
+
+tokenType
+	"Answer the Symbol indicating the current token type."
+	^tokenType!
+
+currentComment
+	"Answer the collection of comment strings accumulated during scanning."
+	^currentComment!
+
+source
+	"Answer the source stream being scanned."
+	^source! !
+
 !Scanner methodsFor: 'error handling'!
 notify: string 
 	self error: string!
@@ -34646,6 +35191,756 @@ isLiteralSymbol: aSymbol
 	^false! !
 
 Scanner initialize!
+Object subclass: #ScannerHighlighter
+	instanceVariableNames: 'scanner tokens sourceString'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'System-Compiler'!
+ScannerHighlighter comment: 'I wrap the Scanner class to provide syntax highlighting tokens with position information. I tokenize Smalltalk source code and categorize each token for syntax highlighting purposes.
+
+I produce a collection of SyntaxToken objects, each containing:
+- type: a Symbol indicating the highlight category (#keyword, #string, #comment, etc.)
+- start: the 1-based start position in source
+- end: the 1-based end position in source
+
+Usage:
+    | tokens |
+    tokens := ScannerHighlighter new tokenize: ''self foo: 42''.
+    tokens do: [:token | Transcript show: token type; cr]
+
+Instance Variables:
+    scanner     Scanner - the underlying Smalltalk scanner
+    tokens      OrderedCollection - collected syntax tokens
+    sourceString String - the source being scanned'!
+
+
+!ScannerHighlighter methodsFor: 'tokenizing'!
+tokenize: aString
+	"Answer a collection of SyntaxToken objects for the source string."
+	| stream t0 t1 t2 t3 t4 addTime scanTime tokenCount commentTokens scannerTokens |
+	sourceString := aString.
+	aString isEmpty ifTrue: [^OrderedCollection new].
+
+	t0 := Time millisecondClockValue.
+	stream := ReadStream on: aString.
+	scanner := Scanner new initScanner; scan: stream.
+	t1 := Time millisecondClockValue.
+
+	"Find all comments (Scanner skips them) - store separately"
+	tokens := OrderedCollection new.
+	self findComments.
+	commentTokens := tokens.
+
+	"Scan all tokens into separate collection"
+	tokens := OrderedCollection new.
+	t2 := Time millisecondClockValue.
+	addTime := 0. scanTime := 0. tokenCount := 0.
+	[scanner tokenType ~~ #doIt] whileTrue: [
+		| ta tb |
+		ta := Time millisecondClockValue.
+		self addCurrentTokenAt: stream position.
+		tb := Time millisecondClockValue.
+		addTime := addTime + (tb - ta).
+		scanner scanToken.
+		scanTime := scanTime + (Time millisecondClockValue - tb).
+		tokenCount := tokenCount + 1].
+	scannerTokens := tokens.
+	t3 := Time millisecondClockValue.
+
+	Transcript show: '  tokenLoop: ', (t3 - t2) printString, 'ms (add:', addTime printString, ' scan:', scanTime printString, ' n:', tokenCount printString, ')'; cr.
+
+	"Merge two sorted lists in O(n) instead of sorting O(n log n)"
+	tokens := self merge: commentTokens with: scannerTokens.
+	t4 := Time millisecondClockValue.
+	Transcript show: '  merge: ', (t4 - t3) printString, 'ms'; cr.
+	^tokens!
+
+addCurrentTokenAt: streamPosition
+	"Add the current scanner token to our collection.
+	 Scanner now tracks token start (mark) and end (tokenEnd) directly."
+	| type start end scannerType tokenValue |
+	scannerType := scanner tokenType.
+	type := self highlightTypeFor: scannerType.
+
+	"Skip certain token types early"
+	scannerType == #xCharacter ifTrue: [type := #character].
+	scannerType == #literal ifTrue: [
+		tokenValue := scanner token.
+		(tokenValue class == Array) ifTrue: [^self].
+		(tokenValue class == Symbol and: [tokenValue size = 1]) ifTrue: [
+			('()[]' includes: tokenValue first) ifTrue: [^self]]].
+
+	"Character literals ($x) - check only if type is number"
+	(type == #number and: [scanner token class == Character])
+		ifTrue: [type := #character].
+
+	"Use Scanner's position tracking"
+	start := scanner mark max: 1.
+	end := scanner tokenEnd max: start.
+	tokens add: (SyntaxToken type: type start: start end: end)!
+
+findTokenEndFor: tokenValue type: scannerType from: start
+	"Find the actual end of token in source string.
+	 This handles escaped quotes, radix numbers, etc. correctly."
+	| pos char |
+	pos := start.
+	pos > sourceString size ifTrue: [^start].
+
+	"For strings, scan until closing quote (handling escapes)"
+	scannerType == #string ifTrue: [
+		(sourceString at: pos) = $' ifFalse: [^start].
+		pos := pos + 1.
+		[pos <= sourceString size] whileTrue: [
+			char := sourceString at: pos.
+			char = $'
+				ifTrue: [
+					"Check for escaped quote"
+					(pos < sourceString size and: [(sourceString at: pos + 1) = $'])
+						ifTrue: [pos := pos + 2]
+						ifFalse: [^pos]]
+				ifFalse: [pos := pos + 1]].
+		^pos].
+
+	"For symbols #foo or #'foo', and literal arrays #() #[]"
+	scannerType == #literal ifTrue: [
+		(sourceString at: pos) = $# ifFalse: [^start].
+		pos := pos + 1.
+		pos > sourceString size ifTrue: [^pos - 1].
+		char := sourceString at: pos.
+
+		"Literal array #(...)"
+		char = $( ifTrue: [
+			| depth |
+			depth := 1.
+			pos := pos + 1.
+			[pos <= sourceString size and: [depth > 0]] whileTrue: [
+				char := sourceString at: pos.
+				char = $( ifTrue: [depth := depth + 1].
+				char = $) ifTrue: [depth := depth - 1].
+				pos := pos + 1].
+			^pos - 1].
+
+		"Byte array #[...]"
+		char = $[ ifTrue: [
+			pos := pos + 1.
+			[pos <= sourceString size and: [(sourceString at: pos) ~= $]]]
+				whileTrue: [pos := pos + 1].
+			^pos].
+
+		"Quoted symbol #'...'"
+		char = $' ifTrue: [
+			^self findTokenEndFor: nil type: #string from: pos].
+
+		"Unquoted symbol #foo - scan identifier chars and colons"
+		(tokenValue isKindOf: Symbol) ifTrue: [
+			[pos <= sourceString size and: [
+				char := sourceString at: pos.
+				char isAlphaNumeric or: [char = $_ or: [char = $:]]]]
+				whileTrue: [pos := pos + 1].
+			^pos - 1].
+
+		"Unknown literal - just return start"
+		^start].
+
+	"For keywords, scan word chars plus trailing colon"
+	scannerType == #keyword ifTrue: [
+		[pos <= sourceString size and: [
+			char := sourceString at: pos.
+			char isAlphaNumeric or: [char = $_ or: [char = $:]]]]
+			whileTrue: [pos := pos + 1].
+		^pos - 1].
+
+	"For words (identifiers), scan alphanumeric"
+	scannerType == #word ifTrue: [
+		[pos <= sourceString size and: [
+			char := sourceString at: pos.
+			char isAlphaNumeric or: [char = $_]]]
+			whileTrue: [pos := pos + 1].
+		^pos - 1].
+
+	"For numbers, scan digits, radix prefix, decimal point, exponent"
+	scannerType == #number ifTrue: [
+		(tokenValue isKindOf: Character) ifTrue: [
+			"Character literal $x"
+			^start + 1].
+		[pos <= sourceString size and: [
+			char := sourceString at: pos.
+			char isDigit or: [char isLetter or: ['.-+er' includes: char]]]]
+			whileTrue: [pos := pos + 1].
+		^pos - 1].
+
+	"For binary selectors"
+	scannerType == #binary ifTrue: [
+		[pos <= sourceString size and: [
+			char := sourceString at: pos.
+			'+-*/\~<>=@%|&?!,' includes: char]]
+			whileTrue: [pos := pos + 1].
+		^pos - 1].
+
+	"Single character tokens"
+	(#(#leftBracket #rightBracket #leftParenthesis #rightParenthesis
+	   #period #semicolon #upArrow #leftArrow #verticalBar #colon)
+		includes: scannerType) ifTrue: [^start].
+
+	"Assignment :="
+	scannerType == #leftArrow ifTrue: [
+		(pos < sourceString size and: [(sourceString at: pos) = $: and: [(sourceString at: pos + 1) = $=]])
+			ifTrue: [^start + 1]].
+
+	"Default: single character"
+	^start!
+
+calculateEndFor: tokenValue type: scannerType startingAt: start
+	"Calculate the end position for a token.
+	 End is inclusive. For 'nil' (size 3) at start=1: end = 1+3-1 = 3."
+
+	"For strings, account for quotes"
+	scannerType == #string ifTrue: [
+		^start + tokenValue size + 1].  "Include both quotes"
+
+	"For character literals ($x), include the $"
+	(scannerType == #number and: [tokenValue isKindOf: Character]) ifTrue: [
+		^start + 1].
+
+	"For numbers, convert to string to get length"
+	scannerType == #number ifTrue: [
+		^start + tokenValue printString size - 1].
+
+	"For symbols #foo, account for the #"
+	scannerType == #literal ifTrue: [
+		(tokenValue isKindOf: Symbol) ifTrue: [
+			^start + tokenValue size].
+		"For literal arrays, this is tricky - use source position"
+		^start + tokenValue printString size - 1].
+
+	"For keywords (foo:), include the colon"
+	scannerType == #keyword ifTrue: [
+		^start + tokenValue size - 1].
+
+	"For words and binary selectors"
+	(tokenValue isKindOf: String) ifTrue: [
+		^start + tokenValue size - 1].
+	(tokenValue isKindOf: Symbol) ifTrue: [
+		^start + tokenValue size - 1].
+
+	"Default: single character"
+	^start!
+
+highlightTypeFor: scannerTokenType
+	"Map Scanner token types to highlight categories."
+
+	"Literals"
+	scannerTokenType == #string ifTrue: [^#string].
+	scannerTokenType == #number ifTrue: [^#number].
+	scannerTokenType == #literal ifTrue: [^#symbol].
+
+	"Selectors"
+	scannerTokenType == #keyword ifTrue: [^#keyword].
+	scannerTokenType == #binary ifTrue: [^#binary].
+
+	"Special syntax"
+	scannerTokenType == #upArrow ifTrue: [^#return].
+	scannerTokenType == #leftArrow ifTrue: [^#assignment].
+	scannerTokenType == #leftBracket ifTrue: [^#blockStart].
+	scannerTokenType == #rightBracket ifTrue: [^#blockEnd].
+	scannerTokenType == #leftParenthesis ifTrue: [^#paren].
+	scannerTokenType == #rightParenthesis ifTrue: [^#paren].
+	scannerTokenType == #period ifTrue: [^#separator].
+	scannerTokenType == #semicolon ifTrue: [^#cascade].
+	scannerTokenType == #verticalBar ifTrue: [^#tempBar].
+	scannerTokenType == #colon ifTrue: [^#colon].
+
+	"Identifiers - need semantic analysis"
+	scannerTokenType == #word ifTrue: [
+		^self categorizeWord: scanner token].
+
+	^#default!
+
+categorizeWord: word
+	"Distinguish pseudo-variables, globals, and local identifiers."
+
+	"Pseudo-variables"
+	word = 'self' ifTrue: [^#self].
+	word = 'super' ifTrue: [^#super].
+	word = 'true' ifTrue: [^#true].
+	word = 'false' ifTrue: [^#false].
+	word = 'nil' ifTrue: [^#nil].
+	word = 'thisContext' ifTrue: [^#thisContext].
+
+	"Globals start with uppercase"
+	word first isUppercase ifTrue: [^#global].
+
+	"Local variable, temp, or argument"
+	^#identifier!
+
+findComments
+	"Find comment positions by scanning for double-quote pairs."
+	| pos startPos |
+	pos := 1.
+	[pos := sourceString indexOf: $" startingAt: pos.
+	 pos > 0] whileTrue: [
+		startPos := pos.
+		pos := sourceString indexOf: $" startingAt: pos + 1.
+		pos = 0 ifTrue: [^self].  "Unterminated comment"
+		tokens add: (SyntaxToken type: #comment start: startPos end: pos).
+		pos := pos + 1]!
+merge: list1 with: list2
+	"Merge two sorted token lists into one sorted list. O(n) vs O(n log n) for sort."
+	| result i1 i2 n1 n2 |
+	n1 := list1 size.
+	n2 := list2 size.
+	n1 = 0 ifTrue: [^list2].
+	n2 = 0 ifTrue: [^list1].
+	result := OrderedCollection new: n1 + n2.
+	i1 := 1. i2 := 1.
+	[i1 <= n1 and: [i2 <= n2]] whileTrue: [
+		(list1 at: i1) start <= (list2 at: i2) start
+			ifTrue: [result add: (list1 at: i1). i1 := i1 + 1]
+			ifFalse: [result add: (list2 at: i2). i2 := i2 + 1]].
+	"Add remaining elements"
+	[i1 <= n1] whileTrue: [result add: (list1 at: i1). i1 := i1 + 1].
+	[i2 <= n2] whileTrue: [result add: (list2 at: i2). i2 := i2 + 1].
+	^result! !
+
+!ScannerHighlighter methodsFor: 'accessing'!
+tokens
+	"Answer the collection of syntax tokens."
+	^tokens!
+
+findMethodHeaderEnd
+	"Find the end position of the method header (selector + arguments) in tokens.
+	 Returns 0 if no tokens. Used to avoid creating a Parser just for selector bolding.
+
+	 Method header patterns:
+	   Unary:   identifier                      (e.g., 'size')
+	   Binary:  binary identifier               (e.g., '+ aNumber')
+	   Keyword: (keyword identifier)+           (e.g., 'at: index put: value')"
+	| i n token firstType |
+	n := tokens size.
+	n = 0 ifTrue: [^0].
+
+	"Skip leading comments"
+	i := 1.
+	[i <= n and: [(tokens at: i) type == #comment]] whileTrue: [i := i + 1].
+	i > n ifTrue: [^0].
+
+	token := tokens at: i.
+	firstType := token type.
+
+	"Unary method: first identifier (that's not a pseudo-variable)"
+	(firstType == #identifier or: [firstType == #global]) ifTrue: [
+		^token end].
+
+	"Binary method: binary operator + argument name"
+	firstType == #binary ifTrue: [
+		i := i + 1.
+		"Skip comments"
+		[i <= n and: [(tokens at: i) type == #comment]] whileTrue: [i := i + 1].
+		i > n ifTrue: [^token end].
+		"Next should be argument identifier"
+		token := tokens at: i.
+		(token type == #identifier or: [token type == #global]) ifTrue: [
+			^token end].
+		^(tokens at: i - 1) end].
+
+	"Keyword method: alternating keyword/identifier pairs"
+	firstType == #keyword ifTrue: [
+		| lastEnd |
+		lastEnd := token end.
+		[i <= n] whileTrue: [
+			token := tokens at: i.
+			token type == #comment ifTrue: [i := i + 1]
+			ifFalse: [
+				token type == #keyword ifTrue: [
+					lastEnd := token end.
+					i := i + 1.
+					"Skip comments"
+					[i <= n and: [(tokens at: i) type == #comment]] whileTrue: [i := i + 1].
+					"Next should be argument identifier"
+					i <= n ifTrue: [
+						token := tokens at: i.
+						(token type == #identifier or: [token type == #global]) ifTrue: [
+							lastEnd := token end.
+							i := i + 1]
+						ifFalse: [^lastEnd]]
+					ifFalse: [^lastEnd]]
+				ifFalse: [^lastEnd]]].
+		^lastEnd].
+
+	"Default: return end of first token"
+	^(tokens at: 1) end! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+ScannerHighlighter class
+	instanceVariableNames: ''!
+
+
+!ScannerHighlighter class methodsFor: 'instance creation'!
+tokenize: aString
+	"Convenience method to tokenize a string. Returns the highlighter instance.
+	 Call 'tokens' to get the tokens, 'findMethodHeaderEnd' for method header position."
+	^self new tokenize: aString; yourself! !
+
+Object subclass: #SyntaxToken
+	instanceVariableNames: 'type start end'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'System-Compiler'!
+SyntaxToken comment: 'I represent a syntax token with its position in source code. I am produced by ScannerHighlighter for syntax highlighting.
+
+Instance Variables:
+    type    Symbol - the highlight category (#keyword, #string, #comment, etc.)
+    start   Integer - 1-based start position in source
+    end     Integer - 1-based end position in source (inclusive)'!
+
+
+!SyntaxToken methodsFor: 'accessing'!
+type
+	"Answer the highlight category Symbol."
+	^type!
+
+start
+	"Answer the 1-based start position."
+	^start!
+
+end
+	"Answer the 1-based end position (inclusive)."
+	^end!
+
+length
+	"Answer the length of this token."
+	^end - start + 1! !
+
+!SyntaxToken methodsFor: 'comparing'!
+= aSyntaxToken
+	"Answer whether the receiver equals aSyntaxToken."
+	self species = aSyntaxToken species ifFalse: [^false].
+	^type = aSyntaxToken type and: [start = aSyntaxToken start and: [end = aSyntaxToken end]]!
+
+hash
+	"Answer a hash value."
+	^type hash bitXor: (start hash bitXor: end hash)! !
+
+!SyntaxToken methodsFor: 'printing'!
+printOn: aStream
+	"Print the receiver on aStream."
+	aStream nextPutAll: 'SyntaxToken(';
+		print: type;
+		nextPutAll: ' ';
+		print: start;
+		nextPutAll: '-';
+		print: end;
+		nextPut: $)! !
+
+!SyntaxToken methodsFor: 'private'!
+setType: aSymbol start: startPos end: endPos
+	"Set instance variables - private."
+	type := aSymbol.
+	start := startPos.
+	end := endPos! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+SyntaxToken class
+	instanceVariableNames: ''!
+
+
+!SyntaxToken class methodsFor: 'instance creation'!
+type: aSymbol start: startPos end: endPos
+	"Answer a new SyntaxToken."
+	^self new setType: aSymbol start: startPos end: endPos! !
+
+Object subclass: #SyntaxStyler
+	instanceVariableNames: 'colorMap'
+	classVariableNames: 'ColorSets CurrentColorSetName DefaultColorMap TokenToScopeMap CachedTypeColorMap'
+	poolDictionaries: ''
+	category: 'System-Compiler'!
+SyntaxStyler comment: 'I apply syntax highlighting to Smalltalk source code using a two-level mapping:
+1. Token types (from ScannerHighlighter) → TextMate scopes
+2. TextMate scopes → Colors (defined by themes)
+
+This architecture allows easy theme swapping since themes are defined in terms
+of standard TextMate scopes, matching VSCode/TextMate conventions.
+
+Usage:
+    | styledText |
+    styledText := SyntaxStyler new styleSource: ''self foo: 42''.
+    SyntaxStyler useColorSet: #VSCodeLight.  "Switch themes"
+
+Class Variables:
+    TokenToScopeMap     Dictionary - token type to TextMate scope
+    ColorSets           Dictionary - theme name to (scope → color) mapping
+    CurrentColorSetName Symbol - active theme name
+    DefaultColorMap     Dictionary - current active scope → color mapping
+
+Instance Variables:
+    colorMap            Dictionary - instance-specific color map (optional override)'!
+
+
+!SyntaxStyler methodsFor: 'styling'!
+styleSource: sourceString
+	"Answer a Text with syntax highlighting applied.
+	 Optimized: builds runs directly from sorted tokens - O(m) where m is token count."
+	^self styleSource: sourceString methodHeaderEnd: nil!
+
+styleSource: sourceString methodHeaderEnd: headerEndBlock
+	"Answer a Text with syntax highlighting applied.
+	 If headerEndBlock is not nil, evaluate it with the method header end position.
+	 Optimized: builds runs directly from sorted tokens - O(m) where m is token count."
+	| text tokens size sortedTokens runs values pos t0 t1 t2 t3 loopTime t4 t5 highlighter |
+	sourceString isEmpty ifTrue: [^Text fromString: ''].
+	t0 := Time millisecondClockValue.
+	size := sourceString size.
+	text := Text fromString: sourceString.
+	t1 := Time millisecondClockValue.
+	highlighter := ScannerHighlighter tokenize: sourceString.
+	tokens := highlighter tokens.
+	t2 := Time millisecondClockValue.
+	Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr.
+	tokens isEmpty ifTrue: [
+		headerEndBlock ifNotNil: [headerEndBlock value: 0].
+		^text].
+	"Pass header end position to caller if requested"
+	headerEndBlock ifNotNil: [headerEndBlock value: highlighter findMethodHeaderEnd].
+
+	"Tokens already sorted by tokenize: - no need to sort again"
+	sortedTokens := tokens.
+	t3 := Time millisecondClockValue.
+
+	"Build runs directly - pre-size collections to avoid growing"
+	runs := OrderedCollection new: tokens size * 2.
+	values := OrderedCollection new: tokens size * 2.
+	pos := 1.
+
+	loopTime := Time millisecondClockValue.
+	sortedTokens do: [:token |
+		| textColor start end colorValue |
+		textColor := self colorForType: token type.
+		start := token start.
+		start < 1 ifTrue: [start := 1].
+		end := token end.
+		end > size ifTrue: [end := size].
+		end < start ifTrue: [end := start].
+
+		"Add gap before token (nil = default color)"
+		start > pos ifTrue: [
+			runs add: start - pos.
+			values add: nil].
+
+		"Add token's color run"
+		textColor ifNotNil: [
+			colorValue := textColor color.
+			runs add: end - start + 1.
+			values add: colorValue.
+			pos := end + 1]
+		ifNil: [
+			"No color for this token type - skip, will be covered by nil run"
+			pos < start ifTrue: [pos := start]]].
+	t4 := Time millisecondClockValue.
+	Transcript show: '  loop: ', (t4 - loopTime) printString, 'ms'; cr.
+
+	"Add final nil run if needed"
+	pos <= size ifTrue: [
+		runs add: size - pos + 1.
+		values add: nil].
+
+	"Set colorRuns directly"
+	runs isEmpty ifFalse: [
+		text setColorRuns: (RunArray runs: runs asArray values: values asArray)].
+	t5 := Time millisecondClockValue.
+	Transcript show: '  setColorRuns: ', (t5 - t4) printString, 'ms'; cr.
+	Transcript show: 'Build runs total: ', (t5 - t3) printString, 'ms'; cr.
+	^text!
+
+styleMethod: sourceString inClass: aClass
+	"Answer a styled Text for a method in the given class.
+	 Makes the selector bold in addition to color highlighting.
+	 Optimized: uses token positions to find header end, avoiding Parser creation."
+	| text headerEnd t0 t1 t2 |
+	t0 := Time millisecondClockValue.
+	headerEnd := 0.
+	text := self styleSource: sourceString methodHeaderEnd: [:pos | headerEnd := pos].
+	t1 := Time millisecondClockValue.
+	Transcript show: 'styleSource: ', (t1 - t0) printString, 'ms'; cr.
+	"Apply bold emphasis to method header (selector + arguments)"
+	headerEnd > 0 ifTrue: [
+		text emphasizeFrom: 1 to: (headerEnd min: sourceString size) with: 2].
+	t2 := Time millisecondClockValue.
+	Transcript show: 'emphasize: ', (t2 - t1) printString, 'ms, TOTAL: ', (t2 - t0) printString, 'ms'; cr.
+	^text! !
+
+!SyntaxStyler methodsFor: 'color mapping'!
+colorForType: tokenType
+	"Answer the TextColor for the given token type, or nil for default (black).
+	 Uses cached direct lookup for performance."
+	colorMap ifNotNil: [
+		"Instance has custom colorMap - use two-level lookup"
+		| scope |
+		scope := TokenToScopeMap at: tokenType ifAbsent: [^nil].
+		^colorMap at: scope ifAbsent: [nil]].
+	"Use cached direct tokenType → TextColor mapping"
+	CachedTypeColorMap ifNil: [^nil].
+	^CachedTypeColorMap at: tokenType ifAbsent: [nil]!
+
+colorMap: aDictionary
+	"Set a custom color map for this styler instance (scope → color)."
+	colorMap := aDictionary!
+
+useDefaultColors
+	"Reset to use the default color map."
+	colorMap := nil! !
+
+!SyntaxStyler methodsFor: 'private'!
+initialize
+	"Initialize the styler."
+	colorMap := nil! !
+"-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
+
+SyntaxStyler class
+	instanceVariableNames: ''!
+
+
+!SyntaxStyler class methodsFor: 'instance creation'!
+new
+	"Answer a new SyntaxStyler."
+	^super new initialize!
+
+styleSource: sourceString
+	"Convenience method to style source code."
+	^self new styleSource: sourceString!
+
+styleMethod: sourceString inClass: aClass
+	"Convenience method to style a method with class context."
+	^self new styleMethod: sourceString inClass: aClass! !
+
+!SyntaxStyler class methodsFor: 'class initialization'!
+initialize
+	"Initialize token-to-scope mapping and themes. Select VSCodeLight as default.
+	 SyntaxStyler initialize"
+	self initializeTokenToScopeMap.
+	ColorSets := Dictionary new.
+	self initializeVSCodeLightTheme.
+	self initializeVSCodeDarkTheme.
+	self useColorSet: #VSCodeLight!
+initializeTokenToScopeMap
+	"Map ScannerHighlighter token types to TextMate scopes.
+	 This mapping is fixed - themes define colors for scopes."
+	TokenToScopeMap := Dictionary new.
+	"Comments"
+	TokenToScopeMap at: #comment put: 'comment.block'.
+	"Literals"
+	TokenToScopeMap at: #string put: 'string.quoted.single'.
+	TokenToScopeMap at: #symbol put: 'constant.other.symbol'.
+	TokenToScopeMap at: #number put: 'constant.numeric'.
+	TokenToScopeMap at: #character put: 'constant.character'.
+	"Language constants"
+	TokenToScopeMap at: #true put: 'constant.language'.
+	TokenToScopeMap at: #false put: 'constant.language'.
+	TokenToScopeMap at: #nil put: 'constant.language'.
+	"Pseudo-variables"
+	TokenToScopeMap at: #self put: 'variable.language.self'.
+	TokenToScopeMap at: #super put: 'variable.language.super'.
+	TokenToScopeMap at: #thisContext put: 'variable.language.thisContext'.
+	"Keywords and control flow"
+	TokenToScopeMap at: #keyword put: 'keyword.control'.
+	TokenToScopeMap at: #return put: 'keyword.control.return'.
+	"Types"
+	TokenToScopeMap at: #global put: 'entity.name.type'.
+	"Punctuation"
+	TokenToScopeMap at: #blockStart put: 'punctuation.section.block.begin'.
+	TokenToScopeMap at: #blockEnd put: 'punctuation.section.block.end'.
+	TokenToScopeMap at: #tempBar put: 'punctuation.definition.variable'.
+	"Identifiers (no color by default)"
+	TokenToScopeMap at: #identifier put: nil.
+	TokenToScopeMap at: #default put: nil!
+initializeVSCodeLightTheme
+	"VSCode Light+ theme - designed for white backgrounds.
+	 Colors from VSCode's built-in Light+ (default light) theme."
+	| colors |
+	colors := Dictionary new.
+	"Comments - #008000 (green)"
+	colors at: 'comment.block' put: (TextColor color: (Color r: 0.0 g: 0.502 b: 0.0)).
+	"Strings - #A31515 (dark red)"
+	colors at: 'string.quoted.single' put: (TextColor color: (Color r: 0.639 g: 0.082 b: 0.082)).
+	"Symbols - #0000FF (blue)"
+	colors at: 'constant.other.symbol' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	"Numbers - #098658 (teal green)"
+	colors at: 'constant.numeric' put: (TextColor color: (Color r: 0.035 g: 0.525 b: 0.345)).
+	"Characters - #0000FF (blue)"
+	colors at: 'constant.character' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	"Language constants (true/false/nil) - #0000FF (blue)"
+	colors at: 'constant.language' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	"self/super - #0000FF (blue)"
+	colors at: 'variable.language.self' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	colors at: 'variable.language.super' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	colors at: 'variable.language.thisContext' put: (TextColor color: (Color r: 0.0 g: 0.0 b: 1.0)).
+	"Keywords - #AF00DB (purple)"
+	colors at: 'keyword.control' put: (TextColor color: (Color r: 0.686 g: 0.0 b: 0.859)).
+	colors at: 'keyword.control.return' put: (TextColor color: (Color r: 0.686 g: 0.0 b: 0.859)).
+	"Types/Classes - #267F99 (teal)"
+	colors at: 'entity.name.type' put: (TextColor color: (Color r: 0.149 g: 0.498 b: 0.6)).
+	"Brackets - #319331 (green) from bracket colorization"
+	colors at: 'punctuation.section.block.begin' put: (TextColor color: (Color r: 0.192 g: 0.576 b: 0.192)).
+	colors at: 'punctuation.section.block.end' put: (TextColor color: (Color r: 0.192 g: 0.576 b: 0.192)).
+	self registerColorSet: colors named: #VSCodeLight!
+initializeVSCodeDarkTheme
+	"VSCode Dark+ theme - designed for dark backgrounds.
+	 Colors from VSCode's built-in Dark+ (default dark) theme."
+	| colors blue purple |
+	colors := Dictionary new.
+	blue := Color r: 0.337 g: 0.612 b: 0.839.    "#569CD6"
+	purple := Color r: 0.773 g: 0.525 b: 0.753.  "#C586C0"
+	"Comments - #6A9955 (green)"
+	colors at: 'comment.block' put: (TextColor color: (Color r: 0.416 g: 0.600 b: 0.333)).
+	"Strings - #CE9178 (orange)"
+	colors at: 'string.quoted.single' put: (TextColor color: (Color r: 0.808 g: 0.569 b: 0.471)).
+	"Symbols - #569CD6 (blue)"
+	colors at: 'constant.other.symbol' put: (TextColor color: blue).
+	"Numbers - #B5CEA8 (light green)"
+	colors at: 'constant.numeric' put: (TextColor color: (Color r: 0.710 g: 0.808 b: 0.659)).
+	"Characters - #569CD6 (blue)"
+	colors at: 'constant.character' put: (TextColor color: blue).
+	"Language constants - #569CD6 (blue)"
+	colors at: 'constant.language' put: (TextColor color: blue).
+	"self/super - #569CD6 (blue)"
+	colors at: 'variable.language.self' put: (TextColor color: blue).
+	colors at: 'variable.language.super' put: (TextColor color: blue).
+	colors at: 'variable.language.thisContext' put: (TextColor color: blue).
+	"Keywords - #C586C0 (purple)"
+	colors at: 'keyword.control' put: (TextColor color: purple).
+	colors at: 'keyword.control.return' put: (TextColor color: purple).
+	"Types/Classes - #4EC9B0 (teal)"
+	colors at: 'entity.name.type' put: (TextColor color: (Color r: 0.306 g: 0.788 b: 0.690)).
+	"Brackets - #FFD700 (gold)"
+	colors at: 'punctuation.section.block.begin' put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
+	colors at: 'punctuation.section.block.end' put: (TextColor color: (Color r: 1.0 g: 0.843 b: 0.0)).
+	self registerColorSet: colors named: #VSCodeDark! !
+
+!SyntaxStyler class methodsFor: 'color set management'!
+colorSetNames
+	"Answer the names of all registered color sets."
+	^ColorSets keys asSortedCollection asArray!
+currentColorSetName
+	"Answer the name of the currently active color set."
+	^CurrentColorSetName!
+registerColorSet: aDictionary named: aSymbol
+	"Register a new color set with the given name."
+	ColorSets at: aSymbol put: aDictionary!
+useColorSet: aSymbol
+	"Switch to the named color set. Answer true if successful.
+	 Also rebuilds the cached tokenType → TextColor map for performance."
+	| colors |
+	colors := ColorSets at: aSymbol ifAbsent: [^false].
+	DefaultColorMap := colors.
+	CurrentColorSetName := aSymbol.
+	"Build direct tokenType → TextColor cache"
+	CachedTypeColorMap := Dictionary new.
+	TokenToScopeMap keysAndValuesDo: [:tokenType :scope |
+		| textColor |
+		textColor := DefaultColorMap at: scope ifAbsent: [nil].
+		textColor ifNotNil: [CachedTypeColorMap at: tokenType put: textColor]].
+	^true! !
+
+SyntaxStyler initialize!
 MouseMenuController subclass: #ScreenController
 	instanceVariableNames: ''
 	classVariableNames: 'ScreenYellowButtonMenu ScreenYellowButtonMessages '
@@ -35263,7 +36558,7 @@ SequenceableCollection comment: 'Abstract superclass for collections that have a
 
 
 !SequenceableCollection methodsFor: 'comparing'!
-= otherCollection 
+= otherCollection
 	"Answer whether the species of the receiver is the same as otherCollection's species,
 	and the receiver's size is the same as otherCollection's size, and each of the receiver's
 	elements equal the corresponding element of otherCollection"
@@ -35274,6 +36569,21 @@ SequenceableCollection comment: 'Abstract superclass for collections that have a
 	index _ 0.
 	[(index _ index + 1) <= size]
 		whileTrue: [(self at: index) = (otherCollection at: index) ifFalse: [^false]].
+	^true!
+beginsWith: aSequenceableCollection
+	"Answer whether the receiver's first elements match aSequenceableCollection."
+	| size |
+	(size _ aSequenceableCollection size) > self size ifTrue: [^false].
+	1 to: size do: [:i |
+		(self at: i) = (aSequenceableCollection at: i) ifFalse: [^false]].
+	^true!
+endsWith: aSequenceableCollection
+	"Answer whether the receiver's last elements match aSequenceableCollection."
+	| size offset |
+	(size _ aSequenceableCollection size) > self size ifTrue: [^false].
+	offset _ self size - size.
+	1 to: size do: [:i |
+		(self at: offset + i) = (aSequenceableCollection at: i) ifFalse: [^false]].
 	^true! !
 
 !SequenceableCollection methodsFor: 'accessing'!
@@ -35300,11 +36610,27 @@ indexOf: anElement
 	not contain anElement, answer 0."
 
 	^self indexOf: anElement ifAbsent: [0]!
-indexOf: anElement ifAbsent: exceptionBlock 
+indexOf: anElement ifAbsent: exceptionBlock
 	"Answer the index of anElement within the receiver.  If the receiver does
 	not contain anElement, answer the result of evaluating the exceptionBlock."
 
 	(1 to: self size)
+		do: [:i | (self at: i) = anElement ifTrue: [^i]].
+	^exceptionBlock value!
+indexOf: anElement startingAt: startIndex
+	"Answer the index of the first occurrence of anElement within the receiver,
+	starting the search at startIndex.  If the receiver does not contain anElement
+	at or after startIndex, answer 0."
+
+	(startIndex to: self size)
+		do: [:i | (self at: i) = anElement ifTrue: [^i]].
+	^0!
+indexOf: anElement startingAt: startIndex ifAbsent: exceptionBlock
+	"Answer the index of anElement within the receiver, starting the search
+	at startIndex.  If the receiver does not contain anElement at or after
+	startIndex, answer the result of evaluating the exceptionBlock."
+
+	(startIndex to: self size)
 		do: [:i | (self at: i) = anElement ifTrue: [^i]].
 	^exceptionBlock value!
 indexOfSubCollection: aSubCollection startingAt: anIndex 
@@ -35388,8 +36714,8 @@ remove: oldObject ifAbsent: anExceptionBlock
 	^self copyReplaceFrom: self size + 1
 		  to: self size
 		  with: aSequenceableCollection!
-copyFrom: start to: stop 
-	"Answer a copy of a subset of the receiver, starting from element at index start 
+copyFrom: start to: stop
+	"Answer a copy of a subset of the receiver, starting from element at index start
 	until element at index stop."
 
 	| newSize |
@@ -35399,6 +36725,20 @@ copyFrom: start to: stop
 		to: newSize
 		with: self
 		startingAt: start!
+allButFirst
+	"Answer a copy of the receiver containing all but the first element.
+	Raise an error if there are not enough elements."
+	^self allButFirst: 1!
+allButFirst: n
+	"Answer a copy of the receiver containing all but the first n elements."
+	^self copyFrom: n + 1 to: self size!
+allButLast
+	"Answer a copy of the receiver containing all but the last element.
+	Raise an error if there are not enough elements."
+	^self allButLast: 1!
+allButLast: n
+	"Answer a copy of the receiver containing all but the last n elements."
+	^self copyFrom: 1 to: self size - n!
 copyReplaceAll: oldSubstring with: newSubstring 
 	"Answer a copy of the receiver in which all occurrances of oldSubstring have
 	been replaced by newSubstring."
@@ -37284,7 +38624,7 @@ basicAt: index put: aCharacter
 	(aCharacter isKindOf: Character)
 		ifTrue: [self errorNonIntegerIndex]
 		ifFalse: [self error: 'Strings only store Characters']!
-findString: subString startingAt: start 
+findString: subString startingAt: start
 	"Answer the index of subString within the receiver, starting at start. If the receiver does not contain subString, answer 0."
 
 	| aCharacter index |
@@ -37298,6 +38638,14 @@ findString: subString startingAt: start
 				[index = subString size ifTrue: [^startIndex].
 				index _ index+1]]].
 	^0!
+indexOf: aCharacter startingAt: startIndex
+	"Answer the index of the first occurrence of aCharacter within the receiver,
+	starting the search at startIndex. If not found, answer 0.
+	Optimized with primitive for performance."
+
+	<primitive: 108>
+	"Fall back to inherited method if primitive fails"
+	^super indexOf: aCharacter startingAt: startIndex!
 replaceFrom: start to: stop with: replacement startingAt: repStart 
 	"This destructively replaces elements from start to stop in the receiver
 	starting at index, repStart, in the collection, replacement.  Answer the
@@ -37398,6 +38746,13 @@ asSymbol
 asText
 	"Answer a Text whose string is the receiver."
 	^Text fromString: self!
+withColor: aColor
+	"Answer a Text with the receiver as string and aColor as foreground.
+	 Example: 'Hello' withColor: Color blue"
+	| text |
+	text := self asText.
+	text addAttribute: (TextColor color: aColor) from: 1 to: self size.
+	^text!
 asUppercase
 	"Answer a string made up from the receiver whose characters are all uppercase."
 
@@ -37470,7 +38825,59 @@ oldRunEncoded
 	^stream contents!
 withCRs
 	"substitute CRs for backslashes"
-	^ self collect: [:char | char = $\ ifTrue: [Character cr] ifFalse: [char]]! !
+	^ self collect: [:char | char = $\ ifTrue: [Character cr] ifFalse: [char]]!
+findTokens: delimiters
+	"Answer a collection of tokens that result from parsing the receiver.
+	Tokens are separated by any character in delimiters."
+	| tokens start delimSet |
+	tokens _ OrderedCollection new.
+	delimSet _ delimiters isCharacter
+		ifTrue: [String with: delimiters]
+		ifFalse: [delimiters].
+	start _ 1.
+	1 to: self size do: [:i |
+		(delimSet includes: (self at: i))
+			ifTrue: [
+				start < i ifTrue: [tokens add: (self copyFrom: start to: i - 1)].
+				start _ i + 1]].
+	start <= self size ifTrue: [tokens add: (self copyFrom: start to: self size)].
+	^tokens!
+trimBoth
+	"Answer a copy of the receiver with leading and trailing whitespace removed."
+	| left right |
+	self isEmpty ifTrue: [^self].
+	left _ 1.
+	[left <= self size and: [(self at: left) isSeparator]]
+		whileTrue: [left _ left + 1].
+	left > self size ifTrue: [^''].
+	right _ self size.
+	[right >= left and: [(self at: right) isSeparator]]
+		whileTrue: [right _ right - 1].
+	^self copyFrom: left to: right!
+trimLeft
+	"Answer a copy of the receiver with leading whitespace removed."
+	| left |
+	self isEmpty ifTrue: [^self].
+	left _ 1.
+	[left <= self size and: [(self at: left) isSeparator]]
+		whileTrue: [left _ left + 1].
+	left > self size ifTrue: [^''].
+	^self copyFrom: left to: self size!
+trimRight
+	"Answer a copy of the receiver with trailing whitespace removed."
+	| right |
+	self isEmpty ifTrue: [^self].
+	right _ self size.
+	[right >= 1 and: [(self at: right) isSeparator]]
+		whileTrue: [right _ right - 1].
+	right < 1 ifTrue: [^''].
+	^self copyFrom: 1 to: right!
+substrings
+	"Answer an array of substrings from the receiver separated by whitespace."
+	^(self findTokens: ' ', (String with: Character tab), (String with: Character cr), (String with: Character lf)) asArray!
+lines
+	"Answer an array of lines from the receiver, split on CR or LF."
+	^(self findTokens: (String with: Character cr), (String with: Character lf)) asArray! !
 
 !String methodsFor: 'displaying'!
 displayAt: aPoint 
@@ -37824,10 +39231,14 @@ display
 				ifTrue: [controller recomputeSelection]].
 	super display!
 displayView
+	| t0 t1 |
+	Transcript ifNotNil: [t0 := Time millisecondClockValue].
 	self clearInside.
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller display]
-		ifFalse: [displayContents display]!
+		ifFalse: [displayContents display].
+	Transcript ifNotNil: [t1 := Time millisecondClockValue.
+		Transcript show: 'displayView: ', (t1 - t0) printString, 'ms'; cr]!
 positionDisplayContents
 	"Presumably the text being displayed changed so that the wrapping box and clipping box should be reset."
 
@@ -37836,14 +39247,17 @@ positionDisplayContents
 		clippingBox: self insetDisplayBox! !
 
 !StringHolderView methodsFor: 'model access'!
-editString: aString 
+editString: aString
 	"The paragraph to be displayed is created from the characters in aString."
-
+	| t0 t1 |
+	Transcript ifNotNil: [t0 := Time millisecondClockValue].
 	displayContents _ Paragraph
 				withText: aString asText
 				style: TextStyle default copy
 				compositionRectangle: (self insetDisplayBox insetBy: self paragraphInset)
 				clippingRectangle: self insetDisplayBox.
+	Transcript ifNotNil: [t1 := Time millisecondClockValue.
+		Transcript show: 'Paragraph compose: ', (t1 - t0) printString, 'ms'; cr].
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller changeParagraph: displayContents]!
 model: aLockedModel 
@@ -38185,16 +39599,17 @@ displayNormal
 			[complemented _ false.
 			self highlight]!
 displaySpecial
+	"32bpp: Use Form and instead of Form under so black pixels dominate."
 	complemented
 		ifTrue: [self displaySpecialComplemented].
-	label == nil 
+	label == nil
 		ifFalse: [label
 					displayOn: Display
 					transformation: self displayTransformation
 					clippingBox: self insetDisplayBox
 					align: label boundingBox center
 					with: label boundingBox center
-					rule: Form under
+					rule: Form and
 					mask: Form black]!
 displaySpecialComplemented	
 	highlightForm
@@ -38275,6 +39690,9 @@ selector: aSymbol
 
 !SwitchView methodsFor: 'deEmphasizing'!
 deEmphasizeView
+	"32bpp: Use Form and instead of Form under.
+	 In 32bpp, AND with black (0) = black, AND with white = dest.
+	 This adds sparse black pixels from lightGray mask, creating dim effect."
 	| newForm |
 	complemented
 		ifTrue: [self highlight.
@@ -38282,10 +39700,10 @@ deEmphasizeView
 				newForm
 					displayOn: Display
 					at: (self insetDisplayBox topLeft + (1@0))
-					clippingBox: self insetDisplayBox 
-					rule: Form under 
+					clippingBox: self insetDisplayBox
+					rule: Form and
 					mask: Form black.
-				Display fill: self insetDisplayBox rule: Form under mask: Form lightGray]! !String variableByteSubclass: #Symbol
+				Display fill: self insetDisplayBox rule: Form and mask: Form lightGray]! !String variableByteSubclass: #Symbol
 	instanceVariableNames: ''
 	classVariableNames: 'SingleCharSymbols USTable '
 	poolDictionaries: ''
@@ -39990,13 +41408,14 @@ writeCloneWithout: aSet
 SystemTracer initialize!
 
 ArrayedCollection subclass: #Text
-	instanceVariableNames: 'string runs '
+	instanceVariableNames: 'string runs colorRuns '
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '
 	category: 'Collections-Text'!
 Text comment: 'Instance Variables:
-	string:	A String of Characters
-	runs:	A RunArray of emphasis codes
+	string:		A String of Characters
+	runs:		A RunArray of integer emphasis codes (for font selection)
+	colorRuns:	A RunArray of Color objects (nil = default black)
 					
 The emphasis codes indicate abstract changes in character appearance.  Actual display is performed in the presence of a TextStyle which indicates, for each abstract code, an actual font to be used'!
 
@@ -40069,7 +41488,7 @@ asUppercase
 !Text methodsFor: 'emphasis'!
 allBold
 	self emphasizeFrom: 1 to: self size with: 2!
-emphasisAt: characterIndex 
+emphasisAt: characterIndex
 	"Answer the code for characters in the run beginning at characterIndex."
 
 	self size = 0 ifTrue: [^1].	"null text tolerates access"
@@ -40092,11 +41511,39 @@ makeSelectorBoldIn: aClass
 	self emphasizeFrom: 1
 		to: (parser endOfLastToken min: string size)
 		with: 2!
-runLengthFor: characterIndex 
-	"Answer the count of characters remaining in run beginning with 
-	characterIndex."
-
+runLengthFor: characterIndex
+	"Answer the count of characters remaining in run beginning with
+	characterIndex. Consider both emphasis runs and color runs,
+	returning the shorter to ensure setStopConditions is called
+	when either changes."
+	| emphasisLength colorLength |
+	emphasisLength := runs runLengthAt: characterIndex.
+	colorRuns ifNil: [^emphasisLength].
+	colorLength := colorRuns runLengthAt: characterIndex.
+	^emphasisLength min: colorLength!
+emphasisRunLengthFor: characterIndex
+	"Answer the count of characters remaining in emphasis run beginning with
+	characterIndex. Ignores color runs - use for composition where only
+	font/emphasis matters, not color. This is O(1) for typical text with
+	few emphasis changes, vs O(runs) for runLengthFor: with many color runs."
 	^runs runLengthAt: characterIndex! !
+
+!Text methodsFor: 'attributes'!
+addAttribute: aTextAttribute from: start to: stop
+	"Apply a TextColor attribute to the character range start-stop.
+	 Colors are stored in colorRuns, separate from emphasis runs."
+	aTextAttribute isColor ifFalse: [^self].  "Only handle color attributes"
+	colorRuns ifNil: [colorRuns := RunArray new: self size withAll: nil].
+	colorRuns := colorRuns
+		copyReplaceFrom: start
+		to: stop
+		with: (RunArray new: stop - start + 1 withAll: aTextAttribute color)!
+
+colorAt: characterIndex
+	"Answer the Color at characterIndex, or nil if no color (default black)."
+	self size = 0 ifTrue: [^nil].
+	colorRuns ifNil: [^nil].
+	^colorRuns at: characterIndex! !
 
 !Text methodsFor: 'printing'!
 printOn: aStream 
@@ -40112,9 +41559,12 @@ storeOn: aStream
 !Text methodsFor: 'private'!
 runs
 	^runs!
-setString: aString setRuns: anArray 
+setString: aString setRuns: anArray
 	string _ aString.
-	runs _ anArray! !
+	runs _ anArray!
+setColorRuns: aRunArray
+	"Set the color runs directly (for efficient bulk color setting)."
+	colorRuns := aRunArray! !
 "-- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- "!
 
 Text class
@@ -40216,6 +41666,13 @@ initTextConstants2		"Text initTextConstants."
 	TextConstants		at: #Ctrln				put:	(14 asCharacter).
 	TextConstants		at: #CtrlN				put:	(245 asCharacter).
 	TextConstants		at: #Ctrlp				put:	(138 asCharacter).
+
+		"Arrow keys for cursor movement"
+	TextConstants		at: #LeftArrowKey			put:	(188 asCharacter).
+	TextConstants		at: #RightArrowKey		put:	(189 asCharacter).
+	TextConstants		at: #UpArrowKey			put:	(190 asCharacter).
+	TextConstants		at: #DownArrowKey		put:	(191 asCharacter).
+
 	TextConstants		at: #CtrlTopBlank			put:	(222 asCharacter).
 	TextConstants		at: #CtrlMiddleBlank		put:	(229 asCharacter).
 	TextConstants		at: #CtrlBottomBlank		put:	(225 asCharacter).
@@ -41729,14 +43186,19 @@ release
 	superView _ nil.! !
 
 !View methodsFor: 'testing'!
-containsPoint: aPoint 
+containsPoint: aPoint
 	"Answer true if aPoint is within the receiver's display box,
-	and answer false, otherwise. It is sent to a View's 
-	subViews by View|subViewAt: in order to determine which subView 
-	contains the cursor point (so that, for example, control can be pass down to 
+	and answer false, otherwise. It is sent to a View's
+	subViews by View|subViewAt: in order to determine which subView
+	contains the cursor point (so that, for example, control can be pass down to
 	that subView's controller)."
 
-	^self displayBox containsPoint: aPoint! !
+	^self displayBox containsPoint: aPoint!
+
+isCollapsed
+	"Answer whether the view is collapsed. Default is false.
+	 StandardSystemView overrides this with actual collapse/expand state."
+	^false! !
 
 !View methodsFor: 'model access'!
 model

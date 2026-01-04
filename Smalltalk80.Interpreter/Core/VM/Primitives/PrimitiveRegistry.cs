@@ -241,10 +241,11 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(103, new FontPrimitives.ScanCharacters());   // Blue Book: Primitive 103 = scanCharactersFrom:to:in:rightX:stopConditions:displaying:
         registry.Register(104, new GraphicsOperations.DrawLoop());     // Blue Book: Primitive 104 = drawLoopX:Y: (Bresenham)
 
-        // String primitives (105-107)
+        // String primitives (105-108)
         registry.Register(105, new StringPrimitives.StringReplace());
         registry.Register(106, new StringPrimitives.AsSymbol());
         registry.Register(107, new StringPrimitives.StoreOn());
+        registry.Register(108, new StringPrimitives.IndexOf());
 
         // Font primitives (147-150)
         // These provide performance optimizations for text operations.
@@ -281,6 +282,7 @@ public class PrimitiveRegistry : IPrimitiveRegistry
         registry.Register(154, new FileInfoPrimitives.GetFileAttributes());
         registry.Register(155, new FileInfoPrimitives.FileExists());
         registry.Register(157, new FileInfoPrimitives.FileCopy());
+        registry.Register(160, new FileInfoPrimitives.GetSpecialFolder());
 
         // File stream primitives (open, close, read, write, seek)
         registry.Register(121, new FileStreamPrimitives.FileOpen());

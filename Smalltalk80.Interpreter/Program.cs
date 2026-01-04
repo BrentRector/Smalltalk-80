@@ -178,10 +178,6 @@ public static class Program
             int displayWidth = InterpreterConstants.DefaultDisplayWidth;
             int displayHeight = InterpreterConstants.DefaultDisplayHeight;
 
-            // EXPERIMENTAL: Enable GDI bitmap font (Fixedsys) for pixel-perfect 1bpp rendering
-            // Set to true to try Fixedsys instead of TrueType fonts
-            FontBridgeFactory.UseGdiBitmapFonts = true;
-
             // Display mode: 1bpp (classic Smalltalk-80 monochrome)
             // The 32bpp experimental mode was removed - we now support only full 1bpp or full 32bpp,
             // with no runtime conversion between them. Full 32bpp requires Smalltalk-side changes.

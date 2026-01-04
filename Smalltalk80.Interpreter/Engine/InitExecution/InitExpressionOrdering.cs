@@ -40,6 +40,8 @@ public static class InitExpressionOrdering
             "SystemTracer initialize",
             "Text initialize",
             "TextList initialize",
+            "Color initialize",
+            "SyntaxStyler initialize",
             "WindowsDirectory initialize",
             "WindowsFileSystem initialize",
             "WindowsFileStream initialize",

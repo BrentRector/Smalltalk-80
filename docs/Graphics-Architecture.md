@@ -155,8 +155,7 @@ Smalltalk80.Interpreter/
 ├── Core/VM/Graphics/
 │   ├── BitBltEngine.cs           # 1bpp BitBlt engine (all 16 rules)
 │   ├── IFontBridge.cs            # Font abstraction
-│   ├── WinFormsFontBridge.cs     # TrueType fonts
-│   └── GdiBitmapFontBridge.cs    # Bitmap fonts (Fixedsys)
+│   └── WinFormsFontBridge.cs     # TrueType fonts with anti-aliasing
 │
 ├── Core/VM/Platform/
 │   └── IDisplay.cs               # Unified display interface
@@ -235,10 +234,9 @@ Smalltalk80.Interpreter/
 ### Phase 5: Font Support - COMPLETE
 
 - `IFontBridge` interface for platform-agnostic fonts
-- `WinFormsFontBridge` - GDI+ TrueType rendering
-- `GdiBitmapFontBridge` - Native GDI bitmap fonts (Fixedsys)
+- `WinFormsFontBridge` - GDI+ TrueType rendering with ClearType anti-aliasing
 - Underscore -> left-arrow conversion for assignment operator
-- Currently using bitmap fonts for clean 1bpp rendering
+- 32bpp font rendering for smooth anti-aliased text
 
 ### Phase 6: Unified IDisplay - COMPLETE
 
