@@ -35200,21 +35200,23 @@ Instance Variables:
 !ScannerHighlighter methodsFor: 'tokenizing'!
 tokenize: aString
 	"Answer a collection of SyntaxToken objects for the source string."
-	| stream t0 t1 t2 t3 t4 addTime scanTime tokenCount |
+	| stream t0 t1 t2 t3 t4 addTime scanTime tokenCount commentTokens scannerTokens |
 	sourceString := aString.
-	tokens := OrderedCollection new.
-	aString isEmpty ifTrue: [^tokens].
+	aString isEmpty ifTrue: [^OrderedCollection new].
 
 	t0 := Time millisecondClockValue.
 	stream := ReadStream on: aString.
 	scanner := Scanner new initScanner; scan: stream.
 	t1 := Time millisecondClockValue.
 
-	"First, find all comments (Scanner doesn't track positions)"
+	"Find all comments (Scanner skips them) - store separately"
+	tokens := OrderedCollection new.
 	self findComments.
-	t2 := Time millisecondClockValue.
+	commentTokens := tokens.
 
-	"Then scan all tokens - track position via stream"
+	"Scan all tokens into separate collection"
+	tokens := OrderedCollection new.
+	t2 := Time millisecondClockValue.
 	addTime := 0. scanTime := 0. tokenCount := 0.
 	[scanner tokenType ~~ #doIt] whileTrue: [
 		| ta tb |
@@ -35225,15 +35227,16 @@ tokenize: aString
 		scanner scanToken.
 		scanTime := scanTime + (Time millisecondClockValue - tb).
 		tokenCount := tokenCount + 1].
+	scannerTokens := tokens.
 	t3 := Time millisecondClockValue.
 
 	Transcript show: '  tokenLoop: ', (t3 - t2) printString, 'ms (add:', addTime printString, ' scan:', scanTime printString, ' n:', tokenCount printString, ')'; cr.
 
-	"Sort by position (comments may be interleaved)"
-	tokens := tokens asSortedCollection: [:a :b | a start < b start].
+	"Merge two sorted lists in O(n) instead of sorting O(n log n)"
+	tokens := self merge: commentTokens with: scannerTokens.
 	t4 := Time millisecondClockValue.
-	Transcript show: '  sort: ', (t4 - t3) printString, 'ms'; cr.
-	^tokens asOrderedCollection!
+	Transcript show: '  merge: ', (t4 - t3) printString, 'ms'; cr.
+	^tokens!
 
 addCurrentTokenAt: streamPosition
 	"Add the current scanner token to our collection.
@@ -35463,7 +35466,24 @@ findComments
 		pos := sourceString indexOf: $" startingAt: pos + 1.
 		pos = 0 ifTrue: [^self].  "Unterminated comment"
 		tokens add: (SyntaxToken type: #comment start: startPos end: pos).
-		pos := pos + 1]! !
+		pos := pos + 1]!
+merge: list1 with: list2
+	"Merge two sorted token lists into one sorted list. O(n) vs O(n log n) for sort."
+	| result i1 i2 n1 n2 |
+	n1 := list1 size.
+	n2 := list2 size.
+	n1 = 0 ifTrue: [^list2].
+	n2 = 0 ifTrue: [^list1].
+	result := OrderedCollection new: n1 + n2.
+	i1 := 1. i2 := 1.
+	[i1 <= n1 and: [i2 <= n2]] whileTrue: [
+		(list1 at: i1) start <= (list2 at: i2) start
+			ifTrue: [result add: (list1 at: i1). i1 := i1 + 1]
+			ifFalse: [result add: (list2 at: i2). i2 := i2 + 1]].
+	"Add remaining elements"
+	[i1 <= n1] whileTrue: [result add: (list1 at: i1). i1 := i1 + 1].
+	[i2 <= n2] whileTrue: [result add: (list2 at: i2). i2 := i2 + 1].
+	^result! !
 
 !ScannerHighlighter methodsFor: 'accessing'!
 tokens
