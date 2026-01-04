@@ -35662,9 +35662,12 @@ styleSource: sourceString
 styleMethod: sourceString inClass: aClass
 	"Answer a styled Text for a method in the given class.
 	 Makes the selector bold in addition to color highlighting."
-	| text |
+	| text t0 t1 |
 	text := self styleSource: sourceString.
+	t0 := Time millisecondClockValue.
 	text makeSelectorBoldIn: aClass.
+	t1 := Time millisecondClockValue.
+	Transcript show: 'makeSelectorBold: ', (t1 - t0) printString, 'ms'; cr.
 	^text! !
 
 !SyntaxStyler methodsFor: 'color mapping'!
