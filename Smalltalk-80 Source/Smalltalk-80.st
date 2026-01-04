@@ -29450,7 +29450,7 @@ text: aText
 	t0 := Time millisecondClockValue.
 	self composeAll.
 	t1 := Time millisecondClockValue.
-	Transcript show: 'Paragraph composeAll: ', (t1 - t0) printString, 'ms'; cr! !
+	Transcript ifNotNil: [Transcript show: 'Paragraph composeAll: ', (t1 - t0) printString, 'ms'; cr]! !
 
 !Paragraph methodsFor: 'displaying'!
 displayAt: aPoint
@@ -29529,7 +29529,7 @@ composeAll
 		 lineIndex _ lineIndex + 1].
 	self updateCompositionHeight.
 	self trimLinesTo: lineIndex - 1.
-	Transcript show: '  composeAll: scanner:', (t1-t0) printString, 'ms lines:', (lineIndex-1) printString, ' loop:', loopTime printString, 'ms'; cr.
+	Transcript ifNotNil: [Transcript show: '  composeAll: scanner:', (t1-t0) printString, 'ms lines:', (lineIndex-1) printString, ' loop:', loopTime printString, 'ms'; cr].
 	^maximumRightX!
 recomposeIn: compositionRect clippingBox: clippingRect 
 	"Set the composition rectangle for the receiver so that the lines wrap
@@ -39238,7 +39238,7 @@ displayView
 		ifTrue: [controller display]
 		ifFalse: [displayContents display].
 	t1 := Time millisecondClockValue.
-	Transcript show: 'displayView: ', (t1 - t0) printString, 'ms'; cr!
+	Transcript ifNotNil: [Transcript show: 'displayView: ', (t1 - t0) printString, 'ms'; cr]!
 positionDisplayContents
 	"Presumably the text being displayed changed so that the wrapping box and clipping box should be reset."
 
@@ -39257,7 +39257,7 @@ editString: aString
 				compositionRectangle: (self insetDisplayBox insetBy: self paragraphInset)
 				clippingRectangle: self insetDisplayBox.
 	t1 := Time millisecondClockValue.
-	Transcript show: 'Paragraph compose: ', (t1 - t0) printString, 'ms'; cr.
+	Transcript ifNotNil: [Transcript show: 'Paragraph compose: ', (t1 - t0) printString, 'ms'; cr].
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller changeParagraph: displayContents]!
 model: aLockedModel 
