@@ -35234,8 +35234,8 @@ Instance Variables:
 !ScannerHighlighter methodsFor: 'tokenizing'!
 tokenize: aString
 	"Answer a collection of SyntaxToken objects for the source string.
-	 OPTIMIZED: Gets comments from Scanner (no separate findComments pass)."
-	| stream t0 t1 estimatedTokens scannerTokens commentTokens positions |
+	 OPTIMIZED: Single pass - comments interleaved from Scanner, no merge needed."
+	| stream t0 t1 estimatedTokens commentPositions lastCommentIdx |
 	sourceString := aString.
 	aString isEmpty ifTrue: [^OrderedCollection new].
 
@@ -35245,30 +35245,28 @@ tokenize: aString
 
 	"Estimate token count for pre-sizing (roughly 1 token per 7 chars)"
 	estimatedTokens := (aString size // 7) max: 16.
-
-	"Scan all tokens - Scanner collects comment positions as it goes"
 	tokens := OrderedCollection new: estimatedTokens.
+	lastCommentIdx := 0.
+	commentPositions := scanner commentPositions.
+
+	"Scan all tokens - interleave comments as Scanner discovers them"
 	t1 := Time millisecondClockValue.
 	[scanner tokenType ~~ #doIt] whileTrue: [
+		"Insert any comments discovered since last token"
+		[lastCommentIdx < commentPositions size] whileTrue: [
+			| pair |
+			pair := commentPositions at: lastCommentIdx + 1.
+			tokens add: (SyntaxToken type: #comment start: (pair at: 1) end: (pair at: 2)).
+			lastCommentIdx := lastCommentIdx + 1].
 		self addCurrentToken.
 		scanner scanToken].
-	scannerTokens := tokens.
 
-	"Get comments from Scanner (collected during scan - no extra pass needed!)"
-	positions := scanner commentPositions.
-	positions isEmpty ifTrue: [
-		Transcript ifNotNil: [Transcript show: '  tokenize: ', (Time millisecondClockValue - t1) printString, 'ms n:', tokens size printString; cr].
-		^tokens].
-
-	"Build comment tokens from Scanner's positions"
-	commentTokens := Array new: positions size.
-	1 to: positions size do: [:i |
+	"Add any trailing comments after last token"
+	[lastCommentIdx < commentPositions size] whileTrue: [
 		| pair |
-		pair := positions at: i.
-		commentTokens at: i put: (SyntaxToken type: #comment start: (pair at: 1) end: (pair at: 2))].
-
-	"Merge - both lists are already sorted"
-	tokens := self merge: commentTokens with: scannerTokens.
+		pair := commentPositions at: lastCommentIdx + 1.
+		tokens add: (SyntaxToken type: #comment start: (pair at: 1) end: (pair at: 2)).
+		lastCommentIdx := lastCommentIdx + 1].
 
 	Transcript ifNotNil: [Transcript show: '  tokenize: ', (Time millisecondClockValue - t1) printString, 'ms n:', tokens size printString; cr].
 	^tokens!
