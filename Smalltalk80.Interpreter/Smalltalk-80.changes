@@ -1,1010 +1,0 @@
-ActionMenu comment:'ActionMenus carry an array of selectors which correspond to the listed menu items.  This allows a menu to stand alone in parameterizing a controller, since the controller just sends the selector to its model.
-
-ActionMenus allow the pluggable views experiment (TextView, SelectionInListView) to
-handle menus much easier than having pairs of variables for the menu and its associated
-selectors.  Obviously these menus eagerly await a proper objectification of protocol.'!Path comment:'I am the abstract base class for file system paths.
-I provide platform-independent path manipulation.
-
-Instance Variables:
-    components  <Array of String> path components
-
-Concrete subclasses implement platform-specific parsing and formatting.'!WindowsPath comment:'I represent a Windows file system path. I handle path parsing and manipulation
-without any file I/O operations.
-
-Instance Variables:
-    driveLetter   <Character|nil> drive letter (C, D, etc.) or nil for UNC/relative paths
-    uncServer     <String|nil> UNC server name (e.g., "server" from "\\server\share")
-    uncShare      <String|nil> UNC share name (e.g., "share" from "\\server\share")
-    components    <Array> path components (directories and filename after root)
-
-Class Variables:
-    Separator     <Character> the path separator (backslash on Windows)
-
-Path Representations:
-- Drive paths: C:\folder\file.txt (driveLetter=C, uncServer=nil, uncShare=nil)
-- UNC paths: \\server\share\folder\file.txt (driveLetter=nil, uncServer="server", uncShare="share")
-- Relative paths: folder\file.txt (driveLetter=nil, uncServer=nil, uncShare=nil)
-
-Parsing vs Canonicalization:
-During parsing (fromString:), I perform MINIMAL normalization to preserve user intent:
-- Forward slashes (/) are converted to backslashes (\) for internal consistency
-- Empty path components are removed
-
-I deliberately DO NOT canonicalize during parsing:
-- "." and ".." components are preserved as-is
-- Drive letter case is preserved (c: stays lowercase)
-- This allows round-tripping and retains the original path form
-
-To get a fully canonical path, explicitly call #canonicalize which:
-- Resolves "." (current directory) by removing
-- Resolves ".." (parent directory) by removing with parent
-- Uppercases drive letters for consistency
-
-This design gives callers control over when normalization occurs.'!FileSystemNode comment:'I am the abstract base class for file system entries (files and directories).
-I define the common protocol for accessing paths, testing existence, and
-manipulating attributes.
-
-Instance Variables:
-    pathName    <String> full path to this entry'!File comment:'I am the abstract base class for files.
-I represent file metadata and provide methods to create streams for reading/writing.
-
-Instance Variables:
-    binary  <Boolean> true if file should be accessed in binary mode'!Directory comment:'I am the abstract base class for directories.
-I define the protocol for listing, creating, and managing files and subdirectories.
-
-Concrete subclasses implement platform-specific directory operations.'!SymbolicLink comment:'I represent a symbolic link in the file system.
-Unlike hard links, I store a path to my target rather than sharing data.
-I can point to files or directories, on local or remote volumes.
-
-Instance Variables:
-    targetPath   <String> the path this link points to (may be relative or absolute)
-    targetType   <Symbol> #file, #directory, or #unknown
-
-Symbolic links differ from other link types:
-- Hard links: share file data, file only, same volume only
-- Junctions: directory only, local volumes only, absolute paths only
-- Symbolic links: file or directory, any volume, relative or absolute, supports UNC
-
-Key behaviors:
-- isSymbolicLink always returns true
-- linkTarget returns the stored target path
-- resolvedTarget follows the chain to the final target
-- isBroken returns true if the target does not exist'!FileSystem comment:'I am the abstract base class representing a platform file system.
-I provide:
-- Concrete class factories for platform-specific implementations
-- File system characteristics (case sensitivity, name constraints, etc.)
-- Directory access (root, current, home, temp)
-
-Concrete subclasses implement platform-specific behavior.'!WindowsFileSystem comment:'I am the Windows implementation of FileSystem.
-I provide Windows-specific file system behavior including NTFS characteristics.
-
-Class Variables:
-    Default     <WindowsFileSystem> the singleton instance'!WindowsFileStream comment:'I am the primary class for file I/O in the simplified file system architecture.
-I provide direct handle-based streaming without the legacy FilePage abstraction.
-
-Instance Variables:
-    pathName    <String> full path to the file
-    handle      <Integer> Windows file handle (-1 if closed)
-    position    <Integer> current read/write position
-    mode        <Integer> access mode (ReadMode, WriteMode, etc.)
-    closed      <Boolean> true if stream is closed
-    logicalSize <Integer> max position reached (tracks writes without OS query)
-
-Class Variables:
-    ReadMode       <Integer> = 1
-    WriteMode      <Integer> = 2
-    AppendMode     <Integer> = 3
-    ReadWriteMode  <Integer> = 4'!WindowsFile comment:'I am the Windows implementation of File.
-I use Windows API primitives to access file metadata and attributes.
-
-Inherits from File (abstract) which inherits from FileSystemNode.
-Instance variable pathName is inherited from FileSystemNode.'!WindowsDirectory comment:'I am the Windows implementation of Directory.
-I use Windows API primitives to implement directory operations.
-
-Inherits from Directory (abstract) which inherits from FileSystemNode.
-Instance variable pathName is inherited from FileSystemNode.
-
-Class Variables:
-    Separator           <Character> path separator (backslash)
-    ExternalReferences  <OrderedCollection> tracked file references'!WindowsSymbolicLink comment:'I am the Windows implementation of SymbolicLink.
-I use Windows symbolic links (not junctions) which support:
-- Both files and directories as targets
-- Relative or absolute target paths
-- Local and UNC (network) paths
-- Cross-volume links
-
-Creation requires either:
-- SeCreateSymbolicLinkPrivilege (administrator)
-- Developer Mode enabled (Windows 10 version 1607+)
-
-I am distinguished from junctions by the IO_REPARSE_TAG_SYMLINK reparse tag.'!AlwaysAcceptCodeController comment:'I am a code controller that will do an accept even if the text is the same.'!Arc comment:'A quarter of a Circle, the quadrant is specified by 1, 2, 3 or 4 points which indicate which part of the circle is to be displayed. Quadrants are numbered 1 - 4 counter clockwise.'!Array comment:'I am an arrayed collection of pointers.'!ArrayedCollection comment:'I am an abstract collection of elements with integers as external keys.  I re-implement several messages inherited from SequenceableCollection in order to obtain some performance gains.
-		Subclasses are
-	Array		 elements are pointers
-	ByteArray	elements are bytes
-	RunArray	elements are typically runs of the same thing
-	String		elements are characters
-	Text		elements are characters with style
-	WordArray		elements are words
-	
-	'!AssignmentNode comment:'I represent a (var_expr) construct.'!Association comment:'I am a pair of associated objects--a key and a value.  I can serve as an entry in a dictionary.  Think of my key as the left-hand side of the dictionary and my value as the right-hand side.'!Bag comment:'I am an unordered collection of elements.  I store these elements in a dictionary, tallying up occurrences of equal objects.  Because I store an occurrence only once, my clients should beware that objects they store will not necessarily be retrieved such that == is true.  If the client cares, a subclass of me should be created.'!Behavior comment:'Instance Variables:
-	superclass	<Behavior> links the chain of inheritance
-	methodDict	<IdentityDictionary> associates message names with methods
-	format		<Integer> encodes storage layout of instances
-	subclasses	<Set> back-pointers to the class'' subclasses
-
-Behavior provides the minimum state necessary for compiling methods, and creating and running instances.  Most objects are created as instances of the more fully supported subclass, Class, but Behavior is a good starting point for providing instance-specific behavior (as in Metaclass).'!Benchmark comment:'Class Benchmark contains facilities for timing the performance of your system and reporting the results.
-
-There are built-in methods for timing certain activities that occur frequently in using Smalltalk-80.  There are also facilities for timing the execution of most byte codes.
-
-It is intended that comparison of timing information between implementations and over time will allow implementors to discover where their systems could stand improvement and to gauge the value of intended performance enhancements.
-
-The main interface to these facilities is through sending the messsage
-	Benchmark new test: aBlock labeled: aLabel repeated: howManyTimes.
-This will cause howManyTimes executions of aBlock and report the results, using aLabel for ease of identification.
-
-The results can be reported in several different ways.  The default is to print a fairly verbose report in the Transcript.  But the reporting mode can be altered by sending the Benchmark which is going to perform a given test the message setOutputParameters.  This gives you the option of directing the report to a file or an internal stream and also of shortening the feedback in the Transcript.  The system automatically invites you to respecify the output parameters (e.g. naming a new output report file) whenever you test more than one thing at a time, using the message testList: (as in testStandardTests below).
-
-Try an example.  To time your system''s performance of simple addition, say
-	Benchmark new test3plus4
-or to time pushing an instance variable onto the stack, say
-	Benchmark new testLoadInstVar.
-
-If you had wished to print the results on a file or internal stream, you could have said
-	Benchmark new setOutputParameters testLoadInstVar.
-
-If you look at the code for these methods (e.g. testLoadInstVar), you will notice that it does a few things that you didn''t want to time, such as sending the message ==, or popping things off the stack.  This is to make the compiler happy or to keep the stack from overflowing.  So you may want to subtract this stuff out.  (Use systems of equations.  Be clever!!)
-
-The message category "macro operations" contains methods for timing more involved activities such as compiling, decompiling, editing text, formatting text, etc.
-
-There is a message to class Benchmark which will invoke all the built-in benchmarks sequentially.  Say
-	Benchmark testStandardTests.
-
-There are also facilities for examining or automatically comparing the output files or streams generated by testing a bunch of benchmarks sequentially.  See the "output" category.  Be sure to read the comment to the streamsRatherThanFiles code.
-
-Have fun and share your results with a friend.
-'!BinaryChoice comment:'I represent a true/false (yes/no) choice.  My instances have two possible actions they can take, depending on which choice is made.
-
-Instance variables
-	trueAction	<BlockContext>	sequence of expression to do if positive choice is made
-	falseAction	<BlockContext>	sequence of expression to do if negative choice is made
-	actionTaken	<Boolean> was the action, true or false, already taken
- '!BinaryChoiceController comment:'My instances assume that their model can carry out some action only once--that is, make a selection only once.  Control is given up if the model responds true to the message actionTaken.'!BinaryChoiceView comment:'I am a view of a BinaryChoice.  I display a question and two switches, yes and no, indicating choices the user can make.'!BitBlt comment:'The BitBlt operation copies bits from one rectangle within a Form (source) to another (dest).  The result is stored according to a combination rule which specifies one of the sixteen possibilities for how white and black should be combined.
-
-If halftoneForm is not nil, it is a halftone screen which masks (is ANDed with) the source during the operation.  Halftones are 16x16 bit Forms which are repeated indefinitely as needed by the BitBlt operation.
-
-If sourceForm is nil, the halftone is taken by itself to be the source, as for filling with a constant pattern.
-
-If color is not nil, it specifies a Color object for solid color drawing operations (32bpp). This is the preferred way to specify colors rather than using halftoneForm.
-
-The clipping parameters specify a rectangle in the destination outside of which BitBlt will not make any changes'!BitEditor comment:'A bit-magnifying tool for editing small Forms directly on the display screen.  Continue in blowup mode until the user depresses any key on the keyboard.'!BlockContext comment:'My instances function similarly to instances of MethodContext, but they hold the dynamic state for execution of a block in Smalltalk.  They access all temporary variables and the method sender via their home pointer, so that those values are effectively shared.  Their indexable part is used to store their independent value stack during execution.
-
-My instance must hold onto its home in order to work.  This can cause circularities if the home is also pointing (via a temp, perhaps) to the instance.  In the rare event that this happens (as in SortedCollection sortBlock:) the message fixTemps will replace home with a copy of home, thus defeating the sharing of temps but, nonetheless, eliminating the circularity.
-
-Instance Variables: *indexed*
-	nargs		<Integer> number of block arguments
-	startpc		<Integer> initial program counter for block body
-	home		<Context> lexical parent context (MethodContext in unified temp frame)
-
-Block Argument Handling (Blue Book Chapter 30):
-Primitive 81 (value/value:/value:value:) pushes arguments onto the BlockContext stack.
-The block body begins with STORE_TEMP bytecodes that pop the arguments into the correct
-slots in the home MethodContext temp frame. This handles non-contiguous slot mappings
-when block arguments reuse outer temporaries with matching names.
-'!BlockNode comment:'I represent a bracketed block with 0 or more arguments and 1 or more statements.  If I am initialized with no statements, I create one.  I have a flag to tell whether my last statement returns a value from the enclosing method.  My last three fields remember data needed for code generation.
-
-I can emit for value in the usual way, in which case I create a literal method (actually a context remotely copied) to be evaluated by sending it value: at run time.  Or I can emit code to be evaluated in line; this only happens at the top level of a method and in conditionals and while-loops, none of which have arguments.'!Boolean comment:'I implement behavior common to true and false.'!BooleanView comment:'BooleanView is a "pluggable" view of a boolean value.  The notion of pluggable views is an
-experiment in user interface design.  The idea is to provide a view which can be plugged
-onto any object, rather than having to define a new subclass specific to every kind of
-object which needs to be viewed.
-
-The chief mechanism is a set of selectors, which can be thought of as an adaptor to
-convert the generic textView operations (such as interrogateModel) into model-specific
-operations (such as metaclassSelected).
-
-See the creation messages in my class for an explication of the various parameters.
-Browse senders of the creation messages in my class for examples in the system.'!Browser comment:'A browser represents a hierarchical query path which identifies a method to be examined.
-
-organization - a SystemOrganizer
-category - a selection from all categories in the organization.
-className - a selection from all classes in the category.
-meta - false for viewing normal methods, true for class methods.
-protocol - a selection from all protocols in the class.
-selector - a selection from all messages in the protocol.
-textMode - symbol indicating the nature of the currently viewed text.'!BrowserView comment:'I am a StandardSystemView that provides initialization methods (messages to myself) to create and schedule the various system browsers:  System Browser, System Category Browser, Class Browser, Message Category Browser, Message Browser.'!Button comment:'I am a Switch that turns off automatically after being turned on, that is, I act like a push-button switch.'!ByteArray comment:'My elements can only be integers between 0 and 255.  The access messages at: and at:put: are handled primitively in class Object'!WordArray comment:'WordArrays provide contiguous storage of data, primarily to hold the graphical data of Forms.  Forms and their subclasses provide the additional structural information as to how the bits should be interpreted in two dimensions.'!CascadeNode comment:'The first message has the common receiver, the rest have receiver == nil, which signifies cascading.'!Change comment:'I represent a single change of some kind.  I have many subclasses for specific kinds of changes.  The text which represents me is a chunk of a file starting at a particular position.
-
-Since so many kinds of changes are related to classes, categories, and methods, there are dummy accessing methods for these parameters in class Change.
-
-Instance variables:
-	file <FileStream>
-	position <Integer>
-'!ChangeController comment:'I am the text view controller for a change browser.'!ChangeList comment:'I know how to scan a changes file and produce Change objects from it.  I also function as a model for a ListView.
-
-Instance variables:
-	listName <String> "label for browser, the set of files that I have read"
-	changes <OrderedCollection of: Change> "my underlying collection of changes"
-	selectionIndex <Integer> "currently selected change, or 0 if none"
-	currentChange <String> "text of current selection"
-	list <OrderedCollection of: Change> "filtered collection of changes"
-	filter <BlockContext> "filter predicate"
-	removed <Set> "removed changes"
-	filterList <Array of: Symbol> "individual filters, or nil"
-	filterKey <Change> "the change supplying the key value(s) for the filter(s)"
-	changeDict <Dictionary from: Symbol to: (OrderedCollection of: Change)> "cross-index for conflict detection"
-	doItDict <Dictionary from: String to: (OrderedCollection of: Change)> "cross-index for conflict detection"
-	fieldList <Array of: Symbol> "individual field options, or nil"
-	'!ChangeListController comment:'I am the controller for ChangeListView, handling the list menu.'!ChangeListView comment:'I am a list view of various system changes.'!ChangeScanner comment:'I know how to parse a file into a collection of changes.'!ChangeSet comment:'I keep track of the changes made to a system, so I can make an incremental fileOut.  I do not remember the order in which changes are made although this sometimes matters.
-
-Instance variables:
-	classChanges	<Dictionary> {class name -> <Set> 
-						{add, change, comment, rename, reorganize, ''oldName: xxx''}}
-	methodChanges	<Dictionary> {class name -> <IdentityDictionary> 
-										{selector -> add | change | remove}}
-	classRemoves	<Set> {class name}
-	reorganizeSystem	<Boolean> - indicates if SystemOrganization was changed.
-	specialDoIts		<OrderedCollection> of Smalltalk expressions.'!Character comment:'This class represents characters by storing their associated ASCII (extended to 256 codes) code.  The instances of this class are created uniquely, so that all instances $R (for instance) are identical'!CharacterBlock comment:'CharacterBlocks contain information about displayed characters.  They are used to return the results of methods
-	Paragraph characterBlockAtPoint: aPoint and
-	Paragraph characterBlockForIndex: stringIndex.
-Any recomposition or movement of a Paragraph can make the information obsolete.'!CharacterBlockScanner comment:'Instance Variables
-
-	characterPoint
-<Point>  Used in character location domain.  The topLeft of the character to be returned in a CharacterBlock.
-
-	characterIndex
-<Integer>  Used in character location domain.  The index in the stylizedString of the character to be returned in a CharacterBlock.
-
-	lastCharacter
-<Character>  Used in character location domain.  The character to be returned in a CharacterBlock.
-
-	lastCharacterExtent
-<Point>  Used in character location domain.  The extent of the character to be returned in a CharacterBlock.  The height is usually the stringStyle*s lineGrid.
-
-	lastSpaceOrTabExtent
-<Point>  Used in character location domain.  If the lastCharacter is a space or a tab, this will be its extent, an unexpected value when justification is turned on, and a variable value in the case of tab no matter what the alignment value is.
-
-	nextLeftMargin
-<Integer>  When, as in the case of cr, the left margin of the succeeding line is what is desired, this value, known to the paragraph is needed.  Since the paragraph is not available to the stop conditions, this value is set when the line of the character is discovered and before access to the paragraph is lost.
-
-CharacterBlockScanners are used to scan text to compute the CharacterBlock for a character specified by its index in the text or its proximity to the cursor location'!CharacterScanner comment:'My instances hold the state associated with scanning text.
-
-
-Instance Variables
-
-	lastIndex
-<Integer>  String index of last character scanned.
-
-	xTable
-<Array>  Array left x-coordinates of character glyphs (cached from font).
-
-	stopConditions
-<Array>  Array of selectors to perform when scanning various characters.
-	----
-	text
-<Text>  The text being scanned.
-
-	textStyle
-<TextStyle>  The style (font set, etc.) being used with this text.
-
-	leftMargin, rightMargin
-<Integers>  Screen coordinates delimiting the text.
-
-	font	
-<StrikeFont>  The font currently in use.
-
-	line	
-<TextLineInterval>  Giving the current range in text.
-
-	runStopIndex
-<Integer>  Where the current run ends in text.
-
-	spaceCount
-<Integer>  How many spaces have been scanned in this line.
-
-	spaceWidth
-<Integer>  How wide spaces should be in this line.
-
-	outputMedium
-<Symbol>  Either #Display, #PressPrinter or #DisplayPrinterWidths as of 1/20/80.  Needed by CompositionScanner for determining the nature of the font to be used for character widths.  For the DisplayScanner there are several places where distinguishing between displaying and printing is required.
-
-The first three variables are required (in addition to inherited BitBlt state) by the primitive scanning operation.
-
-
-'!Checker comment:'I contain a collection of checks to run for system consistency.'!Circle comment:'A full circle is made from four arcs.'!Class comment:'My instances describe the representation and behavior of objects.  I add more comprehensive programming support facilities to the basic attributes of Behavior and the descriptive facilities of ClassDescription.  An example is accessing shared (pool) variables.
-
-Instance Variables:
-		name		<Symbol> name of class for printing and global reference
-		classPool	<Dictionary> of variables common to all instances
-		sharedPools	<Array> of Dictionaries access to other shared variables
-'!ClassCategoryReader comment:'Instance Variables:
-	class		<ClassDescription> the class being read in
-	category	<String> the category for methods being read in
-
-I am created during fileIn in response to "class methodsFor: cat" message.  I subsequently scan consecutive "chunks" from the fileIn stream and ask class to compile them in this category.  I continue in this way until an empty chunk is found.'!ClassChange comment:'I am a change to some part of a class definition (actual definition, comment, name, ...) as opposed to a change to a method within a class.'!ClassCommentChange comment:'I am a change to some part of a class comment.'!ClassDefinitionChange comment:'I am a change to some part of a class definition.'!ClassDescription comment:'Instance Variables:
-		instanceVariables	<Array> names of instance fields
-		organization		<ClassOrganizer> provides organization of message protocol
-
-ClassDescription adds a number of facilities to basic Behavior:
-		- named instance variables
-		- category organization for methods
-		- the notion of a name of this class (implemented as subclass responsibility)
-		- the maintenance of the Changes set, and logging changes on a file
-		- most of the mechanism for fileOut
-ClassDescription is an abstract class: its facilities are intended for inheritance by the two subclasses, Class and Metaclass.'!ClassOrganizer comment:'Instance variables:
-	globalComment		<RemoteString> comment for the class as a whole
-	categoryArray		<Array of: String> category names
-	categoryStops		<Array of: Integer> see below
-	elementArray		<Array of: Symbol> message selectors
-
-ClassOrganizers contain the categorization information for classes.  A ClassOrganizer consists of an Array of category names (categoryArray), each of which refers to an Array of elements (elementArray).  This association is made through an Array of stop indices (categoryStops), each of which is the index in elementArray of the last element (if any) of the corresponding category.
-	For example:
-		categories _ Array with: #firstCat with: secondCat with: thirdCat 
-		stops _ Array with: 1 with: 4 with: 4
-		elements _ Array with: #a with: #b with: #c with: #d
-	means that category firstCat has ony #a, secondCat has #b, #c, and #d,
-		and thirdCat has no elements.
-	This means that stops at: stops size must be the same as elements size.'!ClassOtherChange comment:'I represent a change to a class, other than a class definition.  Possible types are:
-	comment, initialize, inst vars for, rename, rename to'!ClassRelatedChange comment:'I am a change related in some way to a particular class.'!CodeController comment:'This controller adds some capability appropriate only to viewing Smalltalk code,
-such as ''explain'' and ''format''.'!CodeView comment:'I am a TextView that assumes the text is code.  I include support for initial selection of a part of the text.'!Collection comment:'I am the abstract class of all collection classes.'!CompiledMethod comment:'I represent a method suitable for interpretation by the virtual machine.  My instances have pointer fields, including a header and some literals, followed by non-pointer fields comprising the byte encoded instructions for the method.  The header encodes the number of arguments, the number of literals, and the amount of temporary space needed (for context allocation).
-
-An extra three bytes are added after the executable code.  These contain an external file address to the source code for the method.
-
-Instance Variables: *byte indexed*'!Compiler comment:'The compiler accepts Smalltalk source code from sourceStream, and compiles it in the context of a given class.  The debugger supplies a context as well, so that temporary variables are accessible.  If there is an error, the requestor (usually a CodeController) is sent the message notify:at:in:.  If not, then the result of compilation is a parse tree (made up of subinstances of ParseNode) whose root is a MethodNode.  The parse tree can then generate code in a CompiledMethod (for compile or evaluate), or prettyPrint the code (for format), or produce a map from object code back to source code (used by debugger pc selection).  See also Parser, Encoder, ParseNode.'!CompositionScanner comment:'My instances hold the state of CharacterScanner in addition to the following required only for composition.
-
-Instance Variables
-
-	spaceX
-<Integer>  Left edge of last space scanned.  When line overflows this value is substracted from the rightMargin to determine how much padding is available for justification, centering, etc.
-
-	spaceIndex
-<Integer>  Character index of last space scanned in line.  Installed as stop in the TextLineInterval for the line being composed.
-	
-CompositionScanners are used to measure text and determine where line breaks and space padding should occur.'!ContextInspector comment:'I represent a query path into the internal representation of a ContextPart.  Typically this is a context at a point in the query path of a Debugger.  As a StringHolder, the string I represent is the value of the currently selected variable of the observed temporary variable of the context.
-
-Instance Variables:
-	contextCode	<String> the method whose activation is being inspected
-	tempNames	<Array> of Strings, each the name of a temporary variable.
-'!ContextPart comment:'Instance Variables:
-	stackp	<Integer> indicating the offset of the top of my temporary value stack
-
-To the instruction parsing ability of InstructionStream I add the actual semantics for execution.  The execution state is stored in my subclasses indexable fields, which store temporary variables and a stack of values used in evaluating expressions.  The actual semantics of execution can be found in my category "simulator", which exactly parallels the operation of the Smalltalk machine itself.'!Controller comment:'A Controller coordinates a View, its model, and user actions'!ControlManager comment:'I represent the top level control over scheduling which controller of a view on the screen the user is actively using.  ScheduledControllers is the global reference to an instance of me, the one attached to the Project currently being used.
-   
-Instance Variables:
-	scheduledControllers	<OrderedCollection> of Controllers, usually ScheduledControllers
-	activeController		<Controller> usually a ScheduledController
-	activeControllerProcess	<Process>
-	screenController 	<ScreenController> also appears in ScheduledControllers
-	'!CRFillInTheBlankController comment:'I am a FillInTheBlankController that causes termination on a carriage return.'!Cursor comment:'I am a 16 x 16 dot matrix suitable for use as the current cursor.'!Curve comment:'A subclass of Path that is a conic section determined by
-				three points p1,p2 and p3 that interpolates p1 and p3
-				and is tangent to p1,p2 and p3,p2 at p1 and p3 respectively.'!Date comment:'Implements dates.'!Debugger comment:'The debugger allows browsing among the stack of contexts of a suspended process.  In addition to viewing the source code at each level, the debugger supports inspection (and change) of temporary and instance variables in each context.
-
-Instance Variables:
-	context				<ContextPart> the currently viewed context
-	receiverInspector	<Inspector> on instance variables in the current context
-	contextInspector		<Inspector> on temporary variables in the current context 
-	shortStack			<Boolean> true if only a short portion of the stack is being shown
-	sourceMap			<SortedCollection> of associations (pc -> range)
-	tempNames			<Array of: String>, cached names of the temporary variables
-	processHandle		<ProcessHandle> holding onto the observed process'!Decompiler comment:'I translate CompiledMethods into source code.'!DecompilerConstructor comment:'I am used by the decompiler to construct parse tree nodes and other appropriate items corresponding to each unit identified by the decompiler.  This factoring allows the decompiler, in principle, to use other constructors for other purposes. '!Delay comment:'I represent a realtime delay in the execution of a Process.  See the howToUse message in the class messages.
-
-Instance Variables: 
-		delayDuration		<Integer> number of milliseconds to delay process
-		resumptionTime		<Integer> value of millisecond clock at which to resume
-		delaySemaphore		<Semaphore> on which to delay process
-		delayInProgress		<Boolean> true if delaying now
-'!Dictionary comment:'I am a set of associations.'!DictionaryInspector comment:'Note that the "field" instance variable of DictionaryInspectors contains the actual current dictionary key object, not a field name string.'!DisplayBitmap comment:'This subclass of Bitmap is used to indicate the particular bitmap which is being displayed, so that various implementations can treat it specially'!DisplayMedium comment:'I am a display object which can both paint myself on a medium (displayOn: messages), and can act as a medium myself.  My chief subclass is Form.'!DisplayObject comment:'The abstract protocol for most display primitives that are used by Views for presenting information on the screen.'!DisplayScanner comment:'My instances hold the state of CharacterScanner in addition to the following required only for displaying or printing.  They are used to scan text and display it on the screen or in a hidden form.
-
-Instance Variables
-
-	lineY	<Integer>  Top of line currently being displayed or scanned.  The textStyle lineGrid is added or subtracted to discover the top of the next line.  May differ from destY when fonts of differing height fall on the same line.
-
-	runX	<Integer>  Left of first character in the current run -- allows for creating underlining or similar emphasis.
-
-	defaultMask	<Form>  The default halftone mask (from Paragraph) used when no color is specified.
-'!DisplayScreen comment:'There is only one instance of me, CurrentDisplay.  It is a global and is used to handle general user requests to deal with the whole display screen.  Although I offer no protocol, my name provides a way to distinguish this special instance from all other Forms.'!DisplayText comment:'I get used two different ways in the system.
-In the user interface I mainly hold onto some text which is viewed by some form of ParagraphEditor.  However, as a DisplayObject, I may need to display efficiently, so form caches the bits for that purpose.'!DisplayTextView comment:'I represent a view of an instance of DisplayText.
-
-Instance Variables:
-	rule		<Integer> according to which character display behaves:  equal over, under, 
-			and reverse.
-	mask	<Form> with which each character is combined by the display scanner
-			before applying the rule.
-	editParagraph	<Paragraph> the composed text ready for display'!Encoder comment:'I encode names and literals into tree nodes with byte codes for the compiler.  Byte codes for literals are not assigned until the tree-sizing pass of the compiler, because only then is it known which literals are actually needed.  I also keep track of sourceCode ranges during parsing and code generation so I can provide an inverse map for the debugger.
-
-scopeTable is a dictionary of (names->nodes)
-nTemps is the count of temporaries used so far
-supered is true if super has been used in this method
-requestor is usually a parser
-class is the class in which we are compiling - used to look up class and pool variables
-literalStream accumulates the literals used in this method
-selectorSet is a dictionary of (selectors->nodes) predefined or used in this method
-litIndSet is a dictionary of (poolVars->nodes) used in this method
-litSet is a dictionary of (constants->nodes) used in this method
-sourceRanges is a dictionary of (node->source interval)s'!Explainer comment:'I try to determine what a piece of text represents, usually in the context of a method.'!ExternalStream comment:'I represent an accessor for a sequence of objects that communicate to the outside world.  My instances can contain non-homogenous elements.  Assumes streaming on a collection of binary, byte-sized elements.  My methods assume that a "word" consists of two-bytes.'!False comment:'I describe the behavior of my sole instance, false'!FileList comment:'I an a FileModel that can be viewed as a filtered ListMenu of file names as well as the text of a file.
-
-	Instance Variables
-	list				<OrderedCollection> of file names
-	myPatytern		<String> represtenting the filter to select the list'!FileModel comment:'I represent an interface between a File and an editable view of it.  As a StringHolder, the string is the contents of the File.
-
-Instance Variables:
-	fileName	<String> The name of the file I am viewing.'!FileStream comment:'I provide stream-based access to files. My class methods (fileNamed:, newFileNamed:, oldFileNamed:)
-delegate to WindowsFileStream for modern stream-based file I/O.
-
-To use the file system, send one of my class methods:
-  FileStream fileNamed: aPath      - open for read/write
-  FileStream newFileNamed: aPath   - create/truncate for writing
-  FileStream oldFileNamed: aPath   - open existing for reading
-
-All class methods return a WindowsFileStream instance which provides the actual I/O.
-
-Note: The legacy instance methods using FilePage are deprecated. Use WindowsFileStream directly
-for new code, or use the class methods which delegate to WindowsFileStream.'!FillInTheBlank comment:'I represent a request for information that will be applied as the argument of a block of actions.
-
-Instance Variables
-	actionBlock	<BlockContext>
-	actionTaken <Boolean> whether the actonBlock has been evaluated at least once
-'!FillInTheBlankController comment:'I am a StringHolderController for a FillInTheBlankView.  The string is information that the user can type in and edit.  Upon issuing the accept command, this information is used by my model in the evaluation of an action block.'!FillInTheBlankView comment:'I am a view of a FillInTheBlank--I display a query and an area in which the user can type some information.'!Float comment:'I represent floating-point numbers in IEEE 32-bit format.
-
-These floating-point numbers are good for about 8 or 9 digits of accuracy, and the range is between plus and minus 10^32.
-Here are some valid floating-point examples:
-	8.0   13.3   0.3   2.5e6   1.27e-30  1.27e-31 -12.987654e12
-Mainly: no imbedded blanks, little e for tens power, and a digit on both sides of the decimal point.'!Form comment:'This class is a rectangular pattern of dots represented as a Smalltalk Bitmap.'!FormButtonCache comment:'I am used to save information needed to construct the menu for the form editor.  A collection of my instances is an class variable of FormMenuView.'!FormEditor comment:'This is the basic Form Editor provided in Smalltalk for
-				creating and modifying Forms.  This is intended to be
-				an easy to use general-purpose picture (bitMap) editor.'!FormHolderView comment:'I represent a view of a Form.  Editing takes place by modifying a working version of the Form.  The message accept is used to copy the working version into the Form;  the message cancel copies the Form into the working version.
-
-Instance Variables:
-	displayedForm <Form> a working version of the Form for cancelable editing'!FormMenuController comment:'Adds keyboard mapping to the menu selection.'!FormMenuView comment:'I represent a View whose subViews are Switches (Buttons or OneOnSwitches) whose actions set the mode, color, and tool for editing a Form on the screen.  The default controller of my instances is FormMenuController.'!FormView comment:'This class has as its model a Form.  It is used mainly
-			to allow display of Forms on the display screen in the
-			model-view-controller metaphor.'!Fraction comment:'I represent some rational number as a fraction.  All public arithmetic operations return reduced fractions.'!IdentityDictionary comment:'I am a subclass of Dictionary in which the lookup is done using == rather than =.  I am represented as two parallel ordered collections of keys and values, rather than as a single collection of associations.'!IdentitySet comment:'Just like Set, but uses == instead of = for comparisons'!IndicatorOnSwitchController comment:'I am a SwitchController that has its View (a SwitchView) highlighted while the model (a Switch) handles the messages it is sent.'!InfiniteForm comment:'I represent a Form obtained by replicating a pattern form indefinitely in all directions.'!InputSensor comment:'
-I represent an interface to the user input devices.  There is at least one instance of me named Sensor in the system.
-
-	keyboardMap  - <String> indexed by (256 * meta key state + ASCII code + 1)'!InputState comment:'
-I represent the state of the user input devices.
-
-Instance Variables:
-		x  <Integer> mouse X location 
-		y  <Integer> mouse Y location 
-		bitState  <Integer> mouse button and keyset state 
-		lshiftState  <1 or 0> state of left shift key 
-		rshiftState  <1 or 0> state of right shift key 
-		ctrlState  <2 or 0> state of ctrl key 
-		lockState  <4 or 0> state of shift-lock key 
-		metaState  <Integer> combined state of the meta keys 
-		keyboardQueue  <SharedQueue> of keyboard characters 
-		deltaTime  <Integer> sampling ticks since last setting of baseTime 
-		baseTime  <Integer> millisecond timer at last resync 
-		
-'!Inspector comment:'I represent a query path into the internal representation of an object.  The value of fields
-can be inspected by selecting the field name, and can be changed using ''accept''.
-
-Instance Variables:
-	object		any object to be queried
-	field		<String> name of field being viewed'!InspectorView comment:'I am a StandardSystemView that provides initialization methods (messages to myself) to create and schedule the interface to an object Inspector.  I have two subViews, an InspectListView and an InspectCodeView.'!InstructionPrinter comment:'Instance Variables:
-	stream	<WriteStream> accumulates symbolic output
-	oldPC	<integer> remembers where current instruction started
-
-An InstructionPrinter can print the object code of a CompiledMethod in symbolic format.  It prints into stream, and uses oldPC to know how many bytes to print in the listing.
-The inherited variable "sender" is used in an ugly way to hold the method being printed.'!InstructionStream comment:'Instance Variables:
-	sender	<Context>, sometimes <CompiledMethod>
-	pc		<Integer> pointing into my method
-
-As a superclass of contexts, I store the return pointer in sender, and the current position in my method in pc.
-
-This class by itself has the ability to interpret the byte-encoded Smalltalk instruction set and maintains a program counter (pc) for streaming through CompiledMethods.  Contexts thus inherit all this capability and, for other users, sender can hold a method to be similarly interpreted.  The unclean re-use of sender to hold the method was to avoid a trivial subclass for the stand-alone scanning funtion.'!Integer comment:'I am a common abstract superclass for all Integer implementations.  My implementation subclasses are SmallInteger, LargePositiveInteger, and LargeNegativeInteger.'!Interval comment:'I represent a finite arithmetic progression'!KeyboardEvent comment:'
-I represent a keyboard event consisting of a non-meta key being struck plus the state of the meta keys at that moment.  Only InputState creates instances of me.
-
-Instance Variables:
-		keyCharacter "<Integer> non-meta key character"
-		metaState "<Integer> combined state of meta keys"
-		
-'!LargeNegativeInteger comment:'A negative large integer.  Nearly all the work is done in Integer: LargeNegativeInteger just overrides a few messages.'!LargePositiveInteger comment:'A positive large integer.  Nearly all the work is done in Integer: LargePositiveInteger just overrides a few messages.'!LeafNode comment:'I represent a leaf node of the compiler parse tree.  I am abstract.
- Types (defined in class ParseNode):
-	1 LdInstType (which uses class VariableNode)
-	2 LdTempType (which uses class VariableNode)
-	3 LdLitType (which uses class LiteralNode)
-	4 LdLitIndType (which uses class VariableNode)
-	5 SendType (which uses class SelectorNode)'!Line comment:'This Class is a Line specified by two points. This is a sub-class of path though the two points that determine the line are called begin and end.  '!LinearFit comment:'A subclass of Path that is a piece-wise linear
-				approximation to a set of points in the plane.'!Link comment:'I am a simple record of a pointer to another Link'!LinkedList comment:'I implement ordered collections using a chain of elements.  I can be initialized using
-	LinkedList with: Link new
-'!ListController comment:'I am a kind of ScrollController that assumes that the view is a kind of ListView.  Therefore, scrolling means moving the items in a textual list (menu) up or down. In addition, I provide the red button activity of determining when the red button is selecting an item in the list.'!ListView comment:'I am an abstract View of a list of items.  I provide support for storing a selection of one item, as well as formatting the list for presentation on the screen.  My default controller is ListController.
-
-Instance Variables:
-	list				<Array> of Strings, each one an item
-	selection		<Integer> index into the array, list
-	topDelimiter		<String>, usually  ------------, indicating the top of the list
-	bottomDelimiter	<String>, usually  ------------, indicating the bottom of the list
-	lineSpacing		<Integer> the amount of extra space between line items
-	isEmpty			<Boolean> true if the list is empty
-	'!LiteralDictionary comment:'LiteralDictionaries check not only for equality but also for same class of their keys.
-This avoids the problem of 0 being considered = to 0.0 as in Dictionaries, and it
-also avoids the problem of 1.3 not being == to 1.3 (necessarily), as in IdentityDictionaries.'!LiteralNode comment:'I am a parse tree leaf representing a literal string or number'!LockedListController comment:'I am a kind of ListController that blocks new selections if the model is locked--i.e., has been changed in some way that still requires completion.'!LockedSwitchController comment:'I am a SwitchController that will not take control if the model (a Switch) is locked.  As an indication, the view (a SwitchView) flashes.'!LookupKey comment:'I serve as the key for looking up entries in a Dictionary.  Subclasses of me are dictionary entries.  An available example is Association.'!Magnitude comment:'This abstract class assists subclasses which measure something linear like dates or times.'!MappedCollection comment:'I am re-ordering or subcollecting of a writeable SequenceableCollection.'!Message comment:'I represent a selector and its argument values.  
-
-Generally, the system does not use instances of Message.  However, when a message is not understood by its receiver, the interpreter will make up a Message (to capture the information involved in an actual message transmission) and send it as an argument with the message doesNotUnderstand:.'!MessageNode comment:'I represent a receiver and its message.
-
-Precedence codes:
-	1 unary
-	2 binary
-	3 keyword
-	4 other
-
-If special>0, I compile special code in-line instead of sending messages with literal methods as remotely copied contexts.'!MessageTally comment:'See the comment for spyOn: in MessageTally class for an example of how to use the spy.
-
-MessageTallies represent nodes in a tree which gathers statistics on the time spent in various parts of the system.  Specifically, each node represents a message being sent.  During the evaluation of an expression, a timer periodically interrupts the execution of the various methods involved, and tallies these probes in the tree of MessageTallies which it constructs.  When evaluation of the expression is complete, a detailed report is produced indicating where in the system most of the time was spent.
-
-Instance variables:
-	class		<Behavior> the class of the receiver of the message
-	method		<CompiledMethod> which was running when probe occurred
-	tally		<Integer> number of probes which hit this method or others
-				called by it
-	receivers	<Collection of MessageTally> sons of this node in the tree,
-				representing tallies of methods called from this one.
-				If this field is nil, it indicates tallies due to in-line primitives
-
-MessageTallies may be taken on only one block at a time.  Spying on two blocks at once does not work.  The block upon which the MessageTally is spying can be stopped and started.  See spyEvery:on:.'!Metaclass comment:'Instance Variables:
-	thisClass	<Class> the chief instance of me, which I describe
-		
-Metaclasses add instance-specific behavior to various classes in the system.  This typically includes messages for initializing class variables and instance creation messages particular to that class.  There is only one instance of a metaclass, namely the class (thisClass) which is being described.  A metaclass shares the class variables of its instance.
-
-[Subtle] In general, the superclass hierarchy for metaclasses parallels that for classes.  Thus,
-	Integer superclass == Number, and
-	Integer class superclass == Number class.
-However there is a singularity at Object.  Here the class hierarchy terminates, but the metaclass hierarchy must wrap around to Class, since ALL metaclasses are subclasses of Class.  Thus,
-	Object superclass == nil, and
-	Object class superclass == Class.'!MetaclassForMultipleInheritance comment:'This metaclass has an additional field and protocol to support multiple inheritance.
-The field, otherSupers, contains a collection of additional superclasses (other than the normal dynamic one) from which traits are to be inherited.  Since the otherSupers appears in the metaclass, classes must ask their metas for other supers (sort of the way metas ask their thisClasses for subs).
-
-It would have been more natural to put otherSupers into a class ClassWithMultSupers, but this would have had to inherit both the multiple supers AND the normal metaclass
-inheritance, thus posing a bootstrapping need for multiple inheritance.'!MethodChange comment:'Represents a change to a method (new definition or removal).'!MethodContext comment:'My instances hold all the dynamic state associated with the execution of a CompiledMethod.  In addition to their inherited state, this includes the receiver, a method, and temporary space in the variable part of the context.
-
-MethodContexts, though normal in their variable size, are actually only used in two sizes, small and large, which are determined by the temporary space required by the method being executed.
-
-Instance Variables:  *indexed*
-	method			<CompiledMethod>
-	lexicalParent		<MethodContext | nil>  The context where this method/block was defined (nil for top-level methods, non-nil for blocks)
-	receiver			<Object>
-'!MethodDefinitionChange comment:'I represent a change to the text of a method (as opposed to a category change or a removal).'!MethodDescription comment:'I model the result of looking up a selector name.  Usually I simply identify an existing method in some class in the system.  However, the lookup may fail, in which case I know the message would not be understood.  Also, in multiple inheritance situations, the lookup may yield conflicting results, in which case I will know that as well.'!MethodDictionary comment:'MethodDictionaries behave just the same as IdentityDictionaries, except that
-removal is implemented as an atomic operation.  This allows the interpreter
-to access methodDictionaries removal without getting confused.'!MethodListBrowser comment:'I represent a list of methods to be browsed.'!MethodNode comment:'I am the root of the parse tree.'!MethodOtherChange comment:'Represents a change to a method other than new definition or removal.'!MouseMenuController comment:'I am a Controller that modifies the scheduling of user activities so that the three mouse buttons can be used to make selections or display menus.  The menu items are unary messages to the value of sending my instance the message menuMessageReceiver.
-
-Instance Variables:	
-	redButtonMenu			<PopUpMenu>
-	redButtonMessages		<Array> of Symbols, unary messages
-	yellowButtonMenu		<PopUpMenu>
-	yellowButtonMessages	<Array> of Symbols, unary messages
-	blueButtonMenu		<PopUpMenu>
-	blueButtonMessages		<Array> of Symbols, unary messages
-	'!NoController comment:'I represent a controller that never wants control.  I am the controller for views that are non-interactive.'!NotifierController comment:'I am a kind of MouseMenuController that creates a yellow button menu for proceeding an interrupted process or for creating and scheduling a debugger on the interrupted machine state.  I give up control if a blue button is pressed or if the cursor is not inside the view.'!NotifierView comment:'I am a view of interrupted machine state.  The interruption occurred in order to notify the user that some action to be taken is dangerous, perhaps because it is not recoverable. I contain one subView in which the notification information is displayed.  My default controller is NotifierController.
-
-Instance Variables:
-	contents	 <String> the notification information'!Number comment:'The abstract class Number is at the top of the number hierarchy.  Its subclasses are Float, Fraction, and Integer.'!Object comment:'Object is the superclass of all classes.  It thus provides default behavior common to all objects, such as class access, copying and printing.'!OneOnSwitch comment:'I am a kind of Switch that can be connected to some related object, typically to a collection of my instances.  When my instance is created, its connection is set to a particular object.  When the object changes because an instance is turned on, an update message is broadcasted.  All the connected OneOnSwitches, except the changed one, turn off.  This allows OneOnSwitches to maintain the constraint that at most one of them will be on at any time.  OneOnSwitches can thus be made to act like "car radio" switches.
-
-Instance Variables:
-	connection	any object
-'!OnlyWhenSelectedCodeController comment:'I am a code controller that will not take control unless my model has some selection.'!OnlyWhenSelectedCodeView comment:'I am a code view for an OnlyWhenSelectedCodeController.'!OpaqueForm comment:'OpaqueForms include a shape as well as a figure form.  The shape indicates what part of the background should get occluded in displaying, so that patterns other than black in the figure form will still appear opaque.'!OrderedCollection comment:'I am an ordered collection of elements.'!OtherChange comment:'I represent a non-classifiable change, i.e. a doIt.  I cache my text to reduce disk accesses.'!Paragraph comment:'
-The font and emphasis changes for text is fundamentally more complex than such graphical entities as a bar chart or pie chart.  Hence many of the methods associated with Paragraph tend to be, stylistically, longer and more complex than those in most other system classes.
-
-Instance Variables:
-
-	clippingRectangle
-<Rectangle>  A Rectangle in CurrentDisplay coordinates. Its intersection with the compositionRectangle in turn intersected with the destinationForm is the area in which characters are constrained to display.
-
-	compositionRectangle
-<Rectangle>  Its offset serves as a relative offset similar to the offset field in Form.  The width of the compositionRectangle is the dimension, modified by indents and tabsLevels, against which line wraparound is measured.  The height of the compositionRectangle is reset each time recomposition is required.  This happens when the stylizedString is initially composed and whenever a replacement (copyReplaceFrom:to:with:) occurs.
-
-	destinationForm	
-<Form>  The Form into which the characters are scanned.  Typically CurrentDisplay.
-	rule	
-<Integer>  The rule according to which character display behaves. For example, rule may equal over, under, reverse, etc.
-
-	mask
-<Form>  The form with which each character is combined by the scanner before applying the rule for display.
-
-	marginTabsLevel
-<Integer>  The margin tabs give the left and right indent values for a specified marginTabsLevel.  The marginTabsLevel is sometimes referred to as the nesting level and is an index into the marginTabsArray of the stringStyle.
-
-	firstIndent
-<Integer>  Amount to inset from the left margin for the first line of a paragraph. Initialized to value in the textStyle.
-
-	restIndent
-<Integer>  Amount to inset from the left margin for all but the first line of a paragraph. Initialized to value in the textStyle.
-
-	rightIndent
-<Integer>  Amount to inset from the right margin for all the lines of the paragraph. Initialized to value in the textStyle.
-
-	lines
-<Array>  This array is built during composition and modified when the stylizedString is modified (copyReplaceFrom:to:with:).  Each of its fields from 1 to lastLine contains a TextLineInterval which in turn contains the starting index and stopping index of a given line as well as its internal spaces and padding width, the latter two being used to support the management of padded spaces, tabs and changing margin alignments.
-
-	lastLine
-<Integer>  The index of the last validly composed line in the lines array.
-
-	outputMedium
-<Symbol>   Either #Display, #PressPrinter or #DisplayPrinterWidths as of 1/20/80.  Needed by CompositionScanner for determining the nature of the font to be used for character widths.  For the DisplayScanner there are several places where distinguishing between displaying and printing is required.  Also used for some margin and grid computations.
-
-'!ParagraphEditor comment:'I contain the main handling of text editing.  I ought to be used only on smallish paragraphs.
-
-Instance Variables
-
-	paragraph
-<Paragraph>  A pointer to the textForm being edited.  The Paragraph is optimized for managing replacements in it*s stylizedString and for scrolling.
-
-	startBlock
-	stopBlock
-<CharacterBlock>  These variables contain the string indices, characters, and bounding boxes of the starting and stopping characters in the stylizedString which will be operated upon by the next command.
-
-	beginTypeInBlock
-<CharacterBlock>  Used to manage typing and to distinguish selection arising from the last characters typed in from selection with the mouse or which is the result of some special keystroke.
-
-	initialText
-<Text>  A copy of the string held by the Paragraph at the time the text editor was instantiated.  It is currently used to manage the editing of Smalltalk code, and is reinstalled in the Paragraph when a *cancel* is executed and is overwritten when an *accept* is executed."
-
-	selectionState
-<Integer>  1 = on, 0 = off.  Since selection involves raw modification of the bits in the destinationForm of the Paragraph, it must be monitored closely and with care."
-'!ParseNode comment:'This superclass of most compiler/decompiler classes declares common class variables, default messages, and the code emitters for jumps.  Some of the class variables are initialized here; the rest are initialized in class VariableNode, which is the last alphabetically.'!Parser comment:'I parse Smalltalk syntax and create a parse tree.  I look one token ahead.
-Instance Variables:
-	here		<Object> the current token
-	hereType	<Symbol> the "type" of the current token (see initialize)
-	hereMark	<Integer> position in source stream (mark) where this token began
-	prevToken	<Integer> size in chars of the previous token parsed
-	prevMark	<Integer> mark of previous token
-	encoder		<Encoder> which uses tables to decode tokens
-	requestor	object from which parsing was invoked.  If not nil, this object
-				will be sent -notify: prior to evaluating the failBlock
-	parseNode	<ParseNode> result of current (recursive descent) parse
-	failBlock	<BlockContext> to be evaluated in case of parse errors
-	lastTempMark <Integer> mark of last temp; points to vert bar, 
-				or last char of pattern if no temps declared
-	correctionDelta	<Integer> offset of corrected code relative to source stream
-				owing to interactive corrections so far'!ParseStack comment:'I keep track of the current and high position of the stack that will be needed by code being compiled.  I am only used during the code generation pass of the compiler (MethodNode generate:)'!Path comment:'This is the basic superclass of the Graphic Spatial Primitives.  Spatial Primitives are used to generate "trajactories" or paths like lines and circles.  The
-instance variable form is the "brush" used for displaying the Path:  the image is accomplished by displaying the form at each point in the Path.'!Pen comment:'Pens can scribble on the screen, drawing and printing at any angle.'!Color comment:'I represent an RGB color value. My rgb instance variable stores 10 bits per component (R: bits 20-29, G: bits 10-19, B: bits 0-9) for internal precision. I provide conversion to/from 32-bit ARGB pixel values for use with 32bpp Forms.
-
-Class Variables:
-    Black       Color - The color black (0, 0, 0)
-    White       Color - The color white (1, 1, 1)
-    Transparent TranslucentColor - Fully transparent (alpha = 0)
-
-Instance Variables:
-    rgb         Integer - Packed RGB value (10 bits per component)'!TranslucentColor comment:'I am a Color with an alpha (transparency) component. Alpha ranges from 0.0 (fully transparent) to 1.0 (fully opaque).
-
-Instance Variables:
-    alpha   Float - The alpha (opacity) value from 0.0 to 1.0'!TextAttribute comment:'I am an abstract class representing text attributes such as color, emphasis, or font changes. My subclasses implement specific attribute types. I provide polymorphism with integer emphasis codes used by the original Text implementation.
-
-Subclasses:
-    TextColor - text foreground color
-    TextEmphasis - bold, italic, underline, strikethrough'!TextColor comment:'I represent a text foreground color attribute. I wrap a Color object and provide integration with the Text emphasis system.
-
-Instance Variables:
-    color   Color - the foreground color for text'!TextEmphasis comment:'I represent a text emphasis attribute such as bold, italic, underline, or strikethrough. I store an integer emphasis code compatible with the original Text system.
-
-Emphasis codes (bitfield):
-    1 - bold
-    2 - italic
-    4 - underlined
-    8 - strikethrough
-
-Instance Variables:
-    emphasisCode    SmallInteger - the emphasis bitfield'!Point comment:'I am an x-y pair of numbers usually designating a location on the screen'!PopUpMenu comment:'I represent a list of items.  My instances are presented on the display screen in a rectangular area.  The user points to an item, pressing a mouse button;  the item is highlighted.  When the button is released, the highlighted item indicates the selection.
-
-Instance Variables:
-
-labelString	<String> of menu items
-font		<StrikeFont> for displaying the characters
-lineArray	<Array> of integers indicating where lines should be drawn in the menu
-frame	<Quadrangle>
-form	<Form> containing the composed paragraph
-marker	<Rectangle> used to highlight selection
-selection	<Integer> index into menu items;  if 0, no selection
-'!PositionableStream comment:'I assume that my contents is an indexable collection and that, in support of accessing the elements of my contents, I can reposition a pointer.  I am abstract in that I do not implement the messages next and nextPut: which are inherited from my superclass Stream.'!Process comment:'Instance Variables: 
-		suspendedContext	<Context> activeContext at time of process suspension
-		priority				<Integer> partial indication of relative scheduling
-		myList				<LinkedList> on which I am suspended
-
-I represent an independent path of control in the system.  This path of control may be stopped (by sending me the message suspend) in such a way that it can later be restarted (by sending me the message restore).  When any one of several paths of control can be advanced, the single instance of ProcessorScheduler named Processor determines which one will actually be advanced partly using my priority.'!ProcessHandle comment:'A ProcessHandle holds the state of an interrupted process.  It is capable of cutting back
-the process''s stack, terminating the process, or causing it to resume again.'!ProcessorScheduler comment:'Instance Variables: 
-		quiescentProcessLists		<Array of LinkedLists> on which to suspend processes
-		activeProcess			<Process> currently executing process
-
-My single instance, named Processor, coordinates the use of the physical processor by all Processes requiring service'!Project comment:'Each screen is a manifestation of a project.  Each project manages the windows (views) in it.  While the user is working in the project, the changes made to classes are collected.  Thus a system-wide set of changes is the collection of all project changes.'!ProjectController comment:'I am a kind of StringHolderController (a ParagraphEditor that adds the doIt, printIt, accept, and cancel commands).  The commands doIt and printIt are omitted.  I provide one additional menu command
-	enter -- replace the current project by the model, thereby "entering" the door
-			to a new office or work area'!ProjectView comment:'I am a StringHolderView of the description of a Project.  ProjectController is my default controller.'!Quadrangle comment:'I represent a particular kind of Rectangle that has a border and inside color.
-
-Instance Variables:
-	borderWidth		<Rectangle> the left, right, top, bottom border widths
-	borderColor		<Form> 
-	insideColor 		<Form>
-'!Random comment:'A simple random number generator.'!ReadStream comment:'I am a reader of an indexable collection.  I only define the message next.'!ReadWriteStream comment:'I am a positionable stream into which we can both read and write.'!Rectangle comment:'I usually represent a rectangular area on the screen.  Arithmetic functions take points as arguments and carry out scaling and translating operations to create new Rectangles.  Rectangle functions create new Rectangles by determining intersections of rectangles with rectangles. '!RemoteString comment:'Instance Variables:
-	sourceFileNumber	<Integer> index into SourceFiles
-	filePositionHi		<Integer>
-	filePositionLo		<Integer>
-
-I hold the file reference to the class comment (or any other piece of executable text).'!ReturnNode comment:'I represent an expression of the form ^expr'!RunArray comment:'RunArrays provide space-efficient storage of data which tends to be constant over long runs of the possible indices.  runs is an array of Integers, and each indicates the number of indices over which the corresponding value (in values) is constant.'!Scanner comment:'I scan a stream picking out Smalltalk syntactic tokens.  I look one character ahead.  I put each token found into token and its type (a Symbol) into tokenType.  At the end of stream or a doit symbol, I pretend to see an endless sequence of doits.
-
-commentPositions tracks {start, end} pairs for all comments encountered during scanning, enabling syntax highlighting without a separate comment-finding pass.'!ScannerHighlighter comment:'I wrap the Scanner class to provide syntax highlighting tokens with position information. I tokenize Smalltalk source code and categorize each token for syntax highlighting purposes.
-
-I produce a collection of SyntaxToken objects, each containing:
-- type: a Symbol indicating the highlight category (#keyword, #string, #comment, etc.)
-- start: the 1-based start position in source
-- end: the 1-based end position in source
-
-Usage:
-    | tokens |
-    tokens := ScannerHighlighter new tokenize: ''self foo: 42''.
-    tokens do: [:token | Transcript show: token type; cr]
-
-Instance Variables:
-    scanner     Scanner - the underlying Smalltalk scanner
-    tokens      OrderedCollection - collected syntax tokens
-    sourceString String - the source being scanned'!SyntaxToken comment:'I represent a syntax token with its position in source code. I am produced by ScannerHighlighter for syntax highlighting. Color is looked up lazily from token type via SyntaxStyler colorForType:.
-
-Instance Variables:
-    type    Symbol - the highlight category (#keyword, #string, #comment, etc.)
-    start   Integer - 1-based start position in source
-    end     Integer - 1-based end position in source (inclusive)'!SyntaxStyler comment:'I apply syntax highlighting to Smalltalk source code using a two-level mapping:
-1. Token types (from ScannerHighlighter) ? TextMate scopes
-2. TextMate scopes ? Colors (defined by themes)
-
-This architecture allows easy theme swapping since themes are defined in terms
-of standard TextMate scopes, matching VSCode/TextMate conventions.
-
-Usage:
-    | styledText |
-    styledText := SyntaxStyler new styleSource: ''self foo: 42''.
-    SyntaxStyler useColorSet: #VSCodeLight.  "Switch themes"
-
-Class Variables:
-    TokenToScopeMap     Dictionary - token type to TextMate scope
-    ColorSets           Dictionary - theme name to (scope ? color) mapping
-    CurrentColorSetName Symbol - active theme name
-    DefaultColorMap     Dictionary - current active scope ? color mapping
-
-Instance Variables:
-    colorMap            Dictionary - instance-specific color map (optional override)'!ScreenController comment:'I am the controller for the parts of the display screen that have no window on them.  I only provide a standard yellow button menu.  I view (a FormView of) an infinite gray form.'!ScrollController comment:'I represent control for scrolling using a scrollBar.  I am a MouseMenuController that creates a scrollBar, rather than menus.  My subclasses add the button menus.  I keep control as long as the cursor is inside the view or the scrollBar area.
-
-A scrollBar is a rectangular area representing the length of the information being viewed.  It contains an inner rectangle whose top y-coordinate represents the relative position of the information visible on the screen with respect to all of the information, and whose size represents the relative amount of that information visible on the screen.  The user controls which part of the information is visible by pressing the red button.  If the cursor is to the right of the inner rectangle, the window onto the visible information moves upward, if the cursor is to the left, the window moves downward, and if the cursor is inside, the inner rectangle is grabbed and moved to a desired position.  
-
-Instance Variables:
-	scrollBar	<Quadrangle> inside white, the outer rectangle
-	marker		<Quadrangle> inside gray, the inner rectangle
-	savedArea	<Form> the area the scrollBar overlaps, restored whenever
-				the scrollBar is hidden
-	'!SelectionInListController comment:'This controllers is designed to support the pluggable SelectionInListViews (q.v.).
-As its operation is parameterized in the view, it must ask its view for current
-selection and for menu options.  The tighter controller/view relationship appropriate to
-pluggable viewing has not yet fully matured.  Note that control is not accepted
-if the view is empty.'!SelectionInListView comment:'SelectionInListView is a "pluggable" ListView.  The notion of pluggable views is an
-experiment in user interface design.  The idea is to provide a view which can be plugged
-onto any object, rather than having to define a new subclass specific to every kind of
-object which needs to be viewed.
-
-The chief mechanism is a set of selectors, which can be thought of as an adaptor to
-convert the generic listView operations (such as changeSelection) into model-specific
-operations (such as fileName:).
-
-An added feature of this listView is that it tries to preserve its selection through
-changes in the choice list.  This effect, and also the choice of an intial selection are
-transmitted to the model just as a user-requested selection would be.
-
-See the protocol ''adaptor'' for use of the pluggable selectors.
-See the creation messages in my class for an explication of the various parameters.
-Browse senders of the creation messages in my class for examples in the system.'!SelectorNode comment:'I am a parse tree leaf representing a selector'!Semaphore comment:'I provide synchronized communication of a single bit of information (a "signal") between Processes.  A signal is sent by sending me the message signal and received by sending me the message wait.  If no signal has been sent when a wait message is sent, the sending Process will be suspended until a signal is sent.'!SequenceableCollection comment:'Abstract superclass for collections that have a well-defined order associated with their elements'!Set comment:'I am an unordered collection of elements that are not duplicated in me.'!SharedQueue comment:'I provide synchronized communication of arbitrary objects between Processes.  An object is sent by sending me the message nextPut: and received by sending me the message next.  If no object has been sent when a next message is sent, the Process requesting the object will be suspended until one is sent.'!SmallInteger comment:'SmallIntegers are optimized for the interpreter, stored in two-s complement form.  The allowable range is from minVal to maxVal.'!SortedCollection comment:'I am an ordered collection of elements, sorted via the function sortBlock.'!Spline comment:'This is a subclass of Path.  Basically, a collection of Points through
-				which a cubic spline curve is fitted.'!StandardSystemController comment:'I am a controller for StandardSystemViews, that is, those views that are at the top level of a project in the system user interface.  I am a kind of MouseMenuController that creates a blue button menu for moving, framing, collapsing, and closing StandardSystemViews, and for selecting views under the view of my instance.
-
-Instance Variables:
-	status	<Symbol> condition, either 
-			#active--keep control as long as the cursor is inside the view if a 
-					button is pressed
-			#inactive -- no longer in control, deEmphasize any highlighting
-			#open -- visible on the screen
-			#closed -- unschedule the instance from the project 
-'!StandardSystemView comment:'I represent a view that has a label above its top left corner.  The text in the label identifies the kind of view.  In addition to a label, I add control over the maximum and minimum size of the display box of my instance.  My default controller is StandardSystemController.  The elements of ScheduledControllers, the sole instance of ControlManager, usually contain controllers for instances of me.
-
-Instance Variables:
-	labelFrame				<Quadrangle>
-	labelText				<Paragraph>
-	isLabelComplemented	<Boolean> true if the label is complemented
-	savedSubViews			<Array> of Views
-	minimumSize			<Point> representing minimum width and height
-	maximumSize			<Point> representing maximum width and height
-	'!Stream comment:'I am an abstract class representing objects that stream over a self typing data structure.'!StrikeFont comment:'Instance Variables:
-
-	xTable	<Array>  Of left x-coordinate of character in glyphs.
-
-	glyphs	<Form>  Containing bits representing the characters.
-
-	name	<String>  Name of this font.
-
-	stopConditions	<Array>  Of selectors to be performed in scanning text.
-
-	type	<Integer>  Code for strike fonts files.
-
-	minAscii, maxAscii	<Integer>  Giving range supported by this font.
-
-	maxWidth	<Integer>  Width of widest char. Not presently used, but may be for font modification.
-
-	strikeLength	<Integer>  Not used.
-
-	ascent, descent	<Integer>  Max extent of chars above and below the baseline
-
-	xOffset	<Integer>  For kerning (not presently used)
-
-	raster	<Integer>  Specifies layout of the glyphs form
-
-	subscript, superscript	<Integer>  Further vertical offset relative to baseline
-
-	emphasis	<Integer>  code for synthetic bold, italic, underline, strike-out
-
-StrikeFonts are a compact encoding of a set of Forms corresponding to characters in the ASCII character set.  All the forms are placed side by side in a large form whose height is the font height, and whose width is the sum of all the character widths.  The xTable gives the left-x coordinates of the subForms corresponding to the characters.'!String comment:'I am an indexed collection of Characters.  I really store 8-bit bytes, but my access protocol translates between these and real Character instances.'!StringHolder comment:'A model for providing a layer of structure in order to view an aspect of structured information that is a string.
-
-Instance variables
-	contents		<String>
-	isLocked	<Boolean> whether or not the contents has been changed but not stored
-	'!StringHolderController comment:'I represent a ParagraphEditor for a single paragraph of text, omitting alignment commands.  I provide items in the yellow button menu so that the text selection can be evaluated and so that the contents of the model can be stored or restored.
-	doIt -- evaluate the text selection as an expression
-	printIt -- same as doIt but insert a description of the result after the selection
-	accept -- store the contents of the StringHolder into the model
-	cancel -- store the contents of the model into the StringHolder
-
-Instance Variables:
-	isLockingOn	<Boolean> true if the view has been editted so that it should not
-					be closed without warning the user. '!StringHolderView comment:'I am a View of a String that is an aspect of a more structured object.  This String should not be changed by any editing unless the user issues the accept command.  Thus my instances provide a working copy of the String.  This copy is edited.  When the user issues the accept command, the String is copied from the working version;  or if the user issues the cancel command, the working version is restored from the String.  StringHolderController is my default controller.  It is initialized specially by passing the string viewed which is then converted to a Paragraph for editing.
-
-Instance Variables:
-	displayContents	<String> the working copy'!Switch comment:'I represent a selection setting and actions to take depending on a change in the setting.  An instance of me has three attributes:  state, which is either on or off;  on action;  and off action.  The on and off actions are blocks of code that execute whenever the instance changes state.  I am typically used as a menu item in conjunction with a SwitchView and a SwitchController.
-
-Instance Variables:
-		on				<Boolean> true if the Switch is on
-		onAction		<BlockContext> or nil
-		offAction		<BlockContext> or nil
-'!SwitchController comment:'
-I coordinate the interaction of a Switch, a SwitchView, and input events (user actions, see class Sensor).  My instances own a message in the form of a selector and an array of arguments.  Whenever the Switch is selected, this message is sent to the Switch.
-
-Instance Variables:
-
-	selector	<Symbol>
-	arguments	<Array>
-'!SwitchView comment:'I am a view of a Switch.  My instances have labels and display modes (set to "normal" or "complemented").  When one of my instances is displayed in complemented mode, its inside color is reversed.  The value of the display mode corresponds to the value of the model so that, for example, when a Switch is off, its SwitchView is displayed with black text (for the label) on a white background, and when the Switch is off, its SwitchView is displayed with white text on a black background.  My instances have a key character that can be used for switching on or off.  Highlighting can be done specially using a stored form, rather than simply changing all black bits to white and vice versa.  My default controller is SwitchController.
-
-Instance Variables:
-		complemented		<Boolean> true if the model is on
-		label				<DisplayObject>, for example, a DisplayText or a Form
-		selector				<Symbol>
-		keyCharacter		<Character>
-		highlightForm		<Form>
-		arguments			<Array>
-'!Symbol comment:'Symbols are Strings which are created uniquely.  Thus, someString asSymbol == someString asSymbol.'!SyntaxError comment:'I represent a report of a syntax error when reading class descriptions from a noninteractive source such as an external file.  As a StringHolder, the string to be viewed is the code or expression containing the error.'!SystemDictionary comment:'I am a special dictionary that supports protocol for asking questions about the structure of the system.  My only instance is Smalltalk.'!SystemOrganizer comment:'Provides an organization for the classes in the system just as ClassOrganizer organizes the messages within a class.  The only difference is the filout/printing messages.'!SystemTracer comment:'Instance Variables:
-		map		<Array> of new oops indexed by old oops
-		refcts	<ByteArray> encoding refcts and clamping
-		file		<FileStream> for writing vmem image
-		holder	<Stream> of objects created just for the new image
-		writeDict	<Dictionary> of writing selectors for each class
-		maxOop		<Integer> number of objects written in clone
-		specialObjects	<Array> of objects to get first N oops in clone
-		initialProcess	<Process> to resume at startup
-		ot		<FileStream> for writing OT
-		bank	<Integer> high bits of object offest in image
-		addr	<Integer> low bits
-
-The system Tracer is the secret weapon of Smalltalk developers.  Some people think it is an overnight garbage collector.  It is; in fact on a decent machine (heh, heh), it is a coffee-break garbage collector.  But the real value of the tracer is that it allows fundamental changes to be made to the system from within.
-
-Basically, the tracer runs through the system tracing every accessible object, and writing a copy of each object onto a disk image.  It does this carefully enough that the resulting clone can be started up and run, just like a snapshot.  Some care is taken so that objects appear in the same order in the data space as they do in the object table.
-
-The tracer has built-in support for clamping unwanted (or unneeded) classes out of the system.  Use the message writeCloneWithout: for this.  A considerably more powerful clamping mechanism is the message winnowing feature.  It will cull out all unreferenced messages, and then based on THOSE deletions, cull out more and so on.  See the comment in winnow.
-
-Examples of things we have done with the SystemTracer include changing the instruction set of Smalltalk.  For this we define a subclass called Junta which defines a special method for writing CompiledMethods out in the new format.  Then we change the virtual machine and fire up the clone.  Another example is changing the format of FloatingPoint numbers'!Text comment:'Instance Variables:
-	string:		A String of Characters
-	runs:		A RunArray of integer emphasis codes (for font selection)
-	colorRuns:	A RunArray of Color objects (nil = default black) - DEPRECATED, use tokens
-	tokens:		OrderedCollection of SyntaxToken - O(1) sequential color lookup
-	currentTokenIndex: Integer - cached index for sequential access optimization
-	cachedTokenType: Symbol - last looked up token type (avoids repeated dictionary lookups)
-	cachedTokenColor: Color - color for cachedTokenType
-
-The emphasis codes indicate abstract changes in character appearance.  Actual display is performed in the presence of a TextStyle which indicates, for each abstract code, an actual font to be used'!TextCollector comment:'I represent a StringHolder into which text can also be gathered by sending messages using Stream protocol.
-
-Instance Variables
-	entryStream	<WriteStream>
-'!TextCollectorController comment:'I am a kind of StringHolderController (a ParagraphEditor) that adds the doIt, printIt, accept, and cancel commands.  I do not change the yellow button menu.  I do add methods for accepting text that was generated from Stream-like messages to the model, a TextCollector'!TextCollectorView comment:'I am a StringHolderView of the description of the contents of a TextCollector or Transcript.  TextCollectorController is my default controller.'!TextController comment:'This subclass of the paragraphEditor uses actionMenus for model control protocol.
-It also makes a stab (localMenuItem:) at the problem of distinguishing user control
-directed at the model from that directed at the view/controller.
-
-This controller is more tightly connected to its view (for example it asks it for its
-yellowButtonMenu), because the view is the current site for "pluggable" parameterization.'!TextLineInterval comment:'A TextLineInterval specifies the starting and stopping points in a String of a composed line.  The step is always 1.  The internalSpaces is the number of spaces in the line, and the paddingWidth is the amount to be added to the font'!TextList comment:'TextList is a subclass of Paragraph which is a more efficient representation of lists.
-Since it displays a list of items, it does not try to produce a single string with CRs,
-but instead simply makes up TextLineIntervals on the fly as needed by the view.
-The major savings come from not needing to make up a new string for the whole list
-and not having to measure the lines, since it is assumed that if they are too long,
-they will simply be clipped rather than wrapping to the next line.'!TextStyle comment:'TextStyle is the repository of information which may be shared by a number of paragraphs.  What values it contains are still the subject of some experimentation and experience.  It presently is used for both display and printing operations.
-
-Instance Variables:
-	fontArray
-<Array>  A collection of fonts available to the paragraph.  These may be either StrikeFonts or PressFonts.  The emphasis portion of a Text returns a value for indexing the font.
-
-	lineGrid	
-<Integer>  The amount to be added to the top of a line to find the top of the next line.  Will frequently be the greatest height in the fonts in fontArray.
-
-	baseline	
-<Integer>  The amount to be added to the top of a line to find the baseline of the line.  The baseline is the point from which the ascent of a font should rise.
-
-	alignment
-<Integer>  Indicates the mode for first level placement from the margins
-	-- 0=left flush, 1=centered, 2=right flush, 3=justified.
-
-	firstIndent
-<Integer>  Amount to inset from the left margin for the first line of a paragraph.  Initial value for paragraph associated with this TextStyle.
-
-	restIndent
-<Integer>  Amount to inset from the left margin for all but the first line of a paragraph.  Initial value for paragraph associated with this TextStyle.
-
-	rightIndent
-<Integer>  Amount to inset from the right margin for all the lines of the paragraph.  Initial value for paragraph associated with this TextStyle.
-
-	tabsArray
-<Array>  Tab stops.  Values are relative to the left margin of the paragraph.
-
-	marginTabsArray
-<Array>  Each value in the array is a tuple indicating an inset from the left and right margin of this paragraph.  Allows for inset paragraphs.
-
-	outputMedium
-<Symbol>  Currently only #Display.  Allows for use of TextStyle in both display and printing mode.
-
-'!TextView comment:'TextView is a "pluggable" view of text.  The notion of pluggable views is an
-experiment in user interface design.  The idea is to provide a view which can be plugged
-onto any object, rather than having to define a new subclass specific to every kind of
-object which needs to be viewed.
-
-The chief mechanism is a set of selectors, which can be thought of as an adaptor to
-convert the generic textView operations (such as yellowButtonMenu) into model-specific
-operations (such as textMenu).
-
-See the protocol ''adaptor'' for use of the pluggable selectors.
-See the creation messages in my class for an explication of the various parameters.
-Browse senders of the creation messages in my class for examples in the system.'!Time comment:'Implements times of day.'!True comment:'I describe the behavior of my sole instance, true'!UndefinedObject comment:'I describe the behavior of my sole instance, nil.  nil represents a prior value for variables that have not been initialized, or for results which are meaningless.'!VariableNode comment:'I am a parse tree leaf representing a variable.  Note that my name and key are different for pool variables -- the key is the Object Reference.'!View comment:'
-My instances are intended to be components in a  structured picture.  Each View in the structured picture can contain other Views as sub-components.  These sub-components are called subViews.  A View can be a subView of only one View.  This View is called its superView.  The set of Views in a structured picture forms a hierarchy.  The one View in the hierarchy that has no superView is called the topView of the structured picture.  A View in a structured picture with no subViews is called a bottom View.  A View and all of its subViews, and all of their subViews and so on, are treated as a unit in many operations on the View.  For example, if a View is displayed, all of its subViews are displayed as well.  There are several catagories of operations that can be performed on a View.  Among these are the following.
-	1.	Adding subViews to a View.
-	2.	Positioning subViews within a View.
-	3.	Deleting subViews from a View.
-	4.	Transforming a View.
-	5.	Displaying a View.
- 
-Each View has its own coordinate system.   In order to change from one coordinate system to another, each View has two transformations associated with it.  The local transformation is a WindowingTransformation that maps objects in the coordinate system of the View to objects in the coordinate system of the superView of the View.  The displayTransformation is a WindowingTransformation that maps objects in the coordinate system of the View to objects in the display screen coordinate system.
-
-The part of the space that is to be made visible is represented by the window of the View.  The window of a View is a Rectangle expressed in the coordinate system of the View.  The area occupied by a View in the coordinate system of its superView is called its viewport.  The viewport of a View is its window transformed by its local transformation.  The region of the display screen occupied by a View is called its displayBox.  The display box of a View can include a border.  The width of the border expressed in display screen coordinates is called the border width of the View.  The color of the border is called the border color.  The region of the display box of a View excluding the border is called the inset display box.  The color of the inset display box is called the inside color of the View.
-
-model - any object
-controller - <Controller>, #NoControllerAllowed, or nil
-superView - <View>, or nil
-subViews - <OrderedCollection> of Views
-transformation - <WindowingTransformation>
-viewport - <Rectangle> (in superView coordinates), or nil.
-window - <Rectangle> (in View coordinates), or nil.
-displayTransformation - <WindowingTransformation>, or nil.
-insetDisplayBox - <Rectangle> (in display screen coordinates), or nil.
-borderWidth - <Rectangle> (display screen unit) or 0 (meaning no border).
-borderColor - <Form>
-insideColor - <Form>, or nil (meaning transparent)
-boundingBox - <Rectangle> (in View coordinates), or nil
-'!WindowingTransformation comment:'
-WindowingTransformation is used to transform objects from a source coordinate system to a destination coordinate system.  WindowingTransformation contains a scale and a translation which can be applied to objects that respond to scaleBy: and translateBy:.  An instance of WindowingTransformation can be created with a default identity scale and translation, or with a specified scale and translation, or with a scale and translation computed from a window (a Rectangle in the source coordinate system) and a viewport (a Rectangle in the destination coordinate system).  In applying a WindowingTransformation to an object, the object is first scaled (around the origin of the source coordinate system) and then translated.  WindowingTransformations can be composed to form a single compound transformation.
-'!WriteStream comment:'I am a writer of an indexable collection. writeLimit marks the farthest that has been written into the collection, not the actual size of the collection.'!JsonReader comment:'I parse JSON text into Smalltalk objects.
-
-JSON value types map to:
-  object  -> Dictionary
-  array   -> Array
-  string  -> String
-  number  -> Integer or Float (via Number readFrom:)
-  true    -> true
-  false   -> false
-  null    -> nil
-
-Usage:
-  JsonReader parse: ''{"name": "Alice", "age": 30}''
-    => a Dictionary(''name''->''Alice'' ''age''->30)'!JsonWriter comment:'I generate JSON text from Smalltalk objects.
-
-Supported object types:
-  Dictionary -> object
-  Array/OrderedCollection -> array
-  String/Symbol -> string
-  Number -> number
-  true/false -> true/false
-  nil -> null
-
-Usage:
-  JsonWriter stringify: (Dictionary new at: ''name'' put: ''Alice''; yourself)
-    => ''{"name":"Alice"}'''!JsonTest comment:'Test cases for JsonReader and JsonWriter classes.'!JsonTest runAll!
