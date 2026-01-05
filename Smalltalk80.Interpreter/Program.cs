@@ -163,8 +163,6 @@ public static class Program
             Console.WriteLine($"  {gcStatsBefore.GetSummary()}");
 
             // Enable allocation-triggered GC now that cold start is complete and roots are established
-            // During cold start, objects are built but not yet rooted, so AutoGC was disabled
-            // --no-gc flag disables GC entirely (useful for benchmarking)
             if (config.DisableGC)
             {
                 Console.WriteLine("  Auto-GC DISABLED (--no-gc flag)");
@@ -176,27 +174,21 @@ public static class Program
             }
 
             // Display is created lazily when Smalltalk calls BeDisplay
-            // This variable will hold the display once created
             WinFormsDisplay? display = null;
 
             // Create Smalltalk thread context with display factory
-            // The factory coordinates between threads: Smalltalk thread requests,
-            // UI thread creates, then Smalltalk thread continues
             var threadContext = new SmalltalkThreadContext
             {
                 HeapManager = heapManager,
                 VMMetadata = vmMetadata,
                 Bundle = bundle,
-                Display = null,  // Created lazily via DisplayFactory
+                Display = null,
                 DisplayFactory = (width, height, heap, metadata) =>
                 {
-                    // This is called from GetOrCreateDisplay in the Smalltalk thread
-                    // We need to coordinate with the UI thread to create the window
+                    // Called from Smalltalk thread when BeDisplay is invoked
                     threadContext.RequestedDisplayWidth = width;
                     threadContext.RequestedDisplayHeight = height;
                     threadContext.DisplayNeeded.Set();
-
-                    // Wait for UI thread to create the display
                     threadContext.DisplayCreated.Wait();
                     return threadContext.Display!;
                 },
@@ -205,34 +197,25 @@ public static class Program
                 RestoreTimer = restoreTimer
             };
 
-            // Create and start Smalltalk thread
+            // Start Smalltalk thread (runs init expressions and process scheduling)
             Console.WriteLine("\n=== Starting Smalltalk Thread ===");
             var interpreterThread = new SmalltalkInterpreterThread(threadContext);
 
             var smalltalkThread = new Thread(interpreterThread.Run);
             smalltalkThread.SetApartmentState(ApartmentState.MTA);
-            smalltalkThread.IsBackground = false; // Foreground thread
+            smalltalkThread.IsBackground = false;
             smalltalkThread.Name = "Smalltalk Interpreter";
             smalltalkThread.Start();
 
-            // Wait for Smalltalk thread to initialize event architecture
-            Console.WriteLine("\n=== Waiting for Smalltalk initialization ===");
-            threadContext.EventCallbacksReady.Wait();
-            Console.WriteLine("  Event callbacks registered");
-
-            // Signal Smalltalk thread it can proceed with init expressions
-            threadContext.WindowDisplayed.Set();
-            Console.WriteLine("  Smalltalk thread signaled to proceed");
-
             // Wait for Smalltalk to request display creation (BeDisplay primitive)
-            Console.WriteLine("\n=== Waiting for Smalltalk to create display ===");
+            Console.WriteLine("\n=== Waiting for Smalltalk to request display ===");
             threadContext.DisplayNeeded.Wait();
 
             int displayWidth = threadContext.RequestedDisplayWidth;
             int displayHeight = threadContext.RequestedDisplayHeight;
             Console.WriteLine($"  Display requested: {displayWidth}x{displayHeight}");
 
-            // Create display window on UI thread
+            // Create display window on main thread
             Console.WriteLine("\n=== Creating Display Window ===");
             display = new WinFormsDisplay(
                 displayWidth,
@@ -240,14 +223,14 @@ public static class Program
                 "Smalltalk-2026",
                 heapManager,
                 vmMetadata,
-                Core.VM.Platform.PixelDepth.ThirtyTwoBit);  // 32bpp for full color support
+                Core.VM.Platform.PixelDepth.ThirtyTwoBit);
             Console.WriteLine($"  Window created: {displayWidth}x{displayHeight}");
 
-            // Store display in thread context and signal Smalltalk thread
+            // Store display and signal Smalltalk thread
             threadContext.Display = display;
             threadContext.DisplayCreated.Set();
 
-            // Monitor Smalltalk thread and close window when it completes (for --execute mode)
+            // Monitor thread to close window when Smalltalk completes
             var monitorThread = new Thread(() =>
             {
                 smalltalkThread.Join();
@@ -265,7 +248,7 @@ public static class Program
             monitorThread.IsBackground = true;
             monitorThread.Start();
 
-            // Run WinForms event loop (blocks until window closes)
+            // Run WinForms event loop
             Console.WriteLine("\n=== Entering GUI Event Loop ===");
             display.Show();
             Application.Run(display);

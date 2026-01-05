@@ -37,28 +37,9 @@ public class SmalltalkInterpreterThread
         {
             Console.WriteLine("\n[Smalltalk Thread] Starting...");
 
-            // STEP 1: Create VM
+            // Create VM with display factory for lazy window creation
             Console.WriteLine("[Smalltalk Thread] Creating virtual machine...");
             _vm = CreateVirtualMachine();
-
-            // STEP 1.25: Initialize event architecture (Phase 2)
-            // Signal EventCallbacksReady when complete to synchronize with UI thread
-            Console.WriteLine("[Smalltalk Thread] Initializing event architecture...");
-            _vm.InitializeEventArchitecture(onComplete: () =>
-            {
-                Console.WriteLine("[Smalltalk Thread] Event callbacks registered - signaling main thread");
-                _context.EventCallbacksReady.Set();
-            });
-
-            // STEP 1.3: Wait for window to be displayed before proceeding
-            // This ensures graphics operations will work during init expressions
-            // Uses proper synchronization instead of Thread.Sleep
-            Console.WriteLine("[Smalltalk Thread] Waiting for window to be displayed...");
-            if (!_context.WindowDisplayed.Wait(TimeSpan.FromSeconds(10)))
-            {
-                throw new TimeoutException("Window was not displayed within 10 seconds");
-            }
-            Console.WriteLine("[Smalltalk Thread] Window displayed - proceeding");
 
             // Check if restoring from saved image vs cold start
             bool isRestore = _context.Bundle == null;
@@ -72,16 +53,15 @@ public class SmalltalkInterpreterThread
             else
             {
                 // COLD START PATH: Initialize and run normally
-                // STEP 1.5: Initialize ProcessorScheduler with high-priority bootstrap process
-                Console.WriteLine("[Smalltalk Thread] Initializing ProcessorScheduler for runtime...");
+                Console.WriteLine("[Smalltalk Thread] Initializing ProcessorScheduler...");
                 var schedulerInit = new ProcessSchedulerInitializer(_context.HeapManager, _context.VMMetadata);
                 schedulerInit.InitializeForRuntime();
 
-                // STEP 2: Execute init expressions
+                // Execute init expressions (includes DisplayScreen initialize which calls beDisplay)
                 Console.WriteLine("[Smalltalk Thread] Executing init expressions...");
                 ExecuteInitExpressions();
 
-                // STEP 3: Execute user expression if requested (skips controller loop)
+                // Execute user expression if requested (skips controller loop)
                 if (_context.Config.ExecuteExpression != null)
                 {
                     Console.WriteLine("[Smalltalk Thread] Executing user expression...");
@@ -90,12 +70,11 @@ public class SmalltalkInterpreterThread
                     return;
                 }
 
-                // STEP 4: Start MVC controller loop (runs forever)
+                // Start MVC controller loop (runs forever)
                 Console.WriteLine("[Smalltalk Thread] Starting controller loop...");
                 StartControllerLoop();
             }
 
-            // Note: We only reach here if the controller loop exits (unexpected)
             Console.WriteLine("\n[Smalltalk Thread] Completed successfully");
         }
         catch (OperationCanceledException)
