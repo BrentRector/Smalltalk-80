@@ -157,24 +157,13 @@ public static class Program
                     ?? throw new InvalidOperationException("VMMetadata is null after cold start");
             }
 
-            // Display dimensions depend on cold start vs restore
-            int displayWidth;
-            int displayHeight;
-
-            if (config.RestoreImageFile != null)
-            {
-                // RESTORE: Use lazy initialization (0x0)
-                // Smalltalk will call BeDisplay which triggers DisplayResized with actual dimensions.
-                // This avoids allocating buffers at a guessed size that immediately gets replaced.
-                displayWidth = 0;
-                displayHeight = 0;
-            }
-            else
-            {
-                // COLD START: Use full default size (eager initialization)
-                displayWidth = InterpreterConstants.DefaultDisplayWidth;
-                displayHeight = InterpreterConstants.DefaultDisplayHeight;
-            }
+            // Use lazy initialization for display - window stays hidden until Smalltalk calls BeDisplay.
+            // This applies to both cold start and restore:
+            // - Cold start: DisplayScreen initialize calls Display beDisplay
+            // - Restore: Post-restore code resizes display back to original size
+            // Window is shown by DisplayResized when BeDisplay provides actual dimensions.
+            int displayWidth = 0;
+            int displayHeight = 0;
 
             // Display mode: 1bpp (classic Smalltalk-80 monochrome)
             // The 32bpp experimental mode was removed - we now support only full 1bpp or full 32bpp,
@@ -261,24 +250,21 @@ public static class Program
             monitorThread.IsBackground = true;
             monitorThread.Start();
 
-            // Phase 2: Wait for event callbacks to be registered before showing window
+            // Phase 2: Wait for event callbacks to be registered before proceeding
             // This prevents race condition where UI events arrive before VM is ready to handle them
             Console.WriteLine("\n=== Waiting for event architecture to initialize ===");
             threadContext.EventCallbacksReady.Wait();
-            Console.WriteLine("  Event callbacks registered - safe to show window");
+            Console.WriteLine("  Event callbacks registered");
 
-            // Show display window
-            Console.WriteLine("\n=== Showing Display Window ===");
-            display.Show();
-
-            // Signal Smalltalk thread that window is displayed
-            // This replaces the old Thread.Sleep with proper synchronization
+            // Signal Smalltalk thread that it can proceed
+            // Window will be shown later by DisplayResized when Smalltalk calls BeDisplay
             threadContext.WindowDisplayed.Set();
-            Console.WriteLine("  Window displayed signal sent");
+            Console.WriteLine("  Smalltalk thread signaled to proceed");
 
             // Run WinForms event loop (blocks until window closes)
+            // Note: Window starts hidden, will become visible when Smalltalk calls Display beDisplay
             Console.WriteLine("\n=== Entering GUI Event Loop ===");
-            Console.WriteLine("Display window is visible. Close window to exit.\n");
+            Console.WriteLine("Window will appear when Smalltalk initializes display.\n");
             Application.Run(display);
 
             // When window closes, signal Smalltalk thread to shutdown

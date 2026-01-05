@@ -35,6 +35,7 @@ public class WinFormsDisplay : Form, IDisplay
     private uint[]? _displayBuffer;  // 32bpp: 1 pixel per uint (matches Smalltalk Form format) - lazy init
     private Bitmap? _backBuffer;     // 32bpp back buffer for screen rendering - lazy init
     private bool _buffersInitialized = false;  // Track if buffers have been allocated
+    private bool _windowShown = false;  // Track if window has been shown (deferred until BeDisplay)
     private readonly object _bufferLock = new();
     private readonly ISmalltalkHeap? _heap;
     private readonly VMMetadata? _vmMetadata;
@@ -125,14 +126,17 @@ public class WinFormsDisplay : Form, IDisplay
         if (width > 0 && height > 0)
         {
             InitializeBuffers(width, height);
+            _windowShown = true;  // Eager init means window will be shown normally
         }
         else
         {
             // Lazy init mode: use minimal window size, buffers allocated on first DisplayResized
+            // Window stays hidden until BeDisplay is called with real dimensions
             Width = 1;
             Height = 1;
             ClientSize = new Size(1, 1);
-            Console.WriteLine($"[WinForms] Creating window with lazy buffer initialization");
+            Visible = false;  // Start hidden - will be shown by DisplayResized
+            Console.WriteLine($"[WinForms] Creating window with deferred display (hidden until BeDisplay)");
         }
     }
 
@@ -305,6 +309,15 @@ public class WinFormsDisplay : Form, IDisplay
         }
 
         ClientSize = new Size(newWidth, newHeight);
+
+        // Show window if this is the first real resize (deferred display mode)
+        if (!_windowShown)
+        {
+            Console.WriteLine($"[Display] Showing window for first time at {newWidth}x{newHeight}");
+            Visible = true;
+            _windowShown = true;
+        }
+
         Invalidate();
     }
 
