@@ -415,6 +415,35 @@ cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstart.json ../Smalltalk80.I
 
 **Important**: The `Data` folder contents in the Interpreter's bin directory are now tracked in git to ensure init expressions are always in sync with the source code.
 
+### 🔴🔴🔴 CRITICAL: Adding New Init Expressions 🔴🔴🔴
+
+**WHEN ADDING A NEW INIT EXPRESSION TO SMALLTALK-80.ST, YOU MUST DO BOTH:**
+
+1. **Add the Smalltalk method and expression** in `Smalltalk-80 Source/Smalltalk-80.st`:
+   ```smalltalk
+   !SomeClass class methodsFor: 'class initialization'!
+   initialize
+       "Your initialization code here"
+       ...! !
+
+   SomeClass initialize!
+   ```
+
+2. **Add the expression to the execution order list** in `Smalltalk80.Interpreter/Engine/InitExecution/InitExpressionOrdering.cs`:
+   ```csharp
+   "SomeClass initialize",  // Add in appropriate position
+   ```
+
+**WHY BOTH ARE REQUIRED:**
+- The compiler detects init expressions from the `.st` file and includes them in `coldstart.json`
+- But the interpreter only executes expressions listed in `InitExpressionOrdering.GetExecutionOrder()`
+- If you forget step 2, the expression compiles but **NEVER RUNS**
+
+**SYMPTOMS OF FORGETTING STEP 2:**
+- Log shows "Pre-compiling N init expressions" but "N-1 succeeded"
+- Your new `ClassName initialize` doesn't appear in the Phase 1 output
+- Features that depend on the initialization silently don't work
+
 ### 🔴 MANDATORY: BlockContext Regression Test
 
 **Run after EVERY compiler or interpreter change**:
