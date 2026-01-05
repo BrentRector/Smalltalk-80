@@ -1,754 +1,865 @@
 # Modern Graphics Architecture Plan
 
-**Document Version**: 1.0
+**Document Version**: 2.0
 **Date**: 2026-01-05
-**Status**: Draft - Awaiting Review
+**Status**: Draft - Clean-Slate Approach (No Backward Compatibility)
 
 ---
 
 ## Executive Summary
 
-This document presents a comprehensive plan to modernize the Smalltalk-80 graphics system from its current state (legacy 1bpp concepts with 32bpp bolted on) to a modern, GPU-accelerated graphics architecture while maintaining backward compatibility with existing Smalltalk code.
+This document presents a clean-slate redesign of the Smalltalk-80 graphics system. We will **replace** (not wrap) the legacy BitBlt-based architecture with a modern GPU-accelerated Canvas API. All Smalltalk source code will be updated to use the new primitives directly.
 
-### Key Findings
+### Design Principles
 
-| Aspect | Current State | Target State |
-|--------|---------------|--------------|
-| **Rendering** | CPU-based BitBlt32Engine | GPU-accelerated via SkiaSharp |
-| **Text** | Character-by-character rendering | Batched string rendering with glyph atlas |
-| **Color** | 32bpp RGB (no alpha) | 32bpp ARGB with Porter-Duff compositing |
-| **Coordinates** | Integer pixels | Floating-point for zoom/scale support |
-| **Display Updates** | Full invalidation | Dirty rectangle optimization |
-| **Platform** | Windows-only (WinForms) | Cross-platform via SkiaSharp |
+1. **No backward compatibility** - Legacy code will be updated, not accommodated
+2. **No facades or adapters** - Direct implementation, no translation layers
+3. **Delete obsolete code** - Remove BitBlt32Engine, WinForms display, StrikeFont infrastructure
+4. **Modern primitives** - Canvas-based drawing, Porter-Duff compositing, batched text
+5. **Single implementation** - SkiaSharp only, no fallback paths
+
+### Architecture Summary
+
+| Component | Delete | Replace With |
+|-----------|--------|--------------|
+| BitBlt class | ✅ | Canvas class |
+| Form class | ✅ | Surface class |
+| BitBlt32Engine.cs | ✅ | SkiaCanvas.cs |
+| WinFormsDisplay.cs | ✅ | SDL2SkiaDisplay.cs |
+| StrikeFont | ✅ | TrueTypeFont |
+| Primitive 96 (copyBits) | ✅ | Primitive 200+ (canvas ops) |
+| 16 combination rules | ✅ | Porter-Duff blend modes |
+| Halftone patterns | ✅ | Gradient/Pattern brushes |
 
 ---
 
-## Part 1: Analysis of Current Implementation
+## Part 1: What We're Removing
 
-### 1.1 BitBlt Engine Architecture
+### 1.1 BitBlt Infrastructure (DELETE)
 
-**Location**: `Smalltalk80.Interpreter/Core/VM/Graphics/BitBlt32Engine.cs`
+**Files to delete**:
+- `BitBlt32Engine.cs` (570 lines)
+- `BitBltEngine.cs` (418 lines)
+- `CombinationRule.cs` (63 lines)
 
-**Strengths**:
-- Complete 16 Blue Book combination rules + Paint mode (rule 16)
-- Zero-copy heap access via `GetFormSpanDirect32()`
-- Optimized fast paths for rules 3, 7, 1, 6
-- Proper overlap handling for scroll operations
-- XOR caret fix for 32bpp semantics
+**Smalltalk classes to delete**:
+- `BitBlt` - Replace with `Canvas`
+- `Form>>copyBits:from:at:clippingBox:rule:mask:` - Replace with `Canvas>>draw:`
 
-**Limitations**:
-1. **CPU-only rendering** - No GPU acceleration
-2. **No alpha channel** - Only implicit opaque (0xFF)
-3. **Per-pixel operations** - No batching
-4. **Paint mode is grayscale only** - Not true alpha blending
-5. **Integer coordinates** - No sub-pixel positioning
+**Why delete**: The 16 combination rules are a 1975 artifact. Modern compositing uses Porter-Duff operators (12 modes) plus blend modes (multiply, screen, overlay, etc.). Mapping between them requires complex shaders and loses semantics.
 
-### 1.2 Text Rendering
+### 1.2 Form Class (DELETE)
 
-**Location**: `Smalltalk80.Interpreter/Core/VM/Graphics/WinFormsFontBridge.cs`
-
-**Current Approach**:
-- GDI+ font rendering with ClearType anti-aliasing
-- Strike fonts built as pre-rendered glyph bitmaps
-- Fixed-pitch font alignment via `GetCellWidth()`
-- Grayscale anti-aliasing (not subpixel)
-
-**Limitations**:
-1. **Character-by-character BitBlt** - Each glyph rendered individually
-2. **No string batching** - Massive CPU overhead for text-heavy UIs
-3. **No HarfBuzz integration** - Limited international text support
-4. **CPU-based compositing** - Paint mode (rule 16) per-pixel blend
-
-### 1.3 Display System
-
-**Location**: `Smalltalk80.Interpreter/Platform/Windows/WinFormsDisplay.cs`
-
-**Current Approach**:
-- Double-buffered WinForms with `uint[] _displayBuffer`
-- Primitive 96 modifies heap directly, then invalidates region
-- WinForms Paint event copies buffer to screen
-
-**Limitations**:
-1. **System.Drawing.Common** - Windows-only, deprecated for cross-platform
-2. **Full-buffer copy on paint** - No GPU texture caching
-3. **No layer compositing** - All morphs rendered to single buffer
-4. **Thread synchronization overhead** - UI thread vs Smalltalk thread
-
-### 1.4 Form/Display Classes (Smalltalk-side)
-
-**Location**: `Smalltalk-80 Source/Smalltalk-80.st` (lines 19932-20625)
-
-**Current Structure**:
-```
+**Current Form**:
+```smalltalk
 Form
-  bits: WordArray (one word per pixel for 32bpp)
+  bits: WordArray    "raw pixels in heap"
   width: SmallInteger
   height: SmallInteger
   offset: Point
 ```
 
-**Limitations**:
-1. **No ColorForm equivalent** - No indexed color support
-2. **No alpha in Forms** - Can't represent transparent forms
-3. **No depth management** - Hardcoded 32bpp assumption
-4. **Legacy halftone patterns** - 1bpp patterns expanded to 32bpp
+**Problems**:
+- Pixels stored in Smalltalk heap (can't GPU accelerate)
+- No alpha channel
+- Integer coordinates only
+- `bits` directly manipulated by BitBlt
+
+**Replace with**: `Surface` class backed by GPU texture
+
+### 1.3 StrikeFont System (DELETE)
+
+**Files to delete**:
+- `WinFormsFontBridge.cs` (424 lines)
+- `FontObjectBuilder.cs`
+- `IFontBridge.cs` (273 lines)
+
+**Smalltalk classes to delete**:
+- `StrikeFont` - Replace with `Font`
+- Character-by-character rendering methods
+
+**Why delete**: StrikeFont is a bitmap font format from 1980. Each character is BitBlt'd individually. Modern text rendering:
+- Uses TrueType/OpenType vector fonts
+- Renders entire strings in one GPU call
+- Supports kerning, ligatures, complex scripts
+
+### 1.4 WinForms Display (DELETE)
+
+**Files to delete**:
+- `WinFormsDisplay.cs` (835 lines)
+- `WinFormsDisplayProvider.cs`
+
+**Why delete**:
+- System.Drawing.Common is deprecated for cross-platform
+- WinForms is Windows-only
+- No GPU acceleration
+- We're going SDL2 + SkiaSharp from the start
 
 ---
 
-## Part 2: Modern Smalltalk Graphics Comparison
+## Part 2: New Architecture
 
-### 2.1 Squeak/Pharo Evolution
-
-| Feature | Blue Book (1983) | Squeak (2000s) | Pharo Bloc (2024) |
-|---------|------------------|----------------|-------------------|
-| **BitBlt Rules** | 16 rules | 35+ rules | N/A (Canvas API) |
-| **Color Depth** | 1bpp | 1-32bpp | 32bpp ARGB |
-| **Alpha Blending** | No | Rule 24/34 | Full Porter-Duff |
-| **Text** | StrikeFont | FreeType | FreeType+HarfBuzz |
-| **Rendering** | CPU BitBlt | CPU BitBlt | Cairo/Skia GPU |
-| **UI Framework** | MVC | Morphic | Bloc |
-| **Canvas** | N/A | FormCanvas | Athens/Alexandrie |
-
-**Key Innovations from Pharo**:
-- **Alexandrie**: FFI bindings to Cairo + FreeType + HarfBuzz (40.3 FPS vs Cairo 12.5 FPS)
-- **Bloc**: Next-gen UI with GPU-optimized rendering
-- **Layer composition**: Pre-render unchanged elements
-
-### 2.2 Cuis Smalltalk Approach
-
-**Philosophy**: Pure Smalltalk implementation with optional VM acceleration
-
-**Key Innovations**:
-1. **Floating-point coordinates** - Enables smooth zooming/scaling
-2. **Prefiltering antialiasing** - Superior to pixel coverage (scientifically proven)
-3. **VectorGraphics engine** - Path-based drawing with DSP-based AA
-4. **TrueType in Smalltalk** - No FreeType dependency
-5. **Aggressive simplification** - <600 classes total
-
-**Lessons for Our Implementation**:
-- Floating-point coordinates are essential for modern UIs
-- Pure Smalltalk is possible but needs VM acceleration for production
-- Simplicity should be a design goal
-
-### 2.3 Commercial Implementations
-
-**VisualWorks**:
-- MVP pattern with Canvas abstraction
-- Cross-platform via CommonGraphics framework
-- Pluggable rendering backends
-
-**Dolphin Smalltalk**:
-- Direct Windows GDI/GDI+ integration
-- Native performance on Windows
-- GDI+ for modern features (gradients, antialiasing)
-
-**Lesson**: Platform-specific optimization is valuable, but abstraction layer enables portability.
-
----
-
-## Part 3: Modern Graphics Technology Assessment
-
-### 3.1 Rendering Backend Options
-
-| Technology | Cross-Platform | GPU Accel | .NET Support | Effort |
-|------------|----------------|-----------|--------------|--------|
-| **SkiaSharp** | ✅ | ✅ | Excellent | Medium |
-| **Direct2D** | ❌ Windows | ✅ | Good | Low |
-| **Cairo** | ✅ | Limited | Fair (FFI) | High |
-| **Avalonia** | ✅ | ✅ | Native | High |
-| **Custom OpenGL** | ✅ | ✅ | Manual | Very High |
-
-**Recommendation**: **SkiaSharp** as primary backend
-- Cross-platform (Windows, macOS, Linux)
-- GPU-accelerated (OpenGL, Vulkan, Metal, D3D)
-- Excellent .NET bindings
-- Used by Avalonia, MAUI, Flutter (via Impeller)
-- Maps well to BitBlt concepts
-
-### 3.2 Text Rendering Strategy
-
-**Current Issues**:
-1. Per-character BitBlt is 10-100x slower than batched rendering
-2. No complex script support (Arabic, Thai, Devanagari)
-3. No proper kerning or ligatures
-
-**Modern Approach**:
-1. **Glyph Atlas**: Pre-render glyphs to GPU texture
-2. **Batched Drawing**: Submit entire string as single GPU call
-3. **HarfBuzz**: Text shaping for complex scripts
-4. **Subpixel Rendering**: 3x horizontal resolution on LCD
-
-**Performance Impact** (from research):
-- Microsoft AtlasEngine: 2x raw text throughput, ≥10x colored output
-- WebRender optimization: Glyphs in 1-2 textures vs many
-
-### 3.3 Compositing Model
-
-**Current**: Immediate-mode BitBlt to single buffer
-
-**Modern**: Retained-mode layer compositing
-
-**Benefits of Layer Compositing**:
-1. **Independent updates**: Only changed layers re-rendered
-2. **GPU caching**: Layers as GPU textures
-3. **Smooth scrolling**: Compositor thread, not main thread
-4. **Transform acceleration**: Scale/rotate without re-rasterization
-
-**Chrome's Model** (for reference):
-1. Layerize → Raster → Activate → Aggregate → Draw
-2. Compositor frame with render passes and quads
-3. Compositor thread handles scrolling independently
-
----
-
-## Part 4: Recommended Architecture
-
-### 4.1 High-Level Architecture
+### 2.1 High-Level Design
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Smalltalk Application Layer                   │
-│  (View, Controller, Form, DisplayScreen, existing Morphic/MVC)  │
+│            View, Controller, Window, DisplayScreen               │
+│     (Updated to use Canvas API - no BitBlt references)          │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Canvas Abstraction Layer                     │
-│    Canvas API (drawRect:, drawString:, drawImage:, paths)       │
-│    Maintains backward compatibility via BitBlt facade           │
+│                         Canvas API                               │
+│   Smalltalk: Canvas, Surface, Font, Color, Path, Paint          │
+│   Primitives: 200-250 (new graphics primitive range)            │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Graphics Engine Layer                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ SkiaSharp    │  │ GlyphAtlas   │  │ LayerCompositor     │  │
-│  │ Backend      │  │ Manager      │  │ (Future Phase)       │  │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│                      SkiaSharp Engine                            │
+│              SKCanvas, SKSurface, SKPaint, SKPath               │
+│              GPU-accelerated (OpenGL/Vulkan/Metal)              │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Platform Display Layer                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │ Windows      │  │ macOS        │  │ Linux               │  │
-│  │ (SDL2/Skia)  │  │ (Metal/Skia) │  │ (OpenGL/Vulkan/Skia)│  │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘  │
+│                     SDL2 Platform Layer                          │
+│        Window management, input, GPU context creation            │
+│           Cross-platform: Windows, macOS, Linux                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 Core Components
+### 2.2 New Smalltalk Class Hierarchy
 
-#### 4.2.1 Canvas API (New)
-
-**Purpose**: Abstract drawing operations from BitBlt details
-
-```csharp
-public interface IGraphicsCanvas
-{
-    // Basic shapes
-    void DrawRect(RectF bounds, Paint paint);
-    void FillRect(RectF bounds, Paint paint);
-    void DrawOval(RectF bounds, Paint paint);
-    void FillOval(RectF bounds, Paint paint);
-
-    // Paths (vector graphics)
-    void DrawPath(Path path, Paint paint);
-    void FillPath(Path path, Paint paint);
-
-    // Text (batched)
-    void DrawString(string text, PointF origin, Font font, Paint paint);
-    void DrawGlyphs(GlyphRun glyphs, PointF origin, Paint paint);
-
-    // Images/Forms
-    void DrawImage(Image image, RectF destRect, RectF? sourceRect = null);
-    void DrawForm(FormRef form, PointF dest, CombinationRule rule);
-
-    // Clipping
-    void PushClip(RectF clip);
-    void PopClip();
-
-    // Transform
-    void PushTransform(Matrix3x2 transform);
-    void PopTransform();
-
-    // Compositing
-    void SetBlendMode(BlendMode mode);
-}
+```
+Object
+├── Canvas                    "Drawing context (wraps SKCanvas)"
+│   └── RecordingCanvas       "For display lists"
+├── Surface                   "GPU texture (replaces Form)"
+│   └── DisplaySurface        "The screen (replaces DisplayScreen)"
+├── Paint                     "Fill/stroke style"
+├── Path                      "Vector paths (lines, curves)"
+├── Font                      "TrueType font"
+├── Color                     "ARGB color with alpha"
+├── BlendMode                 "Porter-Duff + blend modes"
+└── Transform                 "2D affine transformation matrix"
 ```
 
-#### 4.2.2 BitBlt Compatibility Facade
+### 2.3 Canvas Class (Smalltalk)
 
-**Purpose**: Maintain existing Smalltalk code compatibility
+**New API** - Clean, modern, no legacy:
 
-```csharp
-public class BitBltFacade
-{
-    // Maps BitBlt primitive 96 to Canvas API
-    public void CopyBits(BitBltParams params, IGraphicsCanvas canvas)
-    {
-        // Convert combination rule to blend mode
-        var blendMode = MapRuleToBlendMode(params.CombinationRule);
-        canvas.SetBlendMode(blendMode);
+```smalltalk
+Canvas class
+  "Instance creation"
+  onSurface: aSurface         "Create canvas for drawing to surface"
+  onDisplay                   "Create canvas for drawing to screen"
 
-        if (params.SourceForm == null)
-        {
-            // Fill operation with halftone
-            canvas.FillRect(params.DestRect, CreatePatternPaint(params.Halftone));
-        }
-        else
-        {
-            // Image transfer
-            canvas.DrawForm(params.SourceForm, params.DestPoint, params.Rule);
-        }
-    }
+Canvas instance
+  "State"
+  save                        "Push state (clip, transform)"
+  restore                     "Pop state"
 
-    // Map Blue Book rules to Porter-Duff + blend modes
-    private BlendMode MapRuleToBlendMode(int rule) => rule switch
-    {
-        0 => BlendMode.Clear,
-        3 => BlendMode.Src,        // Copy
-        5 => BlendMode.Dst,        // Noop
-        6 => BlendMode.Xor,
-        7 => BlendMode.SrcOver,    // Or → SrcOver for alpha
-        16 => BlendMode.Multiply,  // Paint mode
-        // ... other mappings
-    };
-}
+  "Clipping"
+  clipRect: aRectangle
+  clipPath: aPath
+
+  "Transform"
+  translate: aPoint
+  scale: aPoint
+  rotate: radians
+  transform: aMatrix
+
+  "Drawing - Shapes"
+  drawRect: rect paint: paint
+  fillRect: rect paint: paint
+  drawOval: rect paint: paint
+  fillOval: rect paint: paint
+  drawLine: p1 to: p2 paint: paint
+  drawPath: path paint: paint
+  fillPath: path paint: paint
+
+  "Drawing - Images"
+  drawSurface: surface at: point
+  drawSurface: surface from: srcRect to: destRect
+  drawSurface: surface at: point blend: blendMode
+
+  "Drawing - Text"
+  drawString: string at: point font: font paint: paint
+  drawText: textBlob at: point paint: paint
+
+  "Compositing"
+  blendMode: aBlendMode       "Set Porter-Duff/blend mode"
+
+  "Convenience"
+  clear: aColor               "Fill entire canvas with color"
 ```
 
-#### 4.2.3 GlyphAtlasManager
+### 2.4 Surface Class (Smalltalk)
 
-**Purpose**: Cache rendered glyphs as GPU textures for batched text rendering
+**Replaces Form** - GPU-backed texture:
 
-```csharp
-public class GlyphAtlasManager
-{
-    private Dictionary<GlyphKey, GlyphEntry> _cache;
-    private SKBitmap _atlasTexture;
-    private AtlasPacker _packer;
+```smalltalk
+Surface class
+  "Instance creation"
+  extent: aPoint                    "Create ARGB surface"
+  extent: aPoint alpha: boolean     "With/without alpha"
+  fromFile: path                    "Load PNG/JPEG"
 
-    public struct GlyphKey
-    {
-        public int FontId;
-        public int GlyphId;
-        public int SizePixels;
-        public bool Subpixel;
-    }
+Surface instance
+  "Accessing"
+  width
+  height
+  extent
+  hasAlpha
 
-    public struct GlyphEntry
-    {
-        public SKRect AtlasRect;
-        public float AdvanceWidth;
-        public SKPoint Bearing;
-    }
+  "Pixel access (for compatibility - prefer Canvas drawing)"
+  colorAt: aPoint
+  colorAt: aPoint put: aColor
 
-    public GlyphEntry GetOrRenderGlyph(GlyphKey key, SKFont font)
-    {
-        if (_cache.TryGetValue(key, out var entry))
-            return entry;
+  "Canvas"
+  canvas                            "Get Canvas for drawing to this surface"
 
-        // Render glyph to atlas
-        var glyphBitmap = RenderGlyph(key, font);
-        var atlasRect = _packer.Pack(glyphBitmap.Width, glyphBitmap.Height);
+  "I/O"
+  saveAsPng: path
+  saveAsJpeg: path quality: percent
 
-        // Copy to atlas texture
-        CopyToAtlas(glyphBitmap, atlasRect);
+  "GPU"
+  flush                             "Ensure drawing complete"
 
-        entry = new GlyphEntry
-        {
-            AtlasRect = atlasRect,
-            AdvanceWidth = font.MeasureText(key.GlyphId),
-            Bearing = GetBearing(font, key.GlyphId)
-        };
-
-        _cache[key] = entry;
-        return entry;
-    }
-
-    public void DrawStringBatched(SKCanvas canvas, string text, SKPoint origin,
-                                   SKFont font, SKPaint paint)
-    {
-        // Pre-collect all glyphs
-        var glyphs = new List<(GlyphEntry, SKPoint)>();
-        var x = origin.X;
-
-        foreach (var codepoint in text.EnumerateRunes())
-        {
-            var glyphId = font.GetGlyph(codepoint);
-            var key = new GlyphKey { FontId = font.GetHashCode(),
-                                     GlyphId = glyphId,
-                                     SizePixels = (int)font.Size };
-            var entry = GetOrRenderGlyph(key, font);
-            glyphs.Add((entry, new SKPoint(x + entry.Bearing.X,
-                                           origin.Y - entry.Bearing.Y)));
-            x += entry.AdvanceWidth;
-        }
-
-        // Single batched draw call
-        canvas.DrawAtlas(_atlasTexture,
-                         glyphs.Select(g => g.Item1.AtlasRect).ToArray(),
-                         glyphs.Select(g => SKRect.Create(g.Item2,
-                                        g.Item1.AtlasRect.Size)).ToArray(),
-                         paint);
-    }
-}
+  "No 'bits' instance variable - pixels live on GPU"
 ```
 
-#### 4.2.4 Extended Color Model
+### 2.5 Color Class (Updated)
 
-**Purpose**: Support true alpha blending and modern color operations
+**Full ARGB support**:
 
-```csharp
-public struct Color32
-{
-    public byte A;  // Alpha (0=transparent, 255=opaque)
-    public byte R;
-    public byte G;
-    public byte B;
+```smalltalk
+Color class
+  "Creation"
+  r: r g: g b: b                    "RGB 0.0-1.0, alpha=1.0"
+  r: r g: g b: b a: a               "RGBA 0.0-1.0"
+  fromARGB: integer                 "0xAARRGGBB"
+  transparent                       "Fully transparent"
 
-    public static Color32 FromARGB(uint argb) => new Color32
-    {
-        A = (byte)(argb >> 24),
-        R = (byte)(argb >> 16),
-        G = (byte)(argb >> 8),
-        B = (byte)argb
-    };
+  "Named colors"
+  black, white, red, green, blue, etc.
 
-    public static Color32 FromSmalltalk10Bit(int rgb, byte alpha = 255)
-    {
-        // Convert Smalltalk's 10-bit per channel to 8-bit
-        return new Color32
-        {
-            A = alpha,
-            R = (byte)(((rgb >> 20) & 0x3FF) * 255 / 1023),
-            G = (byte)(((rgb >> 10) & 0x3FF) * 255 / 1023),
-            B = (byte)((rgb & 0x3FF) * 255 / 1023)
-        };
-    }
+Color instance
+  "Components (0.0-1.0)"
+  red, green, blue, alpha
 
-    // Premultiplied alpha (required for correct compositing)
-    public Color32 Premultiply() => new Color32
-    {
-        A = A,
-        R = (byte)(R * A / 255),
-        G = (byte)(G * A / 255),
-        B = (byte)(B * A / 255)
-    };
-}
+  "Conversion"
+  asARGB                            "Integer 0xAARRGGBB"
+  withAlpha: newAlpha               "Return copy with different alpha"
+  premultiplied                     "For correct compositing"
 ```
 
-### 4.3 Dirty Rectangle Optimization
+### 2.6 BlendMode Class
 
-**Purpose**: Only redraw changed regions
+**Porter-Duff + Standard Blend Modes**:
 
-```csharp
-public class DamageRegion
-{
-    private List<SKRectI> _dirtyRects = new();
-    private const int MaxDirtyRects = 10; // Coalesce if too many
+```smalltalk
+BlendMode class
+  "Porter-Duff (compositing)"
+  clear           "Result = 0"
+  src             "Result = src (ignore dest)"
+  dst             "Result = dest (ignore src)"
+  srcOver         "Result = src + (1-srcAlpha)*dest  [DEFAULT]"
+  dstOver         "Result = (1-dstAlpha)*src + dest"
+  srcIn           "Result = src * dstAlpha"
+  dstIn           "Result = dest * srcAlpha"
+  srcOut          "Result = src * (1-dstAlpha)"
+  dstOut          "Result = dest * (1-srcAlpha)"
+  srcATop         "Result = src*dstAlpha + dest*(1-srcAlpha)"
+  dstATop         "Result = dest*srcAlpha + src*(1-dstAlpha)"
+  xor             "Result = src*(1-dstAlpha) + dest*(1-srcAlpha)"
 
-    public void AddDamage(SKRectI rect)
-    {
-        // Check for overlap with existing
-        for (int i = 0; i < _dirtyRects.Count; i++)
-        {
-            if (_dirtyRects[i].IntersectsWith(rect))
-            {
-                // Union overlapping rectangles
-                _dirtyRects[i] = SKRectI.Union(_dirtyRects[i], rect);
-                CoalesceIfNeeded();
-                return;
-            }
-        }
+  "Blend modes (color mixing)"
+  multiply        "Result = src * dest"
+  screen          "Result = src + dest - src*dest"
+  overlay         "Multiply or screen based on dest"
+  darken          "Result = min(src, dest)"
+  lighten         "Result = max(src, dest)"
+  colorDodge      "Brighten dest based on src"
+  colorBurn       "Darken dest based on src"
+  hardLight       "Multiply or screen based on src"
+  softLight       "Softer version of hard light"
+  difference      "Result = |src - dest|"
+  exclusion       "Lower contrast difference"
 
-        _dirtyRects.Add(rect);
-        CoalesceIfNeeded();
-    }
+  "Special"
+  plus            "Result = src + dest (additive)"
+  modulate        "Result = src * dest (component multiply)"
+```
 
-    private void CoalesceIfNeeded()
-    {
-        if (_dirtyRects.Count > MaxDirtyRects)
-        {
-            // Too many rects - union into one
-            var bounds = _dirtyRects.Aggregate(SKRectI.Union);
-            _dirtyRects.Clear();
-            _dirtyRects.Add(bounds);
-        }
-    }
+### 2.7 Font Class (New)
 
-    public IReadOnlyList<SKRectI> GetDirtyRects() => _dirtyRects;
+**TrueType/OpenType fonts**:
 
-    public void Clear() => _dirtyRects.Clear();
-}
+```smalltalk
+Font class
+  "Creation"
+  family: name size: pixels
+  family: name size: pixels weight: weight style: style
+  fromFile: path size: pixels
+
+Font instance
+  "Metrics"
+  ascent
+  descent
+  leading
+  lineHeight
+
+  "Measurement"
+  measureString: string             "Returns extent"
+  measureChar: char                 "Returns width"
+
+  "No xTable, no glyphs Form - it's a handle to Skia font"
+```
+
+### 2.8 Path Class (New)
+
+**Vector graphics paths**:
+
+```smalltalk
+Path class
+  new                               "Empty path"
+
+Path instance
+  "Construction"
+  moveTo: point
+  lineTo: point
+  quadTo: control end: end          "Quadratic Bezier"
+  cubicTo: c1 c2: c2 end: end       "Cubic Bezier"
+  arcTo: rect startAngle: s sweepAngle: sweep
+  close                             "Close current contour"
+
+  "Shapes (convenience)"
+  addRect: rect
+  addOval: rect
+  addRoundRect: rect radius: r
+  addCircle: center radius: r
+
+  "Operations"
+  transform: matrix
+  bounds                            "Bounding rectangle"
 ```
 
 ---
 
-## Part 5: Implementation Roadmap
+## Part 3: New Primitives
 
-### Phase 1: Foundation (Weeks 1-4)
+### 3.1 Primitive Numbering
 
-**Goal**: Add SkiaSharp backend while maintaining existing WinForms
+Reserve range **200-299** for new graphics primitives. Delete primitives 96-104.
 
-#### 1.1 Add SkiaSharp Dependencies
-- Add SkiaSharp NuGet packages
-- Create `IGraphicsBackend` interface
-- Implement both `WinFormsBackend` (existing) and `SkiaBackend` (new)
-- Configuration switch between backends
+| Primitive | Operation | Parameters |
+|-----------|-----------|------------|
+| 200 | Canvas: save | canvas |
+| 201 | Canvas: restore | canvas |
+| 202 | Canvas: clipRect | canvas, rect |
+| 203 | Canvas: translate | canvas, point |
+| 204 | Canvas: scale | canvas, point |
+| 205 | Canvas: rotate | canvas, radians |
+| 210 | Canvas: drawRect | canvas, rect, paint |
+| 211 | Canvas: fillRect | canvas, rect, paint |
+| 212 | Canvas: drawOval | canvas, rect, paint |
+| 213 | Canvas: fillOval | canvas, rect, paint |
+| 214 | Canvas: drawLine | canvas, p1, p2, paint |
+| 215 | Canvas: drawPath | canvas, path, paint |
+| 216 | Canvas: fillPath | canvas, path, paint |
+| 220 | Canvas: drawSurface | canvas, surface, srcRect, destRect, blend |
+| 225 | Canvas: drawString | canvas, string, point, font, paint |
+| 226 | Canvas: drawTextBlob | canvas, blob, point, paint |
+| 230 | Canvas: clear | canvas, color |
+| 231 | Canvas: blendMode | canvas, mode |
+| 240 | Surface: create | width, height, hasAlpha → surface |
+| 241 | Surface: fromFile | path → surface |
+| 242 | Surface: extent | surface → point |
+| 243 | Surface: colorAt | surface, point → color |
+| 244 | Surface: colorAtPut | surface, point, color |
+| 245 | Surface: saveAsPng | surface, path |
+| 246 | Surface: canvas | surface → canvas |
+| 250 | Font: create | family, size, weight, style → font |
+| 251 | Font: metrics | font → array |
+| 252 | Font: measureString | font, string → extent |
+| 260 | Path: create | → path |
+| 261 | Path: moveTo | path, point |
+| 262 | Path: lineTo | path, point |
+| 263 | Path: quadTo | path, control, end |
+| 264 | Path: cubicTo | path, c1, c2, end |
+| 265 | Path: close | path |
+| 266 | Path: addRect | path, rect |
+| 270 | Paint: create | → paint |
+| 271 | Paint: color | paint, color |
+| 272 | Paint: strokeWidth | paint, width |
+| 273 | Paint: style | paint, style (fill/stroke/both) |
+| 280 | Display: surface | → displaySurface |
+| 281 | Display: present | "Swap buffers" |
+| 282 | Display: resize | width, height |
 
-#### 1.2 Implement Canvas Abstraction
-- Create `IGraphicsCanvas` interface
-- Implement `SkiaCanvas` wrapping `SKCanvas`
-- Implement `WinFormsCanvas` wrapping existing code
-- Verify feature parity
-
-#### 1.3 BitBlt Compatibility Layer
-- Create `BitBltFacade` class
-- Map all 16 combination rules to Skia blend modes
-- Map Paint mode (rule 16) to Multiply blend
-- Ensure primitive 96 works through new layer
-
-**Deliverable**: Build passes, existing UI works with either backend
-
-### Phase 2: Text Optimization (Weeks 5-8)
-
-**Goal**: 10x text rendering performance via batched glyph atlas
-
-#### 2.1 Implement GlyphAtlasManager
-- Create atlas texture (initially 2048x2048)
-- Implement glyph caching with font/size/glyph key
-- Rectangle packing algorithm
-- Automatic atlas growth
-
-#### 2.2 Integrate with StrikeFont
-- Modify `FontObjectBuilder` to populate atlas
-- Keep existing Strike font data for backward compatibility
-- Add atlas-based rendering path
-
-#### 2.3 Batch Text Rendering
-- Implement `DrawStringBatched` in canvas
-- Single draw call per string (not per character)
-- Benchmark: Target 10x improvement in text-heavy views
-
-**Deliverable**: Browser, Transcript show measurable performance gain
-
-### Phase 3: Alpha Channel Support (Weeks 9-12)
-
-**Goal**: True 32bpp ARGB with alpha compositing
-
-#### 3.1 Extend Form Class
-- Add optional alpha channel to Form
-- Backward compatible (default alpha = 255)
-- New primitive for alpha form creation
-
-#### 3.2 Porter-Duff Compositing
-- Implement full Porter-Duff operators
-- Extend combination rules beyond 16
-- Proper premultiplied alpha handling
-
-#### 3.3 TranslucentColor Class
-- Smalltalk-side `TranslucentColor` subclass of `Color`
-- `Color blue alpha: 0.5` support
-- Integration with Paint mode
-
-**Deliverable**: Semi-transparent morphs render correctly
-
-### Phase 4: Platform Abstraction (Weeks 13-16)
-
-**Goal**: Cross-platform support via SDL2 + SkiaSharp
-
-#### 4.1 SDL2 Window Management
-- Replace WinForms with SDL2 for window creation
-- Cross-platform input handling
-- Maintain WinForms option for Windows-only builds
-
-#### 4.2 GPU Surface Management
-- SkiaSharp GPU context creation
-- OpenGL/Vulkan/Metal backend selection
-- Fallback to CPU if no GPU
-
-#### 4.3 Input Abstraction
-- Abstract mouse/keyboard from platform
-- Maintain Blue Book input word format
-- Add touch/gesture support for future
-
-**Deliverable**: Interpreter runs on macOS/Linux
-
-### Phase 5: Performance Optimization (Weeks 17-20)
-
-**Goal**: GPU-accelerated rendering with dirty rectangles
-
-#### 5.1 Dirty Rectangle Tracking
-- Implement `DamageRegion` class
-- Track damaged areas from BitBlt operations
-- Only repaint dirty regions
-
-#### 5.2 Layer Caching (Optional)
-- Cache Views/Windows as GPU textures
-- Compositor pattern for unchanged content
-- Significant win for scrolling
-
-#### 5.3 Benchmarking & Profiling
-- Create graphics benchmark suite
-- Profile bottlenecks
-- Optimize hot paths
-
-**Deliverable**: 2-5x overall rendering performance
-
-### Phase 6: Advanced Features (Future)
-
-#### 6.1 Vector Graphics Support
-- Path-based drawing API
-- Anti-aliased shapes without BitBlt
-- SVG import/export
-
-#### 6.2 Floating-Point Coordinates
-- Support for sub-pixel positioning
-- Zoom/scale without pixelation
-- Retina/HiDPI support
-
-#### 6.3 Hardware Video Decode
-- GPU video playback
-- Camera input
-- Screen capture
-
----
-
-## Part 6: Migration Strategy
-
-### 6.1 Backward Compatibility Guarantees
-
-1. **All existing Smalltalk code continues to work**
-   - BitBlt primitive 96 behavior unchanged
-   - Form class API unchanged
-   - DisplayScreen API unchanged
-
-2. **New features are opt-in**
-   - Alpha channel forms require explicit creation
-   - Vector drawing through new Canvas API
-   - GPU backend via configuration
-
-3. **Graceful degradation**
-   - Falls back to CPU if no GPU
-   - Falls back to WinForms if SDL2 unavailable
-
-### 6.2 Testing Strategy
-
-| Phase | Test Suite |
-|-------|------------|
-| 1 | BitBlt regression: all 16 rules with/without halftone |
-| 2 | Text rendering: character positions, anti-aliasing quality |
-| 3 | Alpha: compositing math correctness |
-| 4 | Cross-platform: macOS/Linux boot to browser |
-| 5 | Performance: FPS benchmarks, memory usage |
-
-### 6.3 Rollback Plan
-
-Each phase produces a separate backend implementation:
-- Phase 1: `WinFormsBackend` (existing) vs `SkiaBackend` (new)
-- Can switch backends at runtime via configuration
-- If issues found, revert to previous backend
-
----
-
-## Part 7: Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| SkiaSharp API changes | Low | Medium | Pin version, abstract interface |
-| GPU driver issues | Medium | Medium | CPU fallback path |
-| Text quality regression | Medium | High | Extensive visual testing |
-| Performance regression | Low | High | Benchmark before/after each change |
-| Cross-platform bugs | Medium | Medium | CI testing on all platforms |
-
----
-
-## Appendix A: Combination Rule Mapping
-
-| Blue Book Rule | Name | Skia BlendMode | Notes |
-|----------------|------|----------------|-------|
-| 0 | Clear | Clear | Always black |
-| 1 | And | Darken (approx) | src & dest |
-| 2 | AndReverse | - | Custom shader |
-| 3 | Copy | Src | Direct copy |
-| 4 | AndInverted | - | Custom shader |
-| 5 | Noop | Dst | No change |
-| 6 | Xor | Xor | Need source inversion |
-| 7 | Or | SrcOver | For alpha; Plus for RGB |
-| 8 | Nor | - | Custom shader |
-| 9 | Equiv | - | Custom shader |
-| 10 | Invert | - | Custom shader |
-| 11 | OrReverse | - | Custom shader |
-| 12 | CopyInverted | - | Custom shader |
-| 13 | OrInverted | - | Custom shader |
-| 14 | Nand | - | Custom shader |
-| 15 | Set | - | Always white |
-| 16 | Paint | Multiply | Grayscale alpha |
-
-**Note**: Rules 2, 4, 8-15 require custom shaders. Can implement as fallback to CPU BitBlt32Engine if GPU path unavailable.
-
----
-
-## Appendix B: Performance Targets
-
-| Operation | Current | Target | Improvement |
-|-----------|---------|--------|-------------|
-| Single character render | ~100μs | ~10μs | 10x |
-| Full string (20 chars) | ~2ms | ~50μs | 40x |
-| Full screen clear | ~5ms | ~0.5ms | 10x |
-| Browser scroll (1 page) | ~50ms | ~16ms | 3x |
-| Form BitBlt (100x100) | ~200μs | ~50μs | 4x |
-
----
-
-## Appendix C: File Structure
+### 3.2 C# Implementation Structure
 
 ```
 Smalltalk80.Interpreter/
-├── Core/
-│   └── VM/
-│       └── Graphics/
-│           ├── BitBlt32Engine.cs       (existing, unchanged)
-│           ├── Canvas/
-│           │   ├── IGraphicsCanvas.cs  (new interface)
-│           │   ├── SkiaCanvas.cs       (new)
-│           │   └── WinFormsCanvas.cs   (adapter)
-│           ├── Text/
-│           │   ├── GlyphAtlasManager.cs (new)
-│           │   └── TextShaper.cs       (future: HarfBuzz)
-│           └── Compositing/
-│               ├── DamageRegion.cs     (new)
-│               └── LayerCompositor.cs  (future)
+├── Core/VM/
+│   ├── Graphics/                    [DELETE old contents]
+│   │   ├── SkiaCanvas.cs           [NEW]
+│   │   ├── SkiaSurface.cs          [NEW]
+│   │   ├── SkiaFont.cs             [NEW]
+│   │   ├── SkiaPath.cs             [NEW]
+│   │   └── SkiaPaint.cs            [NEW]
+│   └── Primitives/
+│       ├── GraphicsPrimitives.cs   [REWRITE - new primitive range]
+│       └── CanvasPrimitives.cs     [NEW]
 ├── Platform/
-│   ├── Windows/
-│   │   └── WinFormsDisplay.cs          (existing)
-│   ├── CrossPlatform/
-│   │   ├── SDL2Display.cs              (new)
-│   │   └── SkiaGpuContext.cs           (new)
-│   └── IDisplayProvider.cs             (existing interface)
+│   ├── Windows/                     [DELETE]
+│   └── CrossPlatform/
+│       ├── SDL2Display.cs          [NEW]
+│       ├── SDL2Input.cs            [NEW]
+│       └── SkiaGpuContext.cs       [NEW]
 ```
 
 ---
 
-## Appendix D: References
+## Part 4: Smalltalk Source Updates
 
-### Research Sources
+### 4.1 Files to Modify
 
-1. **Squeak/Pharo**: Alexandrie, Bloc, Athens canvas architectures
-2. **Cuis**: Morphic 3, VectorGraphics, Prefiltering Antialiasing paper
-3. **VisualWorks**: Canvas abstraction patterns
-4. **Chrome**: RenderingNG compositor architecture
-5. **Skia**: GPU backend implementation
+**`Smalltalk-80 Source/Smalltalk-80.st`**:
 
-### Key Papers
+| Section | Action |
+|---------|--------|
+| BitBlt class | DELETE entirely |
+| Form class | DELETE, replace with Surface |
+| DisplayScreen class | Rewrite to use DisplaySurface |
+| StrikeFont class | DELETE, replace with Font |
+| CharacterScanner | DELETE (string rendering is one primitive) |
+| Pen class | Rewrite to use Canvas+Path |
+| View hierarchy | Update to use Canvas API |
 
-- Porter, Duff (1984): "Compositing Digital Images" - Alpha compositing algebra
-- Vuletich (2013): "Prefiltering Antialiasing for General Vector Graphics"
-- Ingalls (1981): "BitBlt" - Original BitBlt design
+### 4.2 View Class Update Example
 
-### Documentation
+**Current** (BitBlt-based):
+```smalltalk
+View>>displayOn: aDisplayMedium
+    | form |
+    form := Form extent: self extent.
+    self displayView.
+    form displayOn: aDisplayMedium at: self origin
+        clippingBox: aDisplayMedium boundingBox
+        rule: Form over
+        mask: Form black
+```
 
-- [SkiaSharp Documentation](https://docs.microsoft.com/en-us/dotnet/api/skiasharp)
-- [SDL2 Documentation](https://wiki.libsdl.org/)
-- [Blue Book Chapter 18](http://www.mirandabanda.org/bluebook/) - BitBlt specification
+**New** (Canvas-based):
+```smalltalk
+View>>drawOn: canvas
+    canvas save.
+    canvas clipRect: self bounds.
+    canvas translate: self origin.
+    self drawContent: canvas.
+    self subviews do: [:each | each drawOn: canvas].
+    canvas restore
+```
+
+### 4.3 DisplayScreen Update
+
+**Current**:
+```smalltalk
+DisplayScreen>>beDisplay
+    <primitive: 102>
+```
+
+**New**:
+```smalltalk
+DisplayScreen class>>current
+    "Return the display surface"
+    ^DisplaySurface current
+
+DisplayScreen>>drawFrame
+    | canvas |
+    canvas := DisplaySurface current canvas.
+    self rootView drawOn: canvas.
+    DisplaySurface current present
+```
+
+### 4.4 Text Rendering Update
+
+**Current** (character-by-character):
+```smalltalk
+CharacterScanner>>displayString: string on: destination
+    string do: [:char |
+        self displayCharacter: char on: destination.
+        destX := destX + (font widthOf: char)]
+```
+
+**New** (single call):
+```smalltalk
+Paragraph>>drawOn: canvas
+    canvas drawString: text at: position font: font paint: textPaint
+```
+
+---
+
+## Part 5: Implementation Phases
+
+### Phase 1: Platform Foundation (Week 1-2)
+
+**Goal**: SDL2 window with Skia rendering context
+
+**Tasks**:
+1. Add NuGet packages: SkiaSharp, SkiaSharp.Views.Desktop, SDL2-CS
+2. Create `SDL2Display.cs` - window creation, event loop
+3. Create `SkiaGpuContext.cs` - OpenGL context + SKSurface
+4. Basic event handling (keyboard, mouse)
+5. Delete: `WinFormsDisplay.cs`, `WinFormsDisplayProvider.cs`
+
+**Deliverable**: Window opens, clears to solid color, handles input
+
+### Phase 2: Canvas Primitives (Week 3-4)
+
+**Goal**: Basic Canvas drawing operations working
+
+**Tasks**:
+1. Create `SkiaCanvas.cs` wrapping `SKCanvas`
+2. Create `SkiaSurface.cs` wrapping `SKSurface`
+3. Create `SkiaPaint.cs` wrapping `SKPaint`
+4. Implement primitives 200-231 (Canvas operations)
+5. Implement primitives 240-246 (Surface operations)
+6. Delete: `BitBlt32Engine.cs`, `BitBltEngine.cs`, `GraphicsPrimitives.cs` (old)
+
+**Deliverable**: Can draw rectangles, lines to display from Smalltalk
+
+### Phase 3: Text Rendering (Week 5-6)
+
+**Goal**: Modern text with TrueType fonts
+
+**Tasks**:
+1. Create `SkiaFont.cs` wrapping `SKFont`/`SKTypeface`
+2. Implement primitives 250-252 (Font operations)
+3. Implement primitive 225 (drawString)
+4. Delete: `WinFormsFontBridge.cs`, `IFontBridge.cs`, `FontObjectBuilder.cs`
+5. Update Smalltalk: Font class, delete StrikeFont
+
+**Deliverable**: Text renders with system fonts, anti-aliased
+
+### Phase 4: Vector Graphics (Week 7-8)
+
+**Goal**: Path-based drawing
+
+**Tasks**:
+1. Create `SkiaPath.cs` wrapping `SKPath`
+2. Implement primitives 260-266 (Path operations)
+3. Add Smalltalk Path class
+4. Update Pen class to use Path + Canvas
+
+**Deliverable**: Can draw arbitrary shapes, curves, polygons
+
+### Phase 5: Smalltalk Source Migration (Week 9-12)
+
+**Goal**: Update all Smalltalk graphics code
+
+**Tasks**:
+1. Delete BitBlt class
+2. Replace Form with Surface throughout
+3. Rewrite View hierarchy to use Canvas
+4. Rewrite DisplayScreen
+5. Delete CharacterScanner, replace with single drawString calls
+6. Update all halftone usage to gradient/pattern brushes
+7. Run full test suite, fix issues
+
+**Deliverable**: System Browser, Transcript, all tools work with new graphics
+
+### Phase 6: Polish & Performance (Week 13-14)
+
+**Goal**: Production quality
+
+**Tasks**:
+1. Dirty rectangle optimization
+2. Damage region tracking
+3. Performance profiling
+4. Memory leak detection
+5. Cross-platform testing (Windows, macOS, Linux)
+
+**Deliverable**: Stable, performant graphics system
+
+---
+
+## Part 6: Code Examples
+
+### 6.1 SDL2Display.cs (Sketch)
+
+```csharp
+public class SDL2Display : IDisposable
+{
+    private IntPtr _window;
+    private IntPtr _glContext;
+    private GRContext _grContext;
+    private SKSurface _surface;
+
+    public void Initialize(int width, int height, string title)
+    {
+        SDL.SDL_Init(SDL.SDL_INIT_VIDEO);
+
+        // Request OpenGL 3.3 core
+        SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+        SDL.SDL_GL_SetAttribute(SDL.SDL_GLattr.SDL_GL_CONTEXT_MINOR_VERSION, 3);
+
+        _window = SDL.SDL_CreateWindow(title,
+            SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED,
+            width, height,
+            SDL.SDL_WindowFlags.SDL_WINDOW_OPENGL | SDL.SDL_WindowFlags.SDL_WINDOW_SHOWN);
+
+        _glContext = SDL.SDL_GL_CreateContext(_window);
+        SDL.SDL_GL_MakeCurrent(_window, _glContext);
+
+        // Create Skia GPU context
+        var glInterface = GRGlInterface.Create();
+        _grContext = GRContext.CreateGl(glInterface);
+
+        CreateSurface(width, height);
+    }
+
+    private void CreateSurface(int width, int height)
+    {
+        var renderTarget = new GRBackendRenderTarget(
+            width, height, 0, 8, new GRGlFramebufferInfo(0, SKColorType.Rgba8888.ToGlSizedFormat()));
+        _surface = SKSurface.Create(_grContext, renderTarget,
+            GRSurfaceOrigin.BottomLeft, SKColorType.Rgba8888);
+    }
+
+    public SKCanvas Canvas => _surface.Canvas;
+
+    public void Present()
+    {
+        _surface.Canvas.Flush();
+        SDL.SDL_GL_SwapWindow(_window);
+    }
+}
+```
+
+### 6.2 Canvas Primitive Implementation (Sketch)
+
+```csharp
+public static class CanvasPrimitives
+{
+    // Primitive 211: Canvas fillRect
+    public static PrimitiveResult FillRect(PrimitiveContext ctx)
+    {
+        var canvas = ctx.GetSkiaCanvas(ctx.Receiver);
+        var rect = ctx.GetRectangle(ctx.Arguments[0]);
+        var paint = ctx.GetSkiaPaint(ctx.Arguments[1]);
+
+        canvas.DrawRect(rect, paint);
+        return PrimitiveResult.Success(ctx.Receiver);
+    }
+
+    // Primitive 225: Canvas drawString
+    public static PrimitiveResult DrawString(PrimitiveContext ctx)
+    {
+        var canvas = ctx.GetSkiaCanvas(ctx.Receiver);
+        var text = ctx.GetString(ctx.Arguments[0]);
+        var point = ctx.GetPoint(ctx.Arguments[1]);
+        var font = ctx.GetSkiaFont(ctx.Arguments[2]);
+        var paint = ctx.GetSkiaPaint(ctx.Arguments[3]);
+
+        canvas.DrawText(text, point.X, point.Y, font, paint);
+        return PrimitiveResult.Success(ctx.Receiver);
+    }
+
+    // Primitive 220: Canvas drawSurface
+    public static PrimitiveResult DrawSurface(PrimitiveContext ctx)
+    {
+        var canvas = ctx.GetSkiaCanvas(ctx.Receiver);
+        var surface = ctx.GetSkiaSurface(ctx.Arguments[0]);
+        var srcRect = ctx.GetRectangleOrNull(ctx.Arguments[1]);
+        var destRect = ctx.GetRectangle(ctx.Arguments[2]);
+        var blend = ctx.GetBlendMode(ctx.Arguments[3]);
+
+        using var paint = new SKPaint { BlendMode = blend };
+        canvas.DrawImage(surface.Snapshot(), srcRect, destRect, paint);
+        return PrimitiveResult.Success(ctx.Receiver);
+    }
+}
+```
+
+### 6.3 Updated Smalltalk View (Sketch)
+
+```smalltalk
+"View class - simplified with Canvas"
+View>>drawOn: canvas
+    "Draw this view and all subviews"
+    canvas save.
+    canvas clipRect: self bounds.
+    self drawBackground: canvas.
+    self drawContent: canvas.
+    self drawBorder: canvas.
+    subviews do: [:v | v drawOn: canvas].
+    canvas restore
+
+View>>drawBackground: canvas
+    backgroundColor ifNotNil: [
+        canvas fillRect: self bounds paint: (Paint color: backgroundColor)]
+
+View>>drawBorder: canvas
+    borderWidth > 0 ifTrue: [
+        | paint |
+        paint := Paint new
+            color: borderColor;
+            style: #stroke;
+            strokeWidth: borderWidth.
+        canvas drawRect: self bounds paint: paint]
+
+"Browser pane drawing"
+ListView>>drawOn: canvas
+    | y font paint |
+    super drawOn: canvas.
+    font := Font family: 'Courier New' size: 12.
+    paint := Paint color: Color black.
+    y := self bounds top + font lineHeight.
+    self visibleItems do: [:item |
+        item = selection ifTrue: [
+            canvas fillRect: (self bounds left @ (y - font ascent)
+                              extent: self bounds width @ font lineHeight)
+                   paint: (Paint color: Color blue alpha: 0.3)].
+        canvas drawString: item asString at: self bounds left @ y font: font paint: paint.
+        y := y + font lineHeight]
+```
+
+---
+
+## Part 7: Migration Checklist
+
+### Delete List
+
+**C# Files** (~2,500 lines):
+- [ ] `BitBlt32Engine.cs`
+- [ ] `BitBltEngine.cs`
+- [ ] `CombinationRule.cs`
+- [ ] `WinFormsFontBridge.cs`
+- [ ] `IFontBridge.cs`
+- [ ] `FontObjectBuilder.cs`
+- [ ] `WinFormsDisplay.cs`
+- [ ] `WinFormsDisplayProvider.cs`
+- [ ] Old `GraphicsPrimitives.cs` (primitives 96-104)
+
+**Smalltalk Classes**:
+- [ ] `BitBlt`
+- [ ] `Form` (replace with Surface)
+- [ ] `StrikeFont`
+- [ ] `CharacterScanner`
+- [ ] `Pen` (rewrite)
+- [ ] Halftone-related methods
+
+### Create List
+
+**C# Files** (~1,500 lines estimated):
+- [ ] `SDL2Display.cs`
+- [ ] `SDL2Input.cs`
+- [ ] `SkiaGpuContext.cs`
+- [ ] `SkiaCanvas.cs`
+- [ ] `SkiaSurface.cs`
+- [ ] `SkiaFont.cs`
+- [ ] `SkiaPath.cs`
+- [ ] `SkiaPaint.cs`
+- [ ] `CanvasPrimitives.cs`
+
+**Smalltalk Classes**:
+- [ ] `Canvas`
+- [ ] `Surface`
+- [ ] `DisplaySurface`
+- [ ] `Font` (new)
+- [ ] `Path`
+- [ ] `Paint`
+- [ ] `BlendMode`
+- [ ] `Transform`
+
+### Update List
+
+**Smalltalk Classes** (major updates):
+- [ ] `View` and all subclasses
+- [ ] `DisplayScreen`
+- [ ] `Color` (add alpha)
+- [ ] `Paragraph`/text display
+- [ ] `Cursor`
+- [ ] `Window`
+- [ ] All tools (Browser, Inspector, etc.)
+
+---
+
+## Appendix A: Porter-Duff vs BitBlt Rules
+
+**Why Porter-Duff is better**:
+
+| BitBlt Rule | Meaning | Porter-Duff Equivalent |
+|-------------|---------|------------------------|
+| 3 (copy) | dest = src | `src` |
+| 7 (or) | dest = src \| dest | `srcOver` (with alpha) |
+| 6 (xor) | dest = src ^ dest | `xor` |
+| 16 (paint) | grayscale blend | `multiply` or `srcOver` |
+
+**BitBlt problems**:
+1. Assumes 1bpp or no alpha
+2. Boolean operations don't compose correctly with alpha
+3. "Or" with alpha needs Porter-Duff, not bitwise OR
+4. Rules 1,2,4,8,9,10-15 are rarely used and don't map cleanly
+
+**Porter-Duff benefits**:
+1. Mathematically correct alpha compositing
+2. Industry standard (CSS, SVG, all modern graphics)
+3. Skia implements them natively
+4. Works correctly at any color depth
+
+---
+
+## Appendix B: Performance Expectations
+
+| Operation | Old (CPU BitBlt) | New (GPU Skia) | Improvement |
+|-----------|------------------|----------------|-------------|
+| Full screen clear | ~5ms | ~0.1ms | 50x |
+| 1000 rectangles | ~20ms | ~0.5ms | 40x |
+| 20-char string | ~2ms | ~0.05ms | 40x |
+| 100x100 image copy | ~0.2ms | ~0.02ms | 10x |
+| Page scroll | ~50ms | ~2ms | 25x |
+
+**Why so much faster**:
+1. GPU parallelism (thousands of cores)
+2. Batched draw calls
+3. Texture caching
+4. No CPU-GPU data transfer for cached content
+
+---
+
+## Appendix C: Dependencies
+
+**NuGet Packages**:
+```xml
+<PackageReference Include="SkiaSharp" Version="2.88.7" />
+<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="2.88.7" />
+<PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="2.88.7" />
+<PackageReference Include="SDL2-CS" Version="2.28.5" />
+```
+
+**System Requirements**:
+- OpenGL 3.3+ or Vulkan 1.0+ or Metal (macOS)
+- SDL2 runtime library
+- .NET 9.0+
+
+---
+
+## Summary
+
+This clean-slate approach results in:
+
+1. **~60% less graphics C# code** (delete 2,500 lines, add 1,500)
+2. **Simpler Smalltalk code** (no BitBlt complexity)
+3. **25-50x performance improvement** (GPU acceleration)
+4. **Cross-platform from day one** (SDL2 + Skia)
+5. **Modern graphics features** (alpha, gradients, paths, transforms)
+6. **Industry-standard compositing** (Porter-Duff)
+7. **High-quality text** (TrueType, anti-aliasing, kerning)
+
+The migration requires updating all Smalltalk graphics code, but the result is dramatically simpler and more powerful.
