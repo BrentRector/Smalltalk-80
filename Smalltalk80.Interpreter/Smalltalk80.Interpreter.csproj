@@ -66,36 +66,35 @@
       <ChangesSource>$(CompilerOutputDir)Smalltalk-80.changes</ChangesSource>
     </PropertyGroup>
 
-    <Message Text="" Importance="high" />
-    <Message Text="Deploying Smalltalk-80 files:" Importance="high" />
-
     <!-- Create target directories if they don't exist -->
     <MakeDir Directories="$(CommonAppDataPath)" Condition="!Exists('$(CommonAppDataPath)')" />
     <MakeDir Directories="$(UserAppDataPath)" Condition="!Exists('$(UserAppDataPath)')" />
+
+    <Exec Command="echo Deploying Smalltalk-80 files:" />
 
     <!-- Deploy coldstart.json -->
     <Copy SourceFiles="$(ColdstartSource)"
           DestinationFolder="$(CommonAppDataPath)"
           SkipUnchangedFiles="false"
           Condition="Exists('$(ColdstartSource)')" />
-    <Message Text="coldstart.json → $(CommonAppDataPath)\coldstart.json" Importance="high" Condition="Exists('$(ColdstartSource)')" />
-    <Warning Text="coldstart.json: FAILED - not found at $(ColdstartSource)" Condition="!Exists('$(ColdstartSource)')" />
+    <Exec Command="echo   coldstart.json -^&gt; $(CommonAppDataPath)\coldstart.json" Condition="Exists('$(ColdstartSource)')" />
+    <Exec Command="echo   coldstart.json: FAILED - not found at $(ColdstartSource)" Condition="!Exists('$(ColdstartSource)')" />
 
     <!-- Deploy .sources -->
     <Copy SourceFiles="$(SourcesSource)"
           DestinationFolder="$(UserAppDataPath)"
           SkipUnchangedFiles="false"
           Condition="Exists('$(SourcesSource)')" />
-    <Message Text="Smalltalk-80.sources → $(UserAppDataPath)\Smalltalk-80.sources" Importance="high" Condition="Exists('$(SourcesSource)')" />
-    <Warning Text="Smalltalk-80.sources: FAILED - not found at $(SourcesSource)" Condition="!Exists('$(SourcesSource)')" />
+    <Exec Command="echo   Smalltalk-80.sources -^&gt; $(UserAppDataPath)\Smalltalk-80.sources" Condition="Exists('$(SourcesSource)')" />
+    <Exec Command="echo   Smalltalk-80.sources: FAILED - not found at $(SourcesSource)" Condition="!Exists('$(SourcesSource)')" />
 
     <!-- Deploy .changes -->
     <Copy SourceFiles="$(ChangesSource)"
           DestinationFolder="$(UserAppDataPath)"
           SkipUnchangedFiles="false"
           Condition="Exists('$(ChangesSource)')" />
-    <Message Text="Smalltalk-80.changes → $(UserAppDataPath)\Smalltalk-80.changes" Importance="high" Condition="Exists('$(ChangesSource)')" />
-    <Warning Text="Smalltalk-80.changes: FAILED - not found at $(ChangesSource)" Condition="!Exists('$(ChangesSource)')" />
+    <Exec Command="echo   Smalltalk-80.changes -^&gt; $(UserAppDataPath)\Smalltalk-80.changes" Condition="Exists('$(ChangesSource)')" />
+    <Exec Command="echo   Smalltalk-80.changes: FAILED - not found at $(ChangesSource)" Condition="!Exists('$(ChangesSource)')" />
   </Target>
 
 </Project>
