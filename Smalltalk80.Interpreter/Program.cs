@@ -157,12 +157,25 @@ public static class Program
                     ?? throw new InvalidOperationException("VMMetadata is null after cold start");
             }
 
-            // Use default display dimensions for both cold start and restore
-            // Note: During snapshot, Smalltalk shrinks Display to minimize bitmap size
-            // (see snapshotAs:thenQuit: which calls DisplayScreen displayHeight: (height min: 100))
-            // After restore, the Smalltalk post-snapshot code will resize Display back to original
-            int displayWidth = InterpreterConstants.DefaultDisplayWidth;
-            int displayHeight = InterpreterConstants.DefaultDisplayHeight;
+            // Display dimensions depend on cold start vs restore
+            int displayWidth;
+            int displayHeight;
+
+            if (config.RestoreImageFile != null)
+            {
+                // RESTORE: Use minimal size - Smalltalk will resize via displayExtent:
+                // The snapshot saves Display at shrunk size (e.g., 800x16), then post-restore
+                // code runs DisplayScreen displayHeight: to resize to original dimensions.
+                // Starting small avoids wasted 800x600 allocation that gets immediately resized.
+                displayWidth = InterpreterConstants.DefaultDisplayWidth;
+                displayHeight = 16;  // Matches typical snapshot shrink size
+            }
+            else
+            {
+                // COLD START: Use full default size
+                displayWidth = InterpreterConstants.DefaultDisplayWidth;
+                displayHeight = InterpreterConstants.DefaultDisplayHeight;
+            }
 
             // Display mode: 1bpp (classic Smalltalk-80 monochrome)
             // The 32bpp experimental mode was removed - we now support only full 1bpp or full 32bpp,
