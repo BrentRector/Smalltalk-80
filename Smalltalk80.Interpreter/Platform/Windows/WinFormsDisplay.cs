@@ -32,8 +32,9 @@ namespace Smalltalk80.Interpreter.Platform.Windows;
 /// </summary>
 public class WinFormsDisplay : Form, IDisplay
 {
-    private uint[] _displayBuffer;  // 32bpp: 1 pixel per uint (matches Smalltalk Form format)
-    private Bitmap _backBuffer;     // 32bpp back buffer for screen rendering
+    private uint[]? _displayBuffer;  // 32bpp: 1 pixel per uint (matches Smalltalk Form format) - lazy init
+    private Bitmap? _backBuffer;     // 32bpp back buffer for screen rendering - lazy init
+    private bool _buffersInitialized = false;  // Track if buffers have been allocated
     private readonly object _bufferLock = new();
     private readonly ISmalltalkHeap? _heap;
     private readonly VMMetadata? _vmMetadata;
@@ -96,28 +97,14 @@ public class WinFormsDisplay : Form, IDisplay
         ISmalltalkHeap? heap = null, VMMetadata? vmMetadata = null,
         PixelDepth pixelDepth = PixelDepth.OneBit)  // pixelDepth parameter kept for API compatibility but ignored
     {
-        Width = width;
-        Height = height;
         _heap = heap;
         _vmMetadata = vmMetadata;
         _runtimeServices = (heap != null && vmMetadata != null)
             ? new RuntimeServices(heap, vmMetadata)
             : null;
 
-        Console.WriteLine($"[WinForms] Creating window: {width}x{height} (32bpp)");
-
-        // 32bpp buffer: one uint per pixel
-        int bufferSize = width * height;
-        _displayBuffer = new uint[bufferSize];
-        // Initialize to white
-        Array.Fill(_displayBuffer, 0xFFFFFFFF);
-
-        // Create back buffer for double-buffered rendering (32bpp for screen display)
-        _backBuffer = new Bitmap(width, height, PixelFormat.Format32bppRgb);
-
-        // Configure form
+        // Configure form (always needed for WinForms)
         Text = title;
-        ClientSize = new Size(width, height);
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
@@ -133,6 +120,45 @@ public class WinFormsDisplay : Form, IDisplay
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
         KeyPress += OnKeyPress;
+
+        // Initialize buffers if dimensions provided, otherwise defer to DisplayResized
+        if (width > 0 && height > 0)
+        {
+            InitializeBuffers(width, height);
+        }
+        else
+        {
+            // Lazy init mode: use minimal window size, buffers allocated on first DisplayResized
+            Width = 1;
+            Height = 1;
+            ClientSize = new Size(1, 1);
+            Console.WriteLine($"[WinForms] Creating window with lazy buffer initialization");
+        }
+    }
+
+    /// <summary>
+    /// Allocates display buffers and sets window size.
+    /// Called from constructor (eager init) or DisplayResized (lazy init).
+    /// </summary>
+    private void InitializeBuffers(int width, int height)
+    {
+        Console.WriteLine($"[WinForms] Initializing buffers: {width}x{height} (32bpp)");
+
+        Width = width;
+        Height = height;
+
+        // 32bpp buffer: one uint per pixel
+        int bufferSize = width * height;
+        _displayBuffer = new uint[bufferSize];
+        Array.Fill(_displayBuffer, 0xFFFFFFFF);  // Initialize to white
+
+        // Create back buffer for double-buffered rendering
+        _backBuffer = new Bitmap(width, height, PixelFormat.Format32bppRgb);
+
+        // Set window size
+        ClientSize = new Size(width, height);
+
+        _buffersInitialized = true;
     }
 
     // ============================================================================
@@ -251,7 +277,8 @@ public class WinFormsDisplay : Form, IDisplay
             return;
         }
 
-        if (newWidth == Width && newHeight == Height)
+        // Skip if already at this size (unless lazy init pending)
+        if (_buffersInitialized && newWidth == Width && newHeight == Height)
         {
             Invalidate();
             return;
@@ -273,6 +300,8 @@ public class WinFormsDisplay : Form, IDisplay
             _backBuffer?.Dispose();
             _backBuffer = new Bitmap(newWidth, newHeight, PixelFormat.Format32bppArgb);
             Console.WriteLine($"[Display] Reallocated _backBuffer: {newWidth}x{newHeight}");
+
+            _buffersInitialized = true;
         }
 
         ClientSize = new Size(newWidth, newHeight);
@@ -470,7 +499,14 @@ public class WinFormsDisplay : Form, IDisplay
     {
         lock (_bufferLock)
         {
-            // Sync 1bpp display buffer from Smalltalk heap, convert to 32bpp bitmap, render
+            // Skip painting if buffers not initialized (lazy init pending)
+            if (!_buffersInitialized || _displayBuffer == null || _backBuffer == null)
+            {
+                e.Graphics.Clear(Color.White);
+                return;
+            }
+
+            // Sync display buffer from Smalltalk heap, render to bitmap
             CopyDisplayFromHeap();
             CopyBufferToBitmap();
             e.Graphics.DrawImageUnscaled(_backBuffer, 0, 0);

@@ -163,16 +163,15 @@ public static class Program
 
             if (config.RestoreImageFile != null)
             {
-                // RESTORE: Use minimal size - Smalltalk will resize via displayExtent:
-                // The snapshot saves Display at shrunk size (e.g., 800x16), then post-restore
-                // code runs DisplayScreen displayHeight: to resize to original dimensions.
-                // Starting small avoids wasted 800x600 allocation that gets immediately resized.
-                displayWidth = InterpreterConstants.DefaultDisplayWidth;
-                displayHeight = 16;  // Matches typical snapshot shrink size
+                // RESTORE: Use lazy initialization (0x0)
+                // Smalltalk will call BeDisplay which triggers DisplayResized with actual dimensions.
+                // This avoids allocating buffers at a guessed size that immediately gets replaced.
+                displayWidth = 0;
+                displayHeight = 0;
             }
             else
             {
-                // COLD START: Use full default size
+                // COLD START: Use full default size (eager initialization)
                 displayWidth = InterpreterConstants.DefaultDisplayWidth;
                 displayHeight = InterpreterConstants.DefaultDisplayHeight;
             }
