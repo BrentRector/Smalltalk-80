@@ -9270,11 +9270,14 @@ new
 	"Creating new characters is not allowed."
 
 	self error: 'cannot create new characters'!
-value: anInteger 
+value: anInteger
 	"Answer the Character whose value is anInteger.
-	Characters are unique; they are stored in the class variable CharacterTable."
+	Characters 0-255 are cached in CharacterTable.
+	Characters > 255 (Unicode) are created dynamically."
 
-	^CharacterTable at: anInteger + 1! !
+	anInteger < 256
+		ifTrue: [^CharacterTable at: anInteger + 1]
+		ifFalse: [^self basicNew setValue: anInteger]! !
 
 !Character class methodsFor: 'accessing untypeable characters'!
 backspace
@@ -9286,6 +9289,9 @@ cr
 esc
 	"Answer the Character representing an escape."
 	^self value: 160!
+lf
+	"Answer the Character representing a linefeed."
+	^self value: 10!
 newPage
 	"Answer the Character representing a form feed."
 	^self value: 12!
@@ -27491,6 +27497,9 @@ even
 	"Answer whether the receiver is an even number."
 
 	^self \\ 2 = 0!
+isNumber
+	"Answer true since the receiver is a Number."
+	^true!
 negative
 	"Answer whether the receiver is less than 0."
 	^self < 0!
@@ -27781,9 +27790,18 @@ isInteger
 
 	^false!
 isNil
-	"Coerces nil to true and everything else to false.  UndefinedObject 
+	"Coerces nil to true and everything else to false.  UndefinedObject
 	overrides with ^true"
 
+	^false!
+isNumber
+	"Answer whether the receiver is a Number. Number overrides with ^true"
+	^false!
+isString
+	"Answer whether the receiver is a String. String overrides with ^true"
+	^false!
+isSymbol
+	"Answer whether the receiver is a Symbol. Symbol overrides with ^true"
 	^false!
 notNil
 	"Coerces nil to false and everything else to true.  UndefinedObject
@@ -36598,6 +36616,11 @@ first
 
 	self emptyCheck.
 	^self at: 1!
+second
+	"Answer the second element of the receiver.  Create an error if the receiver
+	contains fewer than two elements."
+
+	^self at: 2!
 indexOf: anElement 
 	"Answer the index of anElement within the receiver.  If the receiver does
 	not contain anElement, answer 0."
@@ -38584,6 +38607,11 @@ spellAgainst: aString
 
 	" 'Smalltalk' spellAgainst: 'Smalltlak' "! !
 
+!String methodsFor: 'testing'!
+isString
+	"Answer true since the receiver is a String."
+	^true! !
+
 !String methodsFor: 'accessing'!
 at: index 
 	"Answer the Character stored in the field of the receiver indexed by the 
@@ -38631,6 +38659,10 @@ findString: subString startingAt: start
 				[index = subString size ifTrue: [^startIndex].
 				index _ index+1]]].
 	^0!
+includesSubstring: aString
+	"Answer whether the receiver contains aString as a substring."
+
+	^(self findString: aString startingAt: 1) > 0!
 indexOf: aCharacter startingAt: startIndex
 	"Answer the index of the first occurrence of aCharacter within the receiver,
 	starting the search at startIndex. If not found, answer 0.
@@ -38733,6 +38765,9 @@ asParagraph
 asString
 	"Answer the receiver itself."
 	^self!
+readStream
+	"Answer a ReadStream on the receiver."
+	^ReadStream on: self!
 asSymbol
 	"Answer the unique symbol whose characters are the characters of the string."
 	^Symbol intern: self!
@@ -39718,6 +39753,11 @@ hash
 hashMappedBy: map
 	"Answer what my hash would be if oops changed according to map"
 	^ map newHashFor: self hash! !
+
+!Symbol methodsFor: 'testing'!
+isSymbol
+	"Answer true since the receiver is a Symbol."
+	^true! !
 
 !Symbol methodsFor: 'copying'!
 copy
@@ -44464,29 +44504,40 @@ parseString
 		char _ stream next.
 		char = $" ifTrue: [^result contents].
 		char = $\
-			ifTrue: [result nextPut: self parseEscape]
+			ifTrue: [self parseEscapeTo: result]
 			ifFalse: [result nextPut: char]].
 	self error: 'Unterminated string'!
-parseEscape
-	"Parse escape sequence after backslash."
+parseEscapeTo: resultStream
+	"Parse escape sequence after backslash, writing to resultStream.
+	 Unicode escapes may write multiple UTF-8 bytes."
 	| char |
 	char _ stream next.
-	char = $n ifTrue: [^Character lf].
-	char = $t ifTrue: [^Character tab].
-	char = $r ifTrue: [^Character cr].
-	char = $" ifTrue: [^$"].
-	char = $\ ifTrue: [^$\].
-	char = $/ ifTrue: [^$/].
-	char = $b ifTrue: [^Character backspace].
-	char = $f ifTrue: [^Character newPage].
-	char = $u ifTrue: [^self parseUnicodeEscape].
+	char = $n ifTrue: [^resultStream nextPut: Character lf].
+	char = $t ifTrue: [^resultStream nextPut: Character tab].
+	char = $r ifTrue: [^resultStream nextPut: Character cr].
+	char = $" ifTrue: [^resultStream nextPut: $"].
+	char = $\ ifTrue: [^resultStream nextPut: $\].
+	char = $/ ifTrue: [^resultStream nextPut: $/].
+	char = $b ifTrue: [^resultStream nextPut: Character backspace].
+	char = $f ifTrue: [^resultStream nextPut: Character newPage].
+	char = $u ifTrue: [^self parseUnicodeEscapeTo: resultStream].
 	self error: 'Unknown escape: \', char asString!
-parseUnicodeEscape
-	"Parse \uXXXX unicode escape."
+parseUnicodeEscapeTo: resultStream
+	"Parse \uXXXX unicode escape, writing UTF-8 bytes to resultStream.
+	 Codepoints 0-127 are single byte. 128-2047 are two bytes.
+	 2048-65535 are three bytes."
 	| hex codePoint |
 	hex _ stream next: 4.
-	codePoint _ Integer readFrom: hex readStream base: 16.
-	^Character value: codePoint!
+	codePoint _ Integer readFrom: hex readStream radix: 16.
+	codePoint < 128 ifTrue: [
+		^resultStream nextPut: (Character value: codePoint)].
+	codePoint < 2048 ifTrue: [
+		resultStream nextPut: (Character value: (16rC0 bitOr: (codePoint bitShift: -6))).
+		^resultStream nextPut: (Character value: (16r80 bitOr: (codePoint bitAnd: 16r3F)))].
+	"3-byte UTF-8 for codepoints 2048-65535"
+	resultStream nextPut: (Character value: (16rE0 bitOr: (codePoint bitShift: -12))).
+	resultStream nextPut: (Character value: (16r80 bitOr: ((codePoint bitShift: -6) bitAnd: 16r3F))).
+	resultStream nextPut: (Character value: (16r80 bitOr: (codePoint bitAnd: 16r3F)))!
 parseTrue
 	"Parse 'true' literal."
 	(stream next: 4) = 'true' ifFalse: [self error: 'Expected true'].

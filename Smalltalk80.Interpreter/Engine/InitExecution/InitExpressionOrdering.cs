@@ -79,6 +79,9 @@ public static class InitExpressionOrdering
 
             // BlockContext Test Runner (runs all 120 tests, expected result: 1191)
             "BlockContextTestRunner initialize"
+
+            // NOTE: JsonTest runAll is NOT run during init - run manually from Workspace:
+            //   JsonTest runAll
         };
     }
 }

@@ -170,9 +170,11 @@ Instance variables
 	actionTaken	<Boolean> was the action, true or false, already taken
  '!BinaryChoiceController comment:'My instances assume that their model can carry out some action only once--that is, make a selection only once.  Control is given up if the model responds true to the message actionTaken.'!BinaryChoiceView comment:'I am a view of a BinaryChoice.  I display a question and two switches, yes and no, indicating choices the user can make.'!BitBlt comment:'The BitBlt operation copies bits from one rectangle within a Form (source) to another (dest).  The result is stored according to a combination rule which specifies one of the sixteen possibilities for how white and black should be combined.
 
-If halftoneForm is not nil, it is a halftone screen which masks (is ANDed with) the source during the operation.  Halftones are 16x16 bit Forms which are repeated indefinitely as needed by the BitBlt operation. with the two forms and a halftoneForm.
+If halftoneForm is not nil, it is a halftone screen which masks (is ANDed with) the source during the operation.  Halftones are 16x16 bit Forms which are repeated indefinitely as needed by the BitBlt operation.
 
 If sourceForm is nil, the halftone is taken by itself to be the source, as for filling with a constant pattern.
+
+If color is not nil, it specifies a Color object for solid color drawing operations (32bpp). This is the preferred way to specify colors rather than using halftoneForm.
 
 The clipping parameters specify a rectangle in the destination outside of which BitBlt will not make any changes'!BitEditor comment:'A bit-magnifying tool for editing small Forms directly on the display screen.  Continue in blowup mode until the user depresses any key on the keyboard.'!BlockContext comment:'My instances function similarly to instances of MethodContext, but they hold the dynamic state for execution of a block in Smalltalk.  They access all temporary variables and the method sender via their home pointer, so that those values are effectively shared.  Their indexable part is used to store their independent value stack during execution.
 
@@ -395,6 +397,8 @@ Instance Variables
 	lineY	<Integer>  Top of line currently being displayed or scanned.  The textStyle lineGrid is added or subtracted to discover the top of the next line.  May differ from destY when fonts of differing height fall on the same line.
 
 	runX	<Integer>  Left of first character in the current run -- allows for creating underlining or similar emphasis.
+
+	defaultMask	<Form>  The default halftone mask (from Paragraph) used when no color is specified.
 '!DisplayScreen comment:'There is only one instance of me, CurrentDisplay.  It is a global and is used to handle general user requests to deal with the whole display screen.  Although I offer no protocol, my name provides a way to distinguish this special instance from all other Forms.'!DisplayText comment:'I get used two different ways in the system.
 In the user interface I mainly hold onto some text which is viewed by some form of ParagraphEditor.  However, as a DisplayObject, I may need to display efficiently, so form caches the bits for that purpose.'!DisplayTextView comment:'I represent a view of an instance of DisplayText.
 
@@ -660,7 +664,23 @@ Instance Variables:
     rgb         Integer - Packed RGB value (10 bits per component)'!TranslucentColor comment:'I am a Color with an alpha (transparency) component. Alpha ranges from 0.0 (fully transparent) to 1.0 (fully opaque).
 
 Instance Variables:
-    alpha   Float - The alpha (opacity) value from 0.0 to 1.0'!Point comment:'I am an x-y pair of numbers usually designating a location on the screen'!PopUpMenu comment:'I represent a list of items.  My instances are presented on the display screen in a rectangular area.  The user points to an item, pressing a mouse button;  the item is highlighted.  When the button is released, the highlighted item indicates the selection.
+    alpha   Float - The alpha (opacity) value from 0.0 to 1.0'!TextAttribute comment:'I am an abstract class representing text attributes such as color, emphasis, or font changes. My subclasses implement specific attribute types. I provide polymorphism with integer emphasis codes used by the original Text implementation.
+
+Subclasses:
+    TextColor - text foreground color
+    TextEmphasis - bold, italic, underline, strikethrough'!TextColor comment:'I represent a text foreground color attribute. I wrap a Color object and provide integration with the Text emphasis system.
+
+Instance Variables:
+    color   Color - the foreground color for text'!TextEmphasis comment:'I represent a text emphasis attribute such as bold, italic, underline, or strikethrough. I store an integer emphasis code compatible with the original Text system.
+
+Emphasis codes (bitfield):
+    1 - bold
+    2 - italic
+    4 - underlined
+    8 - strikethrough
+
+Instance Variables:
+    emphasisCode    SmallInteger - the emphasis bitfield'!Point comment:'I am an x-y pair of numbers usually designating a location on the screen'!PopUpMenu comment:'I represent a list of items.  My instances are presented on the display screen in a rectangular area.  The user points to an item, pressing a mouse button;  the item is highlighted.  When the button is released, the highlighted item indicates the selection.
 
 Instance Variables:
 
@@ -694,7 +714,48 @@ Instance Variables:
 	filePositionHi		<Integer>
 	filePositionLo		<Integer>
 
-I hold the file reference to the class comment (or any other piece of executable text).'!ReturnNode comment:'I represent an expression of the form ^expr'!RunArray comment:'RunArrays provide space-efficient storage of data which tends to be constant over long runs of the possible indices.  runs is an array of Integers, and each indicates the number of indices over which the corresponding value (in values) is constant.'!Scanner comment:'I scan a stream picking out Smalltalk syntactic tokens.  I look one character ahead.  I put each token found into token and its type (a Symbol) into tokenType.  At the end of stream or a doit symbol, I pretend to see an endless sequence of doits.'!ScreenController comment:'I am the controller for the parts of the display screen that have no window on them.  I only provide a standard yellow button menu.  I view (a FormView of) an infinite gray form.'!ScrollController comment:'I represent control for scrolling using a scrollBar.  I am a MouseMenuController that creates a scrollBar, rather than menus.  My subclasses add the button menus.  I keep control as long as the cursor is inside the view or the scrollBar area.
+I hold the file reference to the class comment (or any other piece of executable text).'!ReturnNode comment:'I represent an expression of the form ^expr'!RunArray comment:'RunArrays provide space-efficient storage of data which tends to be constant over long runs of the possible indices.  runs is an array of Integers, and each indicates the number of indices over which the corresponding value (in values) is constant.'!Scanner comment:'I scan a stream picking out Smalltalk syntactic tokens.  I look one character ahead.  I put each token found into token and its type (a Symbol) into tokenType.  At the end of stream or a doit symbol, I pretend to see an endless sequence of doits.
+
+commentPositions tracks {start, end} pairs for all comments encountered during scanning, enabling syntax highlighting without a separate comment-finding pass.'!ScannerHighlighter comment:'I wrap the Scanner class to provide syntax highlighting tokens with position information. I tokenize Smalltalk source code and categorize each token for syntax highlighting purposes.
+
+I produce a collection of SyntaxToken objects, each containing:
+- type: a Symbol indicating the highlight category (#keyword, #string, #comment, etc.)
+- start: the 1-based start position in source
+- end: the 1-based end position in source
+
+Usage:
+    | tokens |
+    tokens := ScannerHighlighter new tokenize: ''self foo: 42''.
+    tokens do: [:token | Transcript show: token type; cr]
+
+Instance Variables:
+    scanner     Scanner - the underlying Smalltalk scanner
+    tokens      OrderedCollection - collected syntax tokens
+    sourceString String - the source being scanned'!SyntaxToken comment:'I represent a syntax token with its position in source code. I am produced by ScannerHighlighter for syntax highlighting. Color is looked up lazily from token type via SyntaxStyler colorForType:.
+
+Instance Variables:
+    type    Symbol - the highlight category (#keyword, #string, #comment, etc.)
+    start   Integer - 1-based start position in source
+    end     Integer - 1-based end position in source (inclusive)'!SyntaxStyler comment:'I apply syntax highlighting to Smalltalk source code using a two-level mapping:
+1. Token types (from ScannerHighlighter) ? TextMate scopes
+2. TextMate scopes ? Colors (defined by themes)
+
+This architecture allows easy theme swapping since themes are defined in terms
+of standard TextMate scopes, matching VSCode/TextMate conventions.
+
+Usage:
+    | styledText |
+    styledText := SyntaxStyler new styleSource: ''self foo: 42''.
+    SyntaxStyler useColorSet: #VSCodeLight.  "Switch themes"
+
+Class Variables:
+    TokenToScopeMap     Dictionary - token type to TextMate scope
+    ColorSets           Dictionary - theme name to (scope ? color) mapping
+    CurrentColorSetName Symbol - active theme name
+    DefaultColorMap     Dictionary - current active scope ? color mapping
+
+Instance Variables:
+    colorMap            Dictionary - instance-specific color map (optional override)'!ScreenController comment:'I am the controller for the parts of the display screen that have no window on them.  I only provide a standard yellow button menu.  I view (a FormView of) an infinite gray form.'!ScrollController comment:'I represent control for scrolling using a scrollBar.  I am a MouseMenuController that creates a scrollBar, rather than menus.  My subclasses add the button menus.  I keep control as long as the cursor is inside the view or the scrollBar area.
 
 A scrollBar is a rectangular area representing the length of the information being viewed.  It contains an inner rectangle whose top y-coordinate represents the relative position of the information visible on the screen with respect to all of the information, and whose size represents the relative amount of that information visible on the screen.  The user controls which part of the information is visible by pressing the red button.  If the cursor is to the right of the inner rectangle, the window onto the visible information moves upward, if the cursor is to the left, the window moves downward, and if the cursor is inside, the inner rectangle is grabbed and moved to a desired position.  
 
@@ -827,9 +888,14 @@ Basically, the tracer runs through the system tracing every accessible object, a
 The tracer has built-in support for clamping unwanted (or unneeded) classes out of the system.  Use the message writeCloneWithout: for this.  A considerably more powerful clamping mechanism is the message winnowing feature.  It will cull out all unreferenced messages, and then based on THOSE deletions, cull out more and so on.  See the comment in winnow.
 
 Examples of things we have done with the SystemTracer include changing the instruction set of Smalltalk.  For this we define a subclass called Junta which defines a special method for writing CompiledMethods out in the new format.  Then we change the virtual machine and fire up the clone.  Another example is changing the format of FloatingPoint numbers'!Text comment:'Instance Variables:
-	string:	A String of Characters
-	runs:	A RunArray of emphasis codes
-					
+	string:		A String of Characters
+	runs:		A RunArray of integer emphasis codes (for font selection)
+	colorRuns:	A RunArray of Color objects (nil = default black) - DEPRECATED, use tokens
+	tokens:		OrderedCollection of SyntaxToken - O(1) sequential color lookup
+	currentTokenIndex: Integer - cached index for sequential access optimization
+	cachedTokenType: Symbol - last looked up token type (avoids repeated dictionary lookups)
+	cachedTokenColor: Color - color for cachedTokenType
+
 The emphasis codes indicate abstract changes in character appearance.  Actual display is performed in the presence of a TextStyle which indicates, for each abstract code, an actual font to be used'!TextCollector comment:'I represent a StringHolder into which text can also be gathered by sending messages using Stream protocol.
 
 Instance Variables
@@ -916,4 +982,29 @@ insideColor - <Form>, or nil (meaning transparent)
 boundingBox - <Rectangle> (in View coordinates), or nil
 '!WindowingTransformation comment:'
 WindowingTransformation is used to transform objects from a source coordinate system to a destination coordinate system.  WindowingTransformation contains a scale and a translation which can be applied to objects that respond to scaleBy: and translateBy:.  An instance of WindowingTransformation can be created with a default identity scale and translation, or with a specified scale and translation, or with a scale and translation computed from a window (a Rectangle in the source coordinate system) and a viewport (a Rectangle in the destination coordinate system).  In applying a WindowingTransformation to an object, the object is first scaled (around the origin of the source coordinate system) and then translated.  WindowingTransformations can be composed to form a single compound transformation.
-'!WriteStream comment:'I am a writer of an indexable collection. writeLimit marks the farthest that has been written into the collection, not the actual size of the collection.'!
+'!WriteStream comment:'I am a writer of an indexable collection. writeLimit marks the farthest that has been written into the collection, not the actual size of the collection.'!JsonReader comment:'I parse JSON text into Smalltalk objects.
+
+JSON value types map to:
+  object  -> Dictionary
+  array   -> Array
+  string  -> String
+  number  -> Integer or Float (via Number readFrom:)
+  true    -> true
+  false   -> false
+  null    -> nil
+
+Usage:
+  JsonReader parse: ''{"name": "Alice", "age": 30}''
+    => a Dictionary(''name''->''Alice'' ''age''->30)'!JsonWriter comment:'I generate JSON text from Smalltalk objects.
+
+Supported object types:
+  Dictionary -> object
+  Array/OrderedCollection -> array
+  String/Symbol -> string
+  Number -> number
+  true/false -> true/false
+  nil -> null
+
+Usage:
+  JsonWriter stringify: (Dictionary new at: ''name'' put: ''Alice''; yourself)
+    => ''{"name":"Alice"}'''!JsonTest comment:'Test cases for JsonReader and JsonWriter classes.'!JsonTest runAll!
