@@ -67,54 +67,35 @@
     </PropertyGroup>
 
     <Message Text="" Importance="high" />
-    <Message Text="========================================" Importance="high" />
-    <Message Text="Deploying Smalltalk-80 files" Importance="high" />
-    <Message Text="========================================" Importance="high" />
-    <Message Text="" Importance="high" />
-    <Message Text="Source locations:" Importance="high" />
-    <Message Text="  coldstart.json:       $(ColdstartSource)" Importance="high" />
-    <Message Text="  Smalltalk-80.sources: $(SourcesSource)" Importance="high" />
-    <Message Text="  Smalltalk-80.changes: $(ChangesSource)" Importance="high" />
-    <Message Text="" Importance="high" />
-    <Message Text="Destination locations:" Importance="high" />
-    <Message Text="  coldstart.json:       $(CommonAppDataPath)\" Importance="high" />
-    <Message Text="  Smalltalk-80.sources: $(UserAppDataPath)\" Importance="high" />
-    <Message Text="  Smalltalk-80.changes: $(UserAppDataPath)\" Importance="high" />
-    <Message Text="" Importance="high" />
+    <Message Text="Deploying Smalltalk-80 files:" Importance="high" />
 
     <!-- Create target directories if they don't exist -->
     <MakeDir Directories="$(CommonAppDataPath)" Condition="!Exists('$(CommonAppDataPath)')" />
     <MakeDir Directories="$(UserAppDataPath)" Condition="!Exists('$(UserAppDataPath)')" />
 
     <!-- Deploy coldstart.json -->
-    <Message Text="Deploying coldstart.json..." Importance="high" />
     <Copy SourceFiles="$(ColdstartSource)"
           DestinationFolder="$(CommonAppDataPath)"
           SkipUnchangedFiles="false"
           Condition="Exists('$(ColdstartSource)')" />
-    <Message Text="  ✓ SUCCESS" Importance="high" Condition="Exists('$(ColdstartSource)')" />
-    <Warning Text="  ✗ FAILED: File not found at $(ColdstartSource)" Condition="!Exists('$(ColdstartSource)')" />
+    <Message Text="coldstart.json → $(CommonAppDataPath)\coldstart.json" Importance="high" Condition="Exists('$(ColdstartSource)')" />
+    <Warning Text="coldstart.json: FAILED - not found at $(ColdstartSource)" Condition="!Exists('$(ColdstartSource)')" />
 
     <!-- Deploy .sources -->
-    <Message Text="Deploying Smalltalk-80.sources..." Importance="high" />
     <Copy SourceFiles="$(SourcesSource)"
           DestinationFolder="$(UserAppDataPath)"
           SkipUnchangedFiles="false"
           Condition="Exists('$(SourcesSource)')" />
-    <Message Text="  ✓ SUCCESS" Importance="high" Condition="Exists('$(SourcesSource)')" />
-    <Warning Text="  ✗ FAILED: File not found at $(SourcesSource)" Condition="!Exists('$(SourcesSource)')" />
+    <Message Text="Smalltalk-80.sources → $(UserAppDataPath)\Smalltalk-80.sources" Importance="high" Condition="Exists('$(SourcesSource)')" />
+    <Warning Text="Smalltalk-80.sources: FAILED - not found at $(SourcesSource)" Condition="!Exists('$(SourcesSource)')" />
 
     <!-- Deploy .changes -->
-    <Message Text="Deploying Smalltalk-80.changes..." Importance="high" />
     <Copy SourceFiles="$(ChangesSource)"
           DestinationFolder="$(UserAppDataPath)"
           SkipUnchangedFiles="false"
           Condition="Exists('$(ChangesSource)')" />
-    <Message Text="  ✓ SUCCESS" Importance="high" Condition="Exists('$(ChangesSource)')" />
-    <Warning Text="  ✗ FAILED: File not found at $(ChangesSource)" Condition="!Exists('$(ChangesSource)')" />
-
-    <Message Text="" Importance="high" />
-    <Message Text="========================================" Importance="high" />
+    <Message Text="Smalltalk-80.changes → $(UserAppDataPath)\Smalltalk-80.changes" Importance="high" Condition="Exists('$(ChangesSource)')" />
+    <Warning Text="Smalltalk-80.changes: FAILED - not found at $(ChangesSource)" Condition="!Exists('$(ChangesSource)')" />
   </Target>
 
 </Project>
