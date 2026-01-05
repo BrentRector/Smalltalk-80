@@ -114,7 +114,6 @@ public class SmalltalkInterpreterThread
                 // Initialize event architecture now that display exists
                 // This sets up the callback that signals _inputEventPending when events arrive
                 vm.InitializeEventArchitecture();
-                Console.WriteLine("[Smalltalk Thread] Event architecture initialized after display creation");
 
                 return display;
             });

@@ -1,7 +1,7 @@
-# Session Handoff: File Location Relocation
+# Session Handoff: Lazy Display Creation & File Locations
 
 **Date**: 2026-01-05
-**Status**: File location relocation implemented (no fallbacks)
+**Status**: Lazy display creation implemented, file location relocation complete
 **Branch**: `claude/session-handoff-continuation-pblzi`
 **Priority**: Enhancement
 **Master Plan**: `docs/32-BIT-IMPLEMENTATION-PLAN.md`
@@ -10,9 +10,15 @@
 
 ## Quick Summary
 
-This session implemented file location relocation to Windows well-known folders. **All files must be deployed to well-known locations** - there are no fallback locations.
+This session implemented **lazy/deferred window creation** so the WinForms display window is only created when Smalltalk calls `BeDisplay` (primitive 102), rather than at interpreter startup. Also includes file location relocation to Windows well-known folders.
 
-**NOTE**: Deploy runs automatically after build. Files are copied to well-known locations each time you build.
+**Key Changes**:
+1. **JSON Reader/Writer** - Pure Smalltalk JSON parsing and generation with full Unicode support
+2. **WindowsPath Class** - Access to Windows special folders via Primitive 160 (`%APPDATA%`, `%COMMONAPPDATA%`, etc.)
+3. **Lazy Display Creation** - Window created only when `DisplayScreen initialize` runs
+4. **Display Factory Pattern** - Thread-safe coordination between Smalltalk and UI threads
+5. **Input Event Fix** - `InitializeEventArchitecture()` called after display creation
+6. **Snapshot to AppData** - Snapshots saved to `%APPDATA%\Smalltalk-80\`
 
 ### File Location Summary
 
@@ -28,13 +34,16 @@ This session implemented file location relocation to Windows well-known folders.
 ## Current State
 
 ### What Works
-- ✅ Build: 0 errors, 0 warnings (prior to this session)
+- ✅ Build: 0 errors, 0 warnings
 - ✅ Cold start: All 6 phases succeed
 - ✅ Init expressions: 286/286 succeed (100%)
 - ✅ System Browser: Fully functional with syntax highlighting (~1.0s display)
 - ✅ Syntax highlighting: 4.5x speedup (Phase 7 complete)
 - ✅ **JsonReader class**: Added to `Smalltalk-80.st` (tested and working)
 - ✅ **JsonWriter class**: Added to `Smalltalk-80.st` (tested and working)
+- ✅ **WindowsPath class**: Primitive 160 for Windows special folders
+- ✅ **Lazy display creation**: Window created when BeDisplay called
+- ✅ **Mouse/keyboard input**: Working with lazy display creation
 - ✅ **CommandLineParser**: Updated for well-known path search
 - ✅ **SystemDictionary>>initialize**: Updated for well-known path search
 
@@ -43,6 +52,23 @@ This session implemented file location relocation to Windows well-known folders.
 - ⏳ **Test file location changes**: After coldstart regeneration
 
 ### Recent Changes (this session)
+
+**JSON Reader/Writer (Pure Smalltalk)**:
+- Added `JsonReader` class for parsing JSON strings
+- Added `JsonWriter` class for generating JSON output
+- Full Unicode escape support (`\uXXXX`)
+- Handles strings, numbers, booleans, null, arrays, dictionaries
+- 29 comprehensive tests pass
+
+**Lazy Display Creation**:
+- `SmalltalkThreadContext.DisplayFactory` - Factory function for lazy window creation
+- `IPrimitiveContext.GetOrCreateDisplay()` - Called by BeDisplay primitive (102)
+- `VirtualMachine.SetDisplayFactory()` - Registers factory during VM creation
+- `InitializeEventArchitecture()` - Now called after display creation (fixes input events)
+- `DisplayScreen initialize` added to init expression ordering
+- Window created when Smalltalk calls `Display beDisplay`, not at startup
+
+**File Location Relocation**:
 ```
 - Updated CommandLineParser.cs:
   - --coldstart uses only %COMMONAPPDATA%\Smalltalk-80\coldstart.json
