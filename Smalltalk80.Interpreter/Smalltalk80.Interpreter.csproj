@@ -47,9 +47,7 @@
 
   <!--
     Deploy target: Copy files to Windows well-known folders.
-    REQUIRED before running the interpreter for the first time.
-
-    Run with: dotnet msbuild /t:Deploy
+    Runs automatically after build. Can also run manually: dotnet msbuild /t:Deploy
 
     Source locations:
     - coldstart.json: Compiler output (bin/Debug/net9.0/Data/)
@@ -59,7 +57,7 @@
     - coldstart.json: %COMMONAPPDATA%\Smalltalk-80\ (system-wide, shared)
     - .sources/.changes: %APPDATA%\Smalltalk-80\ (per-user)
   -->
-  <Target Name="Deploy">
+  <Target Name="Deploy" AfterTargets="Build">
     <PropertyGroup>
       <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
       <!-- Source files are written by Compiler to Interpreter project directory -->

@@ -12,7 +12,7 @@
 
 This session implemented file location relocation to Windows well-known folders. **All files must be deployed to well-known locations** - there are no fallback locations.
 
-**IMPORTANT**: Run `dotnet msbuild /t:Deploy` after building to deploy files before running the interpreter.
+**NOTE**: Deploy runs automatically after build. Files are copied to well-known locations each time you build.
 
 ### File Location Summary
 
@@ -53,7 +53,7 @@ This session implemented file location relocation to Windows well-known folders.
   - No fallback to current working directory
 - Updated Interpreter.csproj:
   - Removed CopyDataFilesToOutput target (no local Data folder)
-  - Deploy target is REQUIRED before running
+  - Deploy target runs automatically after build (AfterTargets="Build")
 ```
 
 ---
@@ -120,7 +120,7 @@ WindowsPath commonAppDataPath
 ### Phase 2.5: File Location Relocation ✅ IMPLEMENTED
 - [x] CommandLineParser updated for well-known path search
 - [x] SystemDictionary>>initialize updated for source file paths
-- [x] Deploy MSBuild target added (`dotnet msbuild /t:Deploy`)
+- [x] Deploy MSBuild target runs automatically after build
 - [ ] Regenerate coldstart bundle
 - [ ] Test file location changes
 
@@ -149,17 +149,16 @@ WindowsPath commonAppDataPath
 ## Build and Test Commands
 
 ```bash
-# Build, deploy, and run
+# Build and run (deploy happens automatically after build)
 cd Smalltalk80.Interpreter
-dotnet build
-dotnet msbuild /t:Deploy   # REQUIRED - copies files to well-known locations
+dotnet build   # Deploys files to well-known locations automatically
 dotnet run
 
 # Regenerate coldstart after Smalltalk changes
 cd "Smalltalk-80 Source"
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
 cd ../Smalltalk80.Interpreter
-dotnet msbuild /t:Deploy   # Redeploy updated files
+dotnet build   # Redeploys updated files automatically
 
 # Run regression tests (using explicit path)
 cd Smalltalk80.Interpreter
@@ -186,9 +185,9 @@ dotnet run -- --coldstart ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstar
 - `docs/WINDOWS-SPECIAL-FOLDERS-IMPLEMENTATION.md` - Special folder primitive
 - `docs/WELL-KNOWN-PATHS-DESIGN.md` - Theme file loading design
 
-### File Deployment Commands:
+### File Deployment:
+Deploy runs automatically after build. Manual invocation if needed:
 ```bash
-# REQUIRED: Deploy files to well-known locations before running
 cd Smalltalk80.Interpreter
 dotnet msbuild /t:Deploy
 
