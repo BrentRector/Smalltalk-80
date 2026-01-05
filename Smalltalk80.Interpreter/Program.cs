@@ -176,25 +176,27 @@ public static class Program
             // Display is created lazily when Smalltalk calls BeDisplay
             WinFormsDisplay? display = null;
 
-            // Create Smalltalk thread context with display factory
+            // Create Smalltalk thread context
             var threadContext = new SmalltalkThreadContext
             {
                 HeapManager = heapManager,
                 VMMetadata = vmMetadata,
                 Bundle = bundle,
                 Display = null,
-                DisplayFactory = (width, height, heap, metadata) =>
-                {
-                    // Called from Smalltalk thread when BeDisplay is invoked
-                    threadContext.RequestedDisplayWidth = width;
-                    threadContext.RequestedDisplayHeight = height;
-                    threadContext.DisplayNeeded.Set();
-                    threadContext.DisplayCreated.Wait();
-                    return threadContext.Display!;
-                },
                 Diagnostics = diagnostics,
                 Config = config,
                 RestoreTimer = restoreTimer
+            };
+
+            // Set display factory after construction (lambda captures threadContext)
+            threadContext.DisplayFactory = (width, height, heap, metadata) =>
+            {
+                // Called from Smalltalk thread when BeDisplay is invoked
+                threadContext.RequestedDisplayWidth = width;
+                threadContext.RequestedDisplayHeight = height;
+                threadContext.DisplayNeeded.Set();
+                threadContext.DisplayCreated.Wait();
+                return threadContext.Display!;
             };
 
             // Start Smalltalk thread (runs init expressions and process scheduling)

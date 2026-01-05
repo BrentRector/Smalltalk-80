@@ -42,8 +42,9 @@ public class SmalltalkThreadContext
     /// Factory function to create the display window.
     /// Called from UI thread when display creation is requested.
     /// Parameters: (width, height, heap, metadata) -> IDisplay
+    /// Must be set after construction since the lambda captures the context itself.
     /// </summary>
-    public Func<int, int, ISmalltalkHeap, VMMetadata, IDisplay>? DisplayFactory { get; init; }
+    public Func<int, int, ISmalltalkHeap, VMMetadata, IDisplay>? DisplayFactory { get; set; }
 
     /// <summary>
     /// Signaled by Smalltalk thread when BeDisplay is called and display needs to be created.
