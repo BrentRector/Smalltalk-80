@@ -49,22 +49,30 @@
     Deploy target: Copy files to Windows well-known folders.
     Runs automatically after build. Can also run manually: dotnet msbuild /t:Deploy
 
-    Source locations (all in Compiler's output folder):
+    Source locations:
     - coldstart.json, .sources, .changes: Smalltalk80.Compiler/bin/{Config}/net9.0/
+    - *.form files: Forms/ folder in repository root
 
     Destination locations:
-    - coldstart.json: %COMMONAPPDATA%\Smalltalk-80\ (system-wide, shared)
+    - coldstart.json, *.form: %COMMONAPPDATA%\Smalltalk-80\ (system-wide, shared)
     - .sources/.changes: %APPDATA%\Smalltalk-80\ (per-user)
   -->
   <Target Name="Deploy" AfterTargets="Build">
     <PropertyGroup>
-      <!-- All source files are in Compiler's output folder -->
+      <!-- Source files in Compiler's output folder -->
       <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
+      <!-- Form files in repository Forms folder -->
+      <FormsDir>$(MSBuildProjectDirectory)\..\Forms\</FormsDir>
       <!-- Full paths for source files -->
       <ColdstartSource>$(CompilerOutputDir)coldstart.json</ColdstartSource>
       <SourcesSource>$(CompilerOutputDir)Smalltalk-80.sources</SourcesSource>
       <ChangesSource>$(CompilerOutputDir)Smalltalk-80.changes</ChangesSource>
     </PropertyGroup>
+
+    <!-- Collect all .form files from Forms folder -->
+    <ItemGroup>
+      <FormFiles Include="$(FormsDir)*.form" />
+    </ItemGroup>
 
     <!-- Create target directories if they don't exist -->
     <MakeDir Directories="$(CommonAppDataPath)" Condition="!Exists('$(CommonAppDataPath)')" />
@@ -95,6 +103,12 @@
           Condition="Exists('$(ChangesSource)')" />
     <Exec Command="echo   Smalltalk-80.changes -^&gt; $(UserAppDataPath)\Smalltalk-80.changes" Condition="Exists('$(ChangesSource)')" />
     <Exec Command="echo   Smalltalk-80.changes: FAILED - not found at $(ChangesSource)" Condition="!Exists('$(ChangesSource)')" />
+
+    <!-- Deploy .form files -->
+    <Copy SourceFiles="@(FormFiles)"
+          DestinationFolder="$(CommonAppDataPath)"
+          SkipUnchangedFiles="false" />
+    <Exec Command="echo   *.form files (@(FormFiles-&gt;Count())) -^&gt; $(CommonAppDataPath)\" />
   </Target>
 
 </Project>

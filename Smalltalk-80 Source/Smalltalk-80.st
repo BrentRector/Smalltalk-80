@@ -20739,10 +20739,19 @@ readFormFile: file
 	file close.
 	^newForm!
 readFrom: fileName
-	"Answer an instance of me with bitmap initialized from the external file named fileName."
+	"Answer an instance of me with bitmap initialized from the external file named fileName.
+	 Form files are loaded from %COMMONAPPDATA%\Smalltalk-80\."
 
-	| file code |
-	file _ FileStream oldFileNamed: fileName.
+	| file code fullPath appDataPath |
+	appDataPath _ WindowsPath commonAppDataPath.
+	appDataPath ifNil: [
+		Transcript cr; show: 'WARNING: Cannot determine CommonAppData path for form files'.
+		^nil].
+	fullPath _ appDataPath asString, '\Smalltalk-80\', fileName.
+	file _ FileStream oldFileNamed: fullPath.
+	file ifNil: [
+		Transcript cr; show: 'WARNING: Form file not found: ', fullPath.
+		^nil].
 	file readOnly; binary.
 	code _ file nextWord.	"reads fileCode"
 	code = 1 ifTrue: [^self readFormFile: file].

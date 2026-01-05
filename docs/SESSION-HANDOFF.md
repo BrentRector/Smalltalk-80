@@ -19,6 +19,7 @@ This session implemented file location relocation to Windows well-known folders.
 | File Type | Location |
 |-----------|----------|
 | coldstart.json | `%COMMONAPPDATA%\Smalltalk-80\coldstart.json` |
+| *.form files | `%COMMONAPPDATA%\Smalltalk-80\` |
 | snapshot.im | `%APPDATA%\Smalltalk-80\snapshot.im` |
 | .sources/.changes | `%APPDATA%\Smalltalk-80\` |
 
@@ -64,6 +65,8 @@ This session implemented file location relocation to Windows well-known folders.
 - Updated .gitignore:
   - Removed Interpreter bin/Data files from tracking
   - Added Compiler bin files (coldstart.json, .sources, .changes) for tracking
+- Updated Form class>>readFrom: to load from %COMMONAPPDATA%\Smalltalk-80\
+- Deploy target now copies *.form files from Forms/ folder to %COMMONAPPDATA%\Smalltalk-80\
 ```
 
 ---
@@ -206,6 +209,7 @@ dotnet msbuild /t:Deploy
 
 # Deployed file locations:
 #   %COMMONAPPDATA%\Smalltalk-80\coldstart.json
+#   %COMMONAPPDATA%\Smalltalk-80\*.form (24 form files)
 #   %APPDATA%\Smalltalk-80\Smalltalk-80.sources
 #   %APPDATA%\Smalltalk-80\Smalltalk-80.changes
 ```
