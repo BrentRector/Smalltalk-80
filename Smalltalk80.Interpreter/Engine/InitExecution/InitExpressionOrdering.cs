@@ -24,6 +24,7 @@ public static class InitExpressionOrdering
             "Decompiler initialize",
             "Explainer initialize",
             "Form initialize",
+            "DisplayScreen initialize",  // Activates Display primitive to create window
             "InputSensor initialize",
             "InputState initialize",
             "InstructionStream initialize",
