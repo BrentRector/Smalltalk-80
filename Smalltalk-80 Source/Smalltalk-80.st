@@ -17165,6 +17165,12 @@ DisplayScreen class
 	instanceVariableNames: ''!
 
 
+!DisplayScreen class methodsFor: 'class initialization'!
+initialize
+	"Activate the display primitive for the global Display object.
+	 This signals the UI thread to create the window."
+	Display beDisplay! !
+
 !DisplayScreen class methodsFor: 'current display'!
 currentDisplay: form 
 	"Make the argument, form, be the form representing the current display
@@ -17206,7 +17212,10 @@ displayHeight: height
 !DisplayScreen class methodsFor: 'display box access'!
 boundingBox
 	"Answer the bounding box for the form representing the current display screen."
-	^Display boundingBox! !DisplayObject subclass: #DisplayText
+	^Display boundingBox! !
+
+DisplayScreen initialize!
+DisplayObject subclass: #DisplayText
 	instanceVariableNames: 'text textStyle offset form '
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '
