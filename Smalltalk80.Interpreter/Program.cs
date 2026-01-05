@@ -68,16 +68,9 @@ public static class Program
             if (config.RestoreImageFile != null)
             {
                 // === RESTORE FROM IMAGE ===
+                // Note: File existence already validated by CommandLineParser
                 restoreTimer = Stopwatch.StartNew();
                 Console.WriteLine($"Restoring from image: {config.RestoreImageFile}");
-
-                // Check if image file exists
-                if (!File.Exists(config.RestoreImageFile))
-                {
-                    Console.Error.WriteLine($"Error: Image file not found: {config.RestoreImageFile}");
-                    Environment.Exit(1);
-                    return;
-                }
 
                 // Create fresh heap manager
                 heapManager = new SmalltalkHeapManager(diagnostics);
@@ -122,14 +115,7 @@ public static class Program
             else
             {
                 // === COLD START ===
-                if (!File.Exists(config.ColdStartFile))
-                {
-                    Console.Error.WriteLine($"Error: Cold start file not found: {config.ColdStartFile}");
-                    CommandLineParser.PrintUsage();
-                    Environment.Exit(1);
-                    return;
-                }
-
+                // Note: File existence already validated by CommandLineParser
                 Console.WriteLine($"Loading cold start bundle: {coldStartFile}");
 
                 // Load the cold start bundle from JSON
