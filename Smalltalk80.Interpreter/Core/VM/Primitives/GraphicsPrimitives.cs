@@ -237,7 +237,7 @@ public static class GraphicsOperations
 
             // Get or create display with these dimensions
             // This may trigger lazy display creation if no display exists yet
-            context.GetOrCreateDisplay(width, height);
+            context.LegacyContext?.GetOrCreateDisplay(width, height);
 
             return PrimitiveResult.Ok(context.Receiver);
         }
