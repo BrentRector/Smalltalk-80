@@ -49,8 +49,8 @@
     Deploy target: Copy files to Windows well-known folders.
     Runs automatically after build. Can also run manually: dotnet msbuild /t:Deploy
 
-    Source locations (all in Compiler's output Data folder):
-    - coldstart.json, .sources, .changes: Smalltalk80.Compiler/bin/{Config}/net9.0/Data/
+    Source locations (all in Compiler's output folder):
+    - coldstart.json, .sources, .changes: Smalltalk80.Compiler/bin/{Config}/net9.0/
 
     Destination locations:
     - coldstart.json: %COMMONAPPDATA%\Smalltalk-80\ (system-wide, shared)
@@ -58,12 +58,12 @@
   -->
   <Target Name="Deploy" AfterTargets="Build">
     <PropertyGroup>
-      <!-- All source files are in Compiler's output Data folder -->
-      <CompilerDataDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\Data\</CompilerDataDir>
+      <!-- All source files are in Compiler's output folder -->
+      <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
       <!-- Full paths for source files -->
-      <ColdstartSource>$(CompilerDataDir)coldstart.json</ColdstartSource>
-      <SourcesSource>$(CompilerDataDir)Smalltalk-80.sources</SourcesSource>
-      <ChangesSource>$(CompilerDataDir)Smalltalk-80.changes</ChangesSource>
+      <ColdstartSource>$(CompilerOutputDir)coldstart.json</ColdstartSource>
+      <SourcesSource>$(CompilerOutputDir)Smalltalk-80.sources</SourcesSource>
+      <ChangesSource>$(CompilerOutputDir)Smalltalk-80.changes</ChangesSource>
     </PropertyGroup>
 
     <Message Text="" Importance="high" />
