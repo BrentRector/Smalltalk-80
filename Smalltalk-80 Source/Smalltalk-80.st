@@ -40597,14 +40597,16 @@ snapshot
 snapshotAs: imageFilePrefix thenQuit: quitIfTrue
 	"Write the OT and Data of this Smalltalk out on an external file.  Answer true if the snapshot was just created."
 
-	| height justSnapped |
+	| height justSnapped snapshotPath appDataPath |
 	Cursor execute show.
 	self logChange: '''----SNAPSHOT----'''.
 	Disk == nil
 		ifFalse:	"Register snapshot filename with VM for primitive 97.
-				   Use Disk fileNamed: to avoid FileStream reading the entire
-				   existing file into memory (which would bloat the new snapshot)."
-			[(Disk fileNamed: imageFilePrefix, '.im') beSnapshotFile].
+				   Snapshot saved to %APPDATA%\Smalltalk-80\"
+			[appDataPath _ WindowsPath applicationPath: 'Smalltalk-80'.
+			appDataPath ifNil: [self error: 'Cannot determine application data path'].
+			snapshotPath _ appDataPath asString, '\', imageFilePrefix, '.im'.
+			(Disk fileNamed: snapshotPath) beSnapshotFile].
 	self releaseExternalViews.
 	Transcript cr; show: 'Snapshot at: ', Time dateAndTimeNow printString.
 	height _ Display height.
