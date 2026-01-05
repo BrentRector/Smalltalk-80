@@ -40793,20 +40793,27 @@ initialize
 		Transcript cr; show: 'WARNING: Cannot determine application data path'.
 		^self].
 	appDataPath _ appDataPath asString.
+	Transcript cr; show: 'SourceFiles path: ', appDataPath.
 
 	"Try to open .sources file (read-only)"
 	sourcesPath _ appDataPath, '\Smalltalk-80.sources'.
+	Transcript cr; show: '  Opening .sources: ', sourcesPath.
 	sourcesFile _ WindowsFileStream readOn: sourcesPath.
 	sourcesFile
-		ifNil: [Transcript cr; show: 'WARNING: Source file not found: ', sourcesPath]
-		ifNotNil: [SourceFiles at: 1 put: sourcesFile].
+		ifNil: [Transcript cr; show: '    WARNING: Source file not found']
+		ifNotNil: [
+			Transcript cr; show: '    OK: Opened .sources'.
+			SourceFiles at: 1 put: sourcesFile].
 
 	"Try to open .changes file (read-write)"
 	changesPath _ appDataPath, '\Smalltalk-80.changes'.
+	Transcript cr; show: '  Opening .changes: ', changesPath.
 	changesFile _ WindowsFileStream readWriteOn: changesPath.
 	changesFile
-		ifNil: [Transcript cr; show: 'WARNING: Changes file not found: ', changesPath]
-		ifNotNil: [SourceFiles at: 2 put: changesFile]
+		ifNil: [Transcript cr; show: '    WARNING: Changes file not found']
+		ifNotNil: [
+			Transcript cr; show: '    OK: Opened .changes'.
+			SourceFiles at: 2 put: changesFile]
 	"SystemDictionary initialize"! !
 
 SystemDictionary initialize!
