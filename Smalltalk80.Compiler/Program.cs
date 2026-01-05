@@ -153,9 +153,6 @@ file sealed class Program
             // Use UTF-8 WITHOUT BOM to ensure source positions match exactly
             var utf8NoBom = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
-            // Output folder is same as coldstart.json
-            string? outputDir = Path.GetDirectoryName(outputFile);
-
             string sourcesFileContent = generator.GetSourcesFileContent();
             if (!string.IsNullOrEmpty(sourcesFileContent) && outputDir != null)
             {
