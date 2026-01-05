@@ -51,9 +51,19 @@ This session implemented file location relocation to Windows well-known folders.
 - Updated SystemDictionary>>initialize:
   - Source files opened only from %APPDATA%\Smalltalk-80\
   - No fallback to current working directory
+  - Defensive nil check for appDataPath
 - Updated Interpreter.csproj:
   - Removed CopyDataFilesToOutput target (no local Data folder)
   - Deploy target runs automatically after build (AfterTargets="Build")
+- Updated Compiler/Program.cs:
+  - Output files (coldstart.json, .sources, .changes) go to bin folder directly
+  - No Data subfolder
+- Updated InitExpressionOrdering.cs:
+  - Added WindowsPath initialize BEFORE SystemDictionary initialize
+  - Fixes dependency: SystemDictionary uses WindowsPath applicationPath:
+- Updated .gitignore:
+  - Removed Interpreter bin/Data files from tracking
+  - Added Compiler bin files (coldstart.json, .sources, .changes) for tracking
 ```
 
 ---
@@ -95,7 +105,10 @@ WindowsPath commonAppDataPath
 | `Smalltalk80.Interpreter/CommandLineParser.cs` | Added well-known path search for coldstart and restore |
 | `Smalltalk80.Interpreter/Program.cs` | Removed redundant file existence checks (now in CommandLineParser) |
 | `Smalltalk80.Interpreter/Smalltalk80.Interpreter.csproj` | Added Deploy MSBuild target for production deployment |
+| `Smalltalk80.Interpreter/Engine/InitExecution/InitExpressionOrdering.cs` | Added WindowsPath before SystemDictionary |
+| `Smalltalk80.Compiler/Program.cs` | Output files to bin folder directly (no Data subfolder) |
 | `Smalltalk-80 Source/Smalltalk-80.st` | Updated SystemDictionary>>initialize for well-known paths |
+| `.gitignore` | Track Compiler bin files, ignore Interpreter bin files |
 | `docs/SESSION-HANDOFF.md` | Updated documentation |
 
 ---
