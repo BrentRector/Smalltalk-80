@@ -40775,22 +40775,14 @@ initialize
 	Project current noChanges.
 
 	"Initialize SourceFiles array with file streams for .sources and .changes.
-	 Files are opened from the user's application data folder.
-	 Search order: %APPDATA%\Smalltalk-80\ first, then current working directory as fallback."
+	 Files are opened from the user's application data folder: %APPDATA%\Smalltalk-80\"
 	SourceFiles _ Array new: 2.
 
-	"Try user's AppData folder first"
 	appDataPath _ (WindowsPath applicationPath: 'Smalltalk-80') asString.
 	sourcesFile _ WindowsFileStream readOn: appDataPath, '\Smalltalk-80.sources'.
-	sourcesFile ifNil: [
-		"Fallback to current working directory"
-		sourcesFile _ WindowsFileStream readOn: 'Smalltalk-80.sources'].
 	sourcesFile ifNotNil: [SourceFiles at: 1 put: sourcesFile].
 
 	changesFile _ WindowsFileStream readWriteOn: appDataPath, '\Smalltalk-80.changes'.
-	changesFile ifNil: [
-		"Fallback to current working directory"
-		changesFile _ WindowsFileStream readWriteOn: 'Smalltalk-80.changes'].
 	changesFile ifNotNil: [SourceFiles at: 2 put: changesFile]
 	"SystemDictionary initialize"! !
 

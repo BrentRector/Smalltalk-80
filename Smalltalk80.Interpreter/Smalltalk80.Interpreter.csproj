@@ -45,25 +45,11 @@
     </ProjectReference>
   </ItemGroup>
 
-  <!-- Copy coldstart.json to output Data folder after build (development fallback) -->
-  <!-- Note: Compiler now outputs .sources and .changes directly to Interpreter output directory -->
-  <Target Name="CopyDataFilesToOutput" AfterTargets="Build">
-    <PropertyGroup>
-      <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
-      <DataOutputDir>$(TargetDir)Data\</DataOutputDir>
-    </PropertyGroup>
-
-    <!-- Create Data directory if it doesn't exist -->
-    <MakeDir Directories="$(DataOutputDir)" Condition="!Exists('$(DataOutputDir)')" />
-
-    <!-- Copy coldstart.json from Compiler output Data folder (if freshly compiled) -->
-    <Copy SourceFiles="$(CompilerOutputDir)Data\coldstart.json" DestinationFolder="$(DataOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
-    <Message Text="✓ Copied freshly compiled coldstart.json to $(DataOutputDir)" Importance="high" Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
-  </Target>
-
   <!--
-    Deploy target: Copy files to Windows well-known folders for production use.
-    Run manually with: dotnet msbuild /t:Deploy
+    Deploy target: Copy files to Windows well-known folders.
+    REQUIRED before running the interpreter for the first time.
+
+    Run with: dotnet msbuild /t:Deploy
 
     This copies:
     - coldstart.json to %COMMONAPPDATA%\Smalltalk-80\ (system-wide, shared)

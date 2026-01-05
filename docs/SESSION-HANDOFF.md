@@ -1,7 +1,7 @@
 # Session Handoff: File Location Relocation
 
 **Date**: 2026-01-05
-**Status**: File location relocation implemented
+**Status**: File location relocation implemented (no fallbacks)
 **Branch**: `claude/session-handoff-continuation-pblzi`
 **Priority**: Enhancement
 **Master Plan**: `docs/32-BIT-IMPLEMENTATION-PLAN.md`
@@ -10,19 +10,17 @@
 
 ## Quick Summary
 
-This session implemented file location relocation to Windows well-known folders. Key achievements:
+This session implemented file location relocation to Windows well-known folders. **All files must be deployed to well-known locations** - there are no fallback locations.
 
-1. **CommandLineParser Updated**: `--coldstart` and `--restore` now search well-known locations
-2. **SystemDictionary>>initialize Updated**: Source files (.sources/.changes) now searched in %APPDATA%
-3. **Error Handling**: Clear error messages when files not found
+**IMPORTANT**: Run `dotnet msbuild /t:Deploy` after building to deploy files before running the interpreter.
 
 ### File Location Summary
 
-| File Type | Well-Known Location | Fallback Location |
-|-----------|---------------------|-------------------|
-| coldstart.json | `%COMMONAPPDATA%\Smalltalk-80\` | `Data\` relative to exe |
-| snapshot.im | `%APPDATA%\Smalltalk-80\` | Current working directory |
-| .sources/.changes | `%APPDATA%\Smalltalk-80\` | Current working directory |
+| File Type | Location |
+|-----------|----------|
+| coldstart.json | `%COMMONAPPDATA%\Smalltalk-80\coldstart.json` |
+| snapshot.im | `%APPDATA%\Smalltalk-80\snapshot.im` |
+| .sources/.changes | `%APPDATA%\Smalltalk-80\` |
 
 ---
 
@@ -46,16 +44,16 @@ This session implemented file location relocation to Windows well-known folders.
 ### Recent Changes (this session)
 ```
 - Updated CommandLineParser.cs:
-  - --coldstart now searches %COMMONAPPDATA%\Smalltalk-80\ then Data\ fallback
-  - --restore now searches %APPDATA%\Smalltalk-80\ then CWD fallback
+  - --coldstart uses only %COMMONAPPDATA%\Smalltalk-80\coldstart.json
+  - --restore uses only %APPDATA%\Smalltalk-80\snapshot.im
   - Explicit paths fail with clear error if file not found
-  - Added helpful error messages showing searched locations
+  - No fallback locations (development uses production paths)
 - Updated SystemDictionary>>initialize:
-  - Source files now searched in %APPDATA%\Smalltalk-80\ first
-  - Falls back to current working directory
-- Added Deploy MSBuild target to Interpreter.csproj:
-  - Run with: dotnet msbuild /t:Deploy
-  - Copies files to well-known Windows folders
+  - Source files opened only from %APPDATA%\Smalltalk-80\
+  - No fallback to current working directory
+- Updated Interpreter.csproj:
+  - Removed CopyDataFilesToOutput target (no local Data folder)
+  - Deploy target is REQUIRED before running
 ```
 
 ---
@@ -66,15 +64,14 @@ This session implemented file location relocation to Windows well-known folders.
 
 **--coldstart behavior:**
 1. With explicit path (`--coldstart /path/to/file.json`): Fail if file not found
-2. Without path: Search `%COMMONAPPDATA%\Smalltalk-80\coldstart.json`, then `Data\coldstart.json` (relative to exe)
+2. Without path: Uses `%COMMONAPPDATA%\Smalltalk-80\coldstart.json` only
 
 **--restore behavior:**
 1. With explicit path (`--restore /path/to/image.im`): Fail if file not found
-2. Without path: Search `%APPDATA%\Smalltalk-80\snapshot.im`, then `snapshot.im` (current directory)
+2. Without path: Uses `%APPDATA%\Smalltalk-80\snapshot.im` only
 
 **Source files (.sources/.changes):**
-- Searched in `%APPDATA%\Smalltalk-80\` first
-- Falls back to current working directory
+- Opens from `%APPDATA%\Smalltalk-80\` only
 - Uses WindowsPath class (Primitive 160) for path resolution
 
 ### WindowsPath Class
@@ -152,19 +149,21 @@ WindowsPath commonAppDataPath
 ## Build and Test Commands
 
 ```bash
-# Build and run
+# Build, deploy, and run
 cd Smalltalk80.Interpreter
 dotnet build
+dotnet msbuild /t:Deploy   # REQUIRED - copies files to well-known locations
 dotnet run
 
 # Regenerate coldstart after Smalltalk changes
 cd "Smalltalk-80 Source"
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
-cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/* ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
+cd ../Smalltalk80.Interpreter
+dotnet msbuild /t:Deploy   # Redeploy updated files
 
-# Run regression tests
+# Run regression tests (using explicit path)
 cd Smalltalk80.Interpreter
-dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_with_runner.json
+dotnet run -- --coldstart ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstart_with_runner.json
 # Expected: Returns 1191 (120 tests pass)
 ```
 
@@ -189,13 +188,11 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 
 ### File Deployment Commands:
 ```bash
-# Development: Files in Data\ relative to exe work as fallback (no deployment needed)
-
-# Production deployment: Run the Deploy target
+# REQUIRED: Deploy files to well-known locations before running
 cd Smalltalk80.Interpreter
 dotnet msbuild /t:Deploy
 
-# This copies files to well-known locations:
+# Deployed file locations:
 #   %COMMONAPPDATA%\Smalltalk-80\coldstart.json
 #   %APPDATA%\Smalltalk-80\Smalltalk-80.sources
 #   %APPDATA%\Smalltalk-80\Smalltalk-80.changes

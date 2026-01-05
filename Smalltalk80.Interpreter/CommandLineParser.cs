@@ -157,15 +157,13 @@ public static class CommandLineParser
         }
         else
         {
-            // No explicit path - search well-known locations
+            // No explicit path - use well-known location
             coldStartFile = ResolveColdstartFile();
             if (coldStartFile == null)
             {
                 Console.Error.WriteLine("Error: Coldstart file not found.");
-                Console.Error.WriteLine("Searched locations:");
-                Console.Error.WriteLine($"  1. {GetCommonAppDataPath()}\\{DefaultColdstartFilename}");
-                Console.Error.WriteLine($"  2. {Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", DefaultColdstartFilename)}");
-                Console.Error.WriteLine("\nUse --coldstart <path> to specify a coldstart file.");
+                Console.Error.WriteLine($"Expected location: {GetCommonAppDataPath()}\\{DefaultColdstartFilename}");
+                Console.Error.WriteLine("\nRun 'dotnet msbuild /t:Deploy' to deploy files, or use --coldstart <path>.");
                 Environment.Exit(1);
                 return null;
             }
@@ -186,14 +184,12 @@ public static class CommandLineParser
             }
             else
             {
-                // No explicit path (empty string marker) - search well-known locations
+                // No explicit path (empty string marker) - use well-known location
                 restoreImageFile = ResolveImageFile();
                 if (restoreImageFile == null)
                 {
                     Console.Error.WriteLine("Error: Image file not found.");
-                    Console.Error.WriteLine("Searched locations:");
-                    Console.Error.WriteLine($"  1. {GetAppDataPath()}\\{DefaultImageFilename}");
-                    Console.Error.WriteLine($"  2. {Path.Combine(Environment.CurrentDirectory, DefaultImageFilename)}");
+                    Console.Error.WriteLine($"Expected location: {GetAppDataPath()}\\{DefaultImageFilename}");
                     Console.Error.WriteLine("\nUse --restore <path> to specify an image file.");
                     Environment.Exit(1);
                     return null;
@@ -218,67 +214,34 @@ public static class CommandLineParser
     }
 
     /// <summary>
-    /// Resolves coldstart file from well-known locations.
-    /// Search order:
-    /// 1. %COMMONAPPDATA%\Smalltalk-80\coldstart.json (shared system data)
-    /// 2. Data\coldstart.json relative to executable (development/portable)
+    /// Resolves coldstart file from well-known location.
+    /// Location: %COMMONAPPDATA%\Smalltalk-80\coldstart.json (shared system data)
     /// </summary>
     /// <returns>Path to coldstart file, or null if not found</returns>
     private static string? ResolveColdstartFile()
     {
-        // First: Check common application data (ProgramData on Windows)
-        string commonAppDataPath = GetCommonAppDataPath();
-        if (commonAppDataPath != null)
+        string systemPath = Path.Combine(GetCommonAppDataPath(), DefaultColdstartFilename);
+        if (File.Exists(systemPath))
         {
-            string systemPath = Path.Combine(commonAppDataPath, DefaultColdstartFilename);
-            if (File.Exists(systemPath))
-            {
-                Console.WriteLine($"Found coldstart at: {systemPath}");
-                return systemPath;
-            }
+            Console.WriteLine($"Found coldstart at: {systemPath}");
+            return systemPath;
         }
-
-        // Second: Check Data subfolder relative to executable (development fallback)
-        string exeDir = AppDomain.CurrentDomain.BaseDirectory;
-        string localPath = Path.Combine(exeDir, "Data", DefaultColdstartFilename);
-        if (File.Exists(localPath))
-        {
-            Console.WriteLine($"Found coldstart at: {localPath}");
-            return localPath;
-        }
-
         return null;
     }
 
     /// <summary>
-    /// Resolves image file from well-known locations.
-    /// Search order:
-    /// 1. %APPDATA%\Smalltalk-80\snapshot.im (user data)
-    /// 2. snapshot.im in current working directory (portable)
+    /// Resolves image file from well-known location.
+    /// Location: %APPDATA%\Smalltalk-80\snapshot.im (user data)
     /// </summary>
     /// <returns>Path to image file, or null if not found</returns>
     private static string? ResolveImageFile()
     {
-        // First: Check user application data (AppData\Roaming on Windows)
-        string appDataPath = GetAppDataPath();
-        if (appDataPath != null)
+        string userPath = Path.Combine(GetAppDataPath(), DefaultImageFilename);
+        if (File.Exists(userPath))
         {
-            string userPath = Path.Combine(appDataPath, DefaultImageFilename);
-            if (File.Exists(userPath))
-            {
-                Console.WriteLine($"Found image at: {userPath}");
-                return userPath;
-            }
+            Console.WriteLine($"Found image at: {userPath}");
+            return userPath;
         }
-
-        // Second: Check current working directory (portable/development)
-        string localPath = Path.Combine(Environment.CurrentDirectory, DefaultImageFilename);
-        if (File.Exists(localPath))
-        {
-            Console.WriteLine($"Found image at: {localPath}");
-            return localPath;
-        }
-
         return null;
     }
 
@@ -311,14 +274,10 @@ public static class CommandLineParser
         Console.Error.WriteLine("Options:");
         Console.Error.WriteLine("  --coldstart [file]     Specify the cold start bundle file to load");
         Console.Error.WriteLine("                         With explicit path: fails if file not found");
-        Console.Error.WriteLine("                         Without path: searches well-known locations:");
-        Console.Error.WriteLine($"                           1. %COMMONAPPDATA%\\{AppName}\\{DefaultColdstartFilename}");
-        Console.Error.WriteLine($"                           2. Data\\{DefaultColdstartFilename} (relative to exe)");
+        Console.Error.WriteLine($"                         Without path: uses %COMMONAPPDATA%\\{AppName}\\{DefaultColdstartFilename}");
         Console.Error.WriteLine("  --restore [file]       Restore from saved image instead of cold start");
         Console.Error.WriteLine("                         With explicit path: fails if file not found");
-        Console.Error.WriteLine("                         Without path: searches well-known locations:");
-        Console.Error.WriteLine($"                           1. %APPDATA%\\{AppName}\\{DefaultImageFilename}");
-        Console.Error.WriteLine($"                           2. {DefaultImageFilename} (current directory)");
+        Console.Error.WriteLine($"                         Without path: uses %APPDATA%\\{AppName}\\{DefaultImageFilename}");
         Console.Error.WriteLine("  --dump-class <name>    Dump comprehensive information about a class");
         Console.Error.WriteLine("                         after cold start completes");
         Console.Error.WriteLine("  --test-filter <pattern> Run only init expressions matching pattern");
@@ -337,9 +296,9 @@ public static class CommandLineParser
         Console.Error.WriteLine("                         (useful for benchmarking to avoid GC interference)");
         Console.Error.WriteLine("  --help, -h             Show this help message");
         Console.Error.WriteLine();
-        Console.Error.WriteLine("File Locations:");
-        Console.Error.WriteLine($"  Coldstart:   %COMMONAPPDATA%\\{AppName}\\ (system-wide)");
-        Console.Error.WriteLine($"  Images:      %APPDATA%\\{AppName}\\ (per-user)");
-        Console.Error.WriteLine($"  Source:      %APPDATA%\\{AppName}\\ (per-user, .sources/.changes)");
+        Console.Error.WriteLine("File Locations (run 'dotnet msbuild /t:Deploy' to deploy):");
+        Console.Error.WriteLine($"  Coldstart:   %COMMONAPPDATA%\\{AppName}\\{DefaultColdstartFilename}");
+        Console.Error.WriteLine($"  Images:      %APPDATA%\\{AppName}\\{DefaultImageFilename}");
+        Console.Error.WriteLine($"  Source:      %APPDATA%\\{AppName}\\Smalltalk-80.sources, .changes");
     }
 }
