@@ -7229,14 +7229,8 @@ text
 			ifTrue: [^ self selectedClass sourceCodeTemplate asText]
 			ifFalse: [
 				"Apply syntax highlighting to method source code"
-				t0 := Time millisecondClockValue.
 				sourceCode := self selectedClass sourceCodeAt: selector.
-				t1 := Time millisecondClockValue.
-				Transcript show: 'sourceCodeAt: ', (t1 - t0) printString, 'ms'; cr.
-				text := SyntaxStyler styleMethod: sourceCode inClass: self selectedClass.
-				t2 := Time millisecondClockValue.
-				Transcript show: 'Browser text total: ', (t2 - t0) printString, 'ms'; cr.
-				^ text]].
+				^ SyntaxStyler styleMethod: sourceCode inClass: self selectedClass]].
 	textMode == #category ifTrue:
 		[^ 'category to add' asText].
 	textMode == #categories ifTrue:
@@ -9276,11 +9270,14 @@ new
 	"Creating new characters is not allowed."
 
 	self error: 'cannot create new characters'!
-value: anInteger 
+value: anInteger
 	"Answer the Character whose value is anInteger.
-	Characters are unique; they are stored in the class variable CharacterTable."
+	Characters 0-255 are cached in CharacterTable.
+	Characters > 255 (Unicode) are created dynamically."
 
-	^CharacterTable at: anInteger + 1! !
+	anInteger < 256
+		ifTrue: [^CharacterTable at: anInteger + 1]
+		ifFalse: [^self basicNew setValue: anInteger]! !
 
 !Character class methodsFor: 'accessing untypeable characters'!
 backspace
@@ -9292,6 +9289,9 @@ cr
 esc
 	"Answer the Character representing an escape."
 	^self value: 160!
+lf
+	"Answer the Character representing a linefeed."
+	^self value: 10!
 newPage
 	"Answer the Character representing a form feed."
 	^self value: 12!
@@ -17165,6 +17165,12 @@ DisplayScreen class
 	instanceVariableNames: ''!
 
 
+!DisplayScreen class methodsFor: 'class initialization'!
+initialize
+	"Activate the display primitive for the global Display object.
+	 This signals the UI thread to create the window."
+	Display beDisplay! !
+
 !DisplayScreen class methodsFor: 'current display'!
 currentDisplay: form 
 	"Make the argument, form, be the form representing the current display
@@ -17185,18 +17191,18 @@ displayExtent: extent
 	| w h |
 	w _ extent x truncateTo: 32.
 	h _ extent y truncateTo: 2.
-	DisplayScreen currentDisplay: 
+	DisplayScreen currentDisplay:
 		(DisplayScreen new
 			extent: w @ 16
 			offset: 0 @ 0
-			bits: (DisplayBitmap new: w // 16 * 16)).
-	"shrink to 16 to release old bitmap"
-	DisplayScreen currentDisplay: 
+			bits: (DisplayBitmap new: w * 16)).
+	"shrink to 16 to release old bitmap (32bpp: w * h words)"
+	DisplayScreen currentDisplay:
 		(DisplayScreen new
 			extent: w @ h
 			offset: 0 @ 0
-			bits: (DisplayBitmap new: w // 16 * h)).
-	"now grow to new size"
+			bits: (DisplayBitmap new: w * h)).
+	"now grow to new size (32bpp: w * h words)"
 	ScheduledControllers restore!
 displayHeight: height 
 	"Make the height of the current display screen form be the argument, height."
@@ -17206,7 +17212,10 @@ displayHeight: height
 !DisplayScreen class methodsFor: 'display box access'!
 boundingBox
 	"Answer the bounding box for the form representing the current display screen."
-	^Display boundingBox! !DisplayObject subclass: #DisplayText
+	^Display boundingBox! !
+
+DisplayScreen initialize!
+DisplayObject subclass: #DisplayText
 	instanceVariableNames: 'text textStyle offset form '
 	classVariableNames: ''
 	poolDictionaries: 'TextConstants '
@@ -20739,10 +20748,19 @@ readFormFile: file
 	file close.
 	^newForm!
 readFrom: fileName
-	"Answer an instance of me with bitmap initialized from the external file named fileName."
+	"Answer an instance of me with bitmap initialized from the external file named fileName.
+	 Form files are loaded from %COMMONAPPDATA%\Smalltalk-80\."
 
-	| file code |
-	file _ FileStream oldFileNamed: fileName.
+	| file code fullPath appDataPath |
+	appDataPath _ WindowsPath commonAppDataPath.
+	appDataPath ifNil: [
+		Transcript cr; show: 'WARNING: Cannot determine CommonAppData path for form files'.
+		^nil].
+	fullPath _ appDataPath asString, '\Smalltalk-80\', fileName.
+	file _ FileStream oldFileNamed: fullPath.
+	file ifNil: [
+		Transcript cr; show: 'WARNING: Form file not found: ', fullPath.
+		^nil].
 	file readOnly; binary.
 	code _ file nextWord.	"reads fileCode"
 	code = 1 ifTrue: [^self readFormFile: file].
@@ -27497,6 +27515,9 @@ even
 	"Answer whether the receiver is an even number."
 
 	^self \\ 2 = 0!
+isNumber
+	"Answer true since the receiver is a Number."
+	^true!
 negative
 	"Answer whether the receiver is less than 0."
 	^self < 0!
@@ -27787,9 +27808,18 @@ isInteger
 
 	^false!
 isNil
-	"Coerces nil to true and everything else to false.  UndefinedObject 
+	"Coerces nil to true and everything else to false.  UndefinedObject
 	overrides with ^true"
 
+	^false!
+isNumber
+	"Answer whether the receiver is a Number. Number overrides with ^true"
+	^false!
+isString
+	"Answer whether the receiver is a String. String overrides with ^true"
+	^false!
+isSymbol
+	"Answer whether the receiver is a Symbol. Symbol overrides with ^true"
 	^false!
 notNil
 	"Coerces nil to false and everything else to true.  UndefinedObject
@@ -29450,12 +29480,8 @@ rule: ruleInteger
 	rule _ ruleInteger.!
 text: aText
 	"Set the argument, aText, to be the text for the receiver."
-	| t0 t1 |
 	text _ aText.
-	Transcript ifNotNil: [t0 := Time millisecondClockValue].
-	self composeAll.
-	Transcript ifNotNil: [t1 := Time millisecondClockValue.
-		Transcript show: 'Paragraph composeAll: ', (t1 - t0) printString, 'ms'; cr]! !
+	self composeAll! !
 
 !Paragraph methodsFor: 'displaying'!
 displayAt: aPoint
@@ -29507,7 +29533,7 @@ computeBoundingBox
 composeAll
 	"Compose a collection of characters into a collection of lines."
 
-	| startIndex stopIndex lineIndex maximumRightX compositionScanner t0 t1 loopTime doTiming |
+	| startIndex stopIndex lineIndex maximumRightX compositionScanner |
 	lines _ Array new: 32.
 	lastLine _ 0.
 	maximumRightX _ 0.
@@ -29517,24 +29543,17 @@ composeAll
 			^maximumRightX].
 	startIndex _ lineIndex _ 1.
 	stopIndex _ text size.
-	doTiming := Transcript notNil.
-	doTiming ifTrue: [t0 := Time millisecondClockValue].
 	compositionScanner _ CompositionScanner new in: self.
-	doTiming ifTrue: [t1 := Time millisecondClockValue. loopTime := 0].
 	[startIndex > stopIndex] whileFalse:
-		[| lt0 |
-		doTiming ifTrue: [lt0 := Time millisecondClockValue].
-		self lineAt: lineIndex
+		[self lineAt: lineIndex
 				put: (compositionScanner composeLine: lineIndex
 										fromCharacterIndex: startIndex
 										inParagraph: self).
-		doTiming ifTrue: [loopTime := loopTime + (Time millisecondClockValue - lt0)].
 		 maximumRightX _ compositionScanner rightX max: maximumRightX.
 		 startIndex _ (lines at: lineIndex) last + 1.
 		 lineIndex _ lineIndex + 1].
 	self updateCompositionHeight.
 	self trimLinesTo: lineIndex - 1.
-	doTiming ifTrue: [Transcript show: '  composeAll: scanner:', (t1-t0) printString, 'ms lines:', (lineIndex-1) printString, ' loop:', loopTime printString, 'ms'; cr].
 	^maximumRightX!
 recomposeIn: compositionRect clippingBox: clippingRect 
 	"Set the composition rectangle for the receiver so that the lines wrap
@@ -35235,11 +35254,10 @@ Instance Variables:
 tokenize: aString
 	"Answer a collection of SyntaxToken objects for the source string.
 	 OPTIMIZED: Single pass - comments interleaved from Scanner, no merge needed."
-	| stream t0 t1 estimatedTokens commentPositions lastCommentIdx |
+	| stream estimatedTokens commentPositions lastCommentIdx |
 	sourceString := aString.
 	aString isEmpty ifTrue: [^OrderedCollection new].
 
-	t0 := Time millisecondClockValue.
 	stream := ReadStream on: aString.
 	scanner := Scanner new initScanner; scan: stream.
 
@@ -35250,7 +35268,6 @@ tokenize: aString
 	commentPositions := scanner commentPositions.
 
 	"Scan all tokens - interleave comments as Scanner discovers them"
-	t1 := Time millisecondClockValue.
 	[scanner tokenType ~~ #doIt] whileTrue: [
 		"Insert any comments discovered since last token"
 		[lastCommentIdx < commentPositions size] whileTrue: [
@@ -35268,7 +35285,6 @@ tokenize: aString
 		tokens add: (SyntaxToken type: #comment start: (pair at: 1) end: (pair at: 2)).
 		lastCommentIdx := lastCommentIdx + 1].
 
-	Transcript ifNotNil: [Transcript show: '  tokenize: ', (Time millisecondClockValue - t1) printString, 'ms n:', tokens size printString; cr].
 	^tokens!
 
 addCurrentToken
@@ -35743,15 +35759,11 @@ styleSource: sourceString methodHeaderEnd: headerEndBlock
 	 If headerEndBlock is not nil, evaluate it with the method header end position.
 	 OPTIMIZED: Lazy color lookup - tokenColorAt: gets color from token type at display time.
 	 DisplayScanner uses tokenColorAt: instead of colorAt: for O(1) rendering."
-	| text tokens t0 t1 t2 highlighter |
+	| text tokens highlighter |
 	sourceString isEmpty ifTrue: [^Text fromString: ''].
-	t0 := Time millisecondClockValue.
 	text := Text fromString: sourceString.
-	t1 := Time millisecondClockValue.
 	highlighter := ScannerHighlighter tokenize: sourceString.
 	tokens := highlighter tokens.
-	t2 := Time millisecondClockValue.
-	Transcript ifNotNil: [Transcript show: 'Tokenize: ', (t2 - t1) printString, 'ms, Text create: ', (t1 - t0) printString, 'ms'; cr].
 	tokens isEmpty ifTrue: [
 		headerEndBlock ifNotNil: [headerEndBlock value: 0].
 		^text].
@@ -35761,24 +35773,18 @@ styleSource: sourceString methodHeaderEnd: headerEndBlock
 	"Store tokens on Text for O(1) lazy color lookup in DisplayScanner.
 	 No color assignment loop needed - tokenColorAt: looks up color from token type."
 	text setTokens: tokens.
-	Transcript ifNotNil: [Transcript show: 'Style total: ', (Time millisecondClockValue - t2) printString, 'ms'; cr].
 	^text!
 
 styleMethod: sourceString inClass: aClass
 	"Answer a styled Text for a method in the given class.
 	 Makes the selector bold in addition to color highlighting.
 	 Optimized: uses token positions to find header end, avoiding Parser creation."
-	| text headerEnd t0 t1 t2 |
-	t0 := Time millisecondClockValue.
+	| text headerEnd |
 	headerEnd := 0.
 	text := self styleSource: sourceString methodHeaderEnd: [:pos | headerEnd := pos].
-	t1 := Time millisecondClockValue.
-	Transcript show: 'styleSource: ', (t1 - t0) printString, 'ms'; cr.
 	"Apply bold emphasis to method header (selector + arguments)"
 	headerEnd > 0 ifTrue: [
 		text emphasizeFrom: 1 to: (headerEnd min: sourceString size) with: 2].
-	t2 := Time millisecondClockValue.
-	Transcript show: 'emphasize: ', (t2 - t1) printString, 'ms, TOTAL: ', (t2 - t0) printString, 'ms'; cr.
 	^text! !
 
 !SyntaxStyler methodsFor: 'color mapping'!
@@ -36628,6 +36634,11 @@ first
 
 	self emptyCheck.
 	^self at: 1!
+second
+	"Answer the second element of the receiver.  Create an error if the receiver
+	contains fewer than two elements."
+
+	^self at: 2!
 indexOf: anElement 
 	"Answer the index of anElement within the receiver.  If the receiver does
 	not contain anElement, answer 0."
@@ -38614,6 +38625,11 @@ spellAgainst: aString
 
 	" 'Smalltalk' spellAgainst: 'Smalltlak' "! !
 
+!String methodsFor: 'testing'!
+isString
+	"Answer true since the receiver is a String."
+	^true! !
+
 !String methodsFor: 'accessing'!
 at: index 
 	"Answer the Character stored in the field of the receiver indexed by the 
@@ -38661,6 +38677,10 @@ findString: subString startingAt: start
 				[index = subString size ifTrue: [^startIndex].
 				index _ index+1]]].
 	^0!
+includesSubstring: aString
+	"Answer whether the receiver contains aString as a substring."
+
+	^(self findString: aString startingAt: 1) > 0!
 indexOf: aCharacter startingAt: startIndex
 	"Answer the index of the first occurrence of aCharacter within the receiver,
 	starting the search at startIndex. If not found, answer 0.
@@ -38763,6 +38783,9 @@ asParagraph
 asString
 	"Answer the receiver itself."
 	^self!
+readStream
+	"Answer a ReadStream on the receiver."
+	^ReadStream on: self!
 asSymbol
 	"Answer the unique symbol whose characters are the characters of the string."
 	^Symbol intern: self!
@@ -39254,14 +39277,10 @@ display
 				ifTrue: [controller recomputeSelection]].
 	super display!
 displayView
-	| t0 t1 |
-	Transcript ifNotNil: [t0 := Time millisecondClockValue].
 	self clearInside.
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller display]
-		ifFalse: [displayContents display].
-	Transcript ifNotNil: [t1 := Time millisecondClockValue.
-		Transcript show: 'displayView: ', (t1 - t0) printString, 'ms'; cr]!
+		ifFalse: [displayContents display]!
 positionDisplayContents
 	"Presumably the text being displayed changed so that the wrapping box and clipping box should be reset."
 
@@ -39272,15 +39291,11 @@ positionDisplayContents
 !StringHolderView methodsFor: 'model access'!
 editString: aString
 	"The paragraph to be displayed is created from the characters in aString."
-	| t0 t1 |
-	Transcript ifNotNil: [t0 := Time millisecondClockValue].
 	displayContents _ Paragraph
 				withText: aString asText
 				style: TextStyle default copy
 				compositionRectangle: (self insetDisplayBox insetBy: self paragraphInset)
 				clippingRectangle: self insetDisplayBox.
-	Transcript ifNotNil: [t1 := Time millisecondClockValue.
-		Transcript show: 'Paragraph compose: ', (t1 - t0) printString, 'ms'; cr].
 	(self controller isKindOf: ParagraphEditor)
 		ifTrue: [controller changeParagraph: displayContents]!
 model: aLockedModel 
@@ -39756,6 +39771,11 @@ hash
 hashMappedBy: map
 	"Answer what my hash would be if oops changed according to map"
 	^ map newHashFor: self hash! !
+
+!Symbol methodsFor: 'testing'!
+isSymbol
+	"Answer true since the receiver is a Symbol."
+	^true! !
 
 !Symbol methodsFor: 'copying'!
 copy
@@ -40586,14 +40606,16 @@ snapshot
 snapshotAs: imageFilePrefix thenQuit: quitIfTrue
 	"Write the OT and Data of this Smalltalk out on an external file.  Answer true if the snapshot was just created."
 
-	| height justSnapped |
+	| height justSnapped snapshotPath appDataPath |
 	Cursor execute show.
 	self logChange: '''----SNAPSHOT----'''.
 	Disk == nil
 		ifFalse:	"Register snapshot filename with VM for primitive 97.
-				   Use Disk fileNamed: to avoid FileStream reading the entire
-				   existing file into memory (which would bloat the new snapshot)."
-			[(Disk fileNamed: imageFilePrefix, '.im') beSnapshotFile].
+				   Snapshot saved to %APPDATA%\Smalltalk-80\"
+			[appDataPath _ WindowsPath applicationPath: 'Smalltalk-80'.
+			appDataPath ifNil: [self error: 'Cannot determine application data path'].
+			snapshotPath _ appDataPath asString, '\', imageFilePrefix, '.im'.
+			(Disk fileNamed: snapshotPath) beSnapshotFile].
 	self releaseExternalViews.
 	Transcript cr; show: 'Snapshot at: ', Time dateAndTimeNow printString.
 	height _ Display height.
@@ -40768,16 +40790,25 @@ SystemDictionary class
 
 !SystemDictionary class methodsFor: 'class initialization'!
 initialize
-	"Initialize system state including SourceFiles for source code storage"
-	| sourcesFile changesFile |
+	"Initialize system state including SourceFiles for source code storage.
+	 Files are opened from %APPDATA%\Smalltalk-80\"
+	| sourcesFile changesFile appDataPath sourcesPath changesPath |
 	Project current noChanges.
-
-	"Initialize SourceFiles array with file streams for .sources and .changes.
-	 Files are opened from the current working directory."
 	SourceFiles _ Array new: 2.
-	sourcesFile _ WindowsFileStream readOn: 'Smalltalk-80.sources'.
+
+	"Get the application data path - requires WindowsPath to be initialized first"
+	appDataPath _ WindowsPath applicationPath: 'Smalltalk-80'.
+	appDataPath ifNil: [^self].
+	appDataPath _ appDataPath asString.
+
+	"Open .sources file (read-only)"
+	sourcesPath _ appDataPath, '\Smalltalk-80.sources'.
+	sourcesFile _ WindowsFileStream readOn: sourcesPath.
 	sourcesFile ifNotNil: [SourceFiles at: 1 put: sourcesFile].
-	changesFile _ WindowsFileStream readWriteOn: 'Smalltalk-80.changes'.
+
+	"Open .changes file (read-write)"
+	changesPath _ appDataPath, '\Smalltalk-80.changes'.
+	changesFile _ WindowsFileStream readWriteOn: changesPath.
 	changesFile ifNotNil: [SourceFiles at: 2 put: changesFile]
 	"SystemDictionary initialize"! !
 
@@ -44436,6 +44467,242 @@ with: aCollection from: firstIndex to: lastIndex
 	resulting collection is already full so the position and the limits are set to the end."
 
 	^self basicNew with: (aCollection copyFrom: firstIndex to: lastIndex)! !
+
+"JSON Processing Classes"
+Object subclass: #JsonReader
+	instanceVariableNames: 'stream'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'System-JSON'!
+
+JsonReader comment:
+'I parse JSON text into Smalltalk objects.
+
+JSON value types map to:
+  object  -> Dictionary
+  array   -> Array
+  string  -> String
+  number  -> Integer or Float (via Number readFrom:)
+  true    -> true
+  false   -> false
+  null    -> nil
+
+Usage:
+  JsonReader parse: ''{"name": "Alice", "age": 30}''
+    => a Dictionary(''name''->''Alice'' ''age''->30)'!
+
+
+!JsonReader class methodsFor: 'instance creation'!
+on: aReadStream
+	"Create a JsonReader on the given stream."
+	^self new stream: aReadStream!
+parse: aString
+	"Parse JSON string and return Smalltalk object."
+	^(self on: aString readStream) parseValue! !
+
+!JsonReader methodsFor: 'accessing'!
+stream: aReadStream
+	stream _ aReadStream! !
+
+!JsonReader methodsFor: 'parsing - values'!
+parseValue
+	"Parse any JSON value."
+	| char |
+	self skipWhitespace.
+	stream atEnd ifTrue: [^nil].
+	char _ stream peek.
+	char = $" ifTrue: [^self parseString].
+	char = ${ ifTrue: [^self parseObject].
+	char = $[ ifTrue: [^self parseArray].
+	char = $- ifTrue: [^self parseNumber].
+	char isDigit ifTrue: [^self parseNumber].
+	char = $t ifTrue: [^self parseTrue].
+	char = $f ifTrue: [^self parseFalse].
+	char = $n ifTrue: [^self parseNull].
+	self error: 'Unexpected character: ', char asString!
+parseNumber
+	"Parse JSON number using existing Number class.
+	 Number readFrom: handles integers, floats, and exponents."
+	^Number readFrom: stream!
+parseString
+	"Parse JSON string with escape handling."
+	| result char |
+	stream next.  "consume opening quote"
+	result _ WriteStream on: (String new: 32).
+	[stream atEnd] whileFalse: [
+		char _ stream next.
+		char = $" ifTrue: [^result contents].
+		char = $\
+			ifTrue: [self parseEscapeTo: result]
+			ifFalse: [result nextPut: char]].
+	self error: 'Unterminated string'!
+parseEscapeTo: resultStream
+	"Parse escape sequence after backslash, writing to resultStream.
+	 Unicode escapes may write multiple UTF-8 bytes."
+	| char |
+	char _ stream next.
+	char = $n ifTrue: [^resultStream nextPut: Character lf].
+	char = $t ifTrue: [^resultStream nextPut: Character tab].
+	char = $r ifTrue: [^resultStream nextPut: Character cr].
+	char = $" ifTrue: [^resultStream nextPut: $"].
+	char = $\ ifTrue: [^resultStream nextPut: $\].
+	char = $/ ifTrue: [^resultStream nextPut: $/].
+	char = $b ifTrue: [^resultStream nextPut: Character backspace].
+	char = $f ifTrue: [^resultStream nextPut: Character newPage].
+	char = $u ifTrue: [^self parseUnicodeEscapeTo: resultStream].
+	self error: 'Unknown escape: \', char asString!
+parseUnicodeEscapeTo: resultStream
+	"Parse \uXXXX unicode escape, writing UTF-8 bytes to resultStream.
+	 Codepoints 0-127 are single byte. 128-2047 are two bytes.
+	 2048-65535 are three bytes."
+	| hex codePoint |
+	hex _ stream next: 4.
+	codePoint _ Integer readFrom: hex readStream radix: 16.
+	codePoint < 128 ifTrue: [
+		^resultStream nextPut: (Character value: codePoint)].
+	codePoint < 2048 ifTrue: [
+		resultStream nextPut: (Character value: (16rC0 bitOr: (codePoint bitShift: -6))).
+		^resultStream nextPut: (Character value: (16r80 bitOr: (codePoint bitAnd: 16r3F)))].
+	"3-byte UTF-8 for codepoints 2048-65535"
+	resultStream nextPut: (Character value: (16rE0 bitOr: (codePoint bitShift: -12))).
+	resultStream nextPut: (Character value: (16r80 bitOr: ((codePoint bitShift: -6) bitAnd: 16r3F))).
+	resultStream nextPut: (Character value: (16r80 bitOr: (codePoint bitAnd: 16r3F)))!
+parseTrue
+	"Parse 'true' literal."
+	(stream next: 4) = 'true' ifFalse: [self error: 'Expected true'].
+	^true!
+parseFalse
+	"Parse 'false' literal."
+	(stream next: 5) = 'false' ifFalse: [self error: 'Expected false'].
+	^false!
+parseNull
+	"Parse 'null' literal."
+	(stream next: 4) = 'null' ifFalse: [self error: 'Expected null'].
+	^nil! !
+
+!JsonReader methodsFor: 'parsing - structures'!
+parseObject
+	"Parse JSON object as Dictionary."
+	| dict key value |
+	stream next.  "consume {"
+	dict _ Dictionary new.
+	self skipWhitespace.
+	stream peek = $} ifTrue: [stream next. ^dict].  "empty object"
+	[true] whileTrue: [
+		self skipWhitespace.
+		stream peek = $" ifFalse: [self error: 'Expected string key'].
+		key _ self parseString.
+		self skipWhitespace.
+		stream next = $: ifFalse: [self error: 'Expected colon'].
+		value _ self parseValue.
+		dict at: key put: value.
+		self skipWhitespace.
+		stream peek = $} ifTrue: [stream next. ^dict].
+		stream peek = $, ifTrue: [stream next] ifFalse: [self error: 'Expected , or }']]!
+parseArray
+	"Parse JSON array as Array."
+	| items value |
+	stream next.  "consume ["
+	items _ OrderedCollection new.
+	self skipWhitespace.
+	stream peek = $] ifTrue: [stream next. ^items asArray].  "empty array"
+	[true] whileTrue: [
+		value _ self parseValue.
+		items add: value.
+		self skipWhitespace.
+		stream peek = $] ifTrue: [stream next. ^items asArray].
+		stream peek = $, ifTrue: [stream next] ifFalse: [self error: 'Expected , or ]']]! !
+
+!JsonReader methodsFor: 'private'!
+skipWhitespace
+	"Skip whitespace characters."
+	[stream atEnd not and: [stream peek isSeparator]]
+		whileTrue: [stream next]! !
+
+Object subclass: #JsonWriter
+	instanceVariableNames: 'stream'
+	classVariableNames: ''
+	poolDictionaries: ''
+	category: 'System-JSON'!
+
+JsonWriter comment:
+'I generate JSON text from Smalltalk objects.
+
+Supported object types:
+  Dictionary -> object
+  Array/OrderedCollection -> array
+  String/Symbol -> string
+  Number -> number
+  true/false -> true/false
+  nil -> null
+
+Usage:
+  JsonWriter stringify: (Dictionary new at: ''name'' put: ''Alice''; yourself)
+    => ''{"name":"Alice"}'''!
+
+
+!JsonWriter class methodsFor: 'instance creation'!
+on: aWriteStream
+	^self new stream: aWriteStream!
+stringify: anObject
+	"Convert Smalltalk object to JSON string."
+	| ws |
+	ws _ WriteStream on: (String new: 256).
+	(self on: ws) writeValue: anObject.
+	^ws contents! !
+
+!JsonWriter methodsFor: 'accessing'!
+stream: aWriteStream
+	stream _ aWriteStream! !
+
+!JsonWriter methodsFor: 'writing'!
+writeValue: anObject
+	"Write any Smalltalk value as JSON."
+	anObject isNil ifTrue: [^stream nextPutAll: 'null'].
+	anObject == true ifTrue: [^stream nextPutAll: 'true'].
+	anObject == false ifTrue: [^stream nextPutAll: 'false'].
+	anObject isString ifTrue: [^self writeString: anObject].
+	anObject isSymbol ifTrue: [^self writeString: anObject].
+	anObject isNumber ifTrue: [^self writeNumber: anObject].
+	(anObject isKindOf: Dictionary) ifTrue: [^self writeObject: anObject].
+	(anObject isKindOf: Collection) ifTrue: [^self writeArray: anObject].
+	self error: 'Cannot serialize: ', anObject class name!
+writeString: aString
+	"Write string with proper escaping."
+	stream nextPut: $".
+	aString do: [:char |
+		char = $" ifTrue: [stream nextPutAll: '\"']
+		ifFalse: [char = $\ ifTrue: [stream nextPutAll: '\\']
+		ifFalse: [char = Character lf ifTrue: [stream nextPutAll: '\n']
+		ifFalse: [char = Character cr ifTrue: [stream nextPutAll: '\r']
+		ifFalse: [char = Character tab ifTrue: [stream nextPutAll: '\t']
+		ifFalse: [stream nextPut: char]]]]]].
+	stream nextPut: $"!
+writeNumber: aNumber
+	"Write number. Integer or Float."
+	stream nextPutAll: aNumber printString!
+writeObject: aDictionary
+	"Write dictionary as JSON object."
+	| first |
+	stream nextPut: ${.
+	first _ true.
+	aDictionary keysAndValuesDo: [:key :value |
+		first ifFalse: [stream nextPut: $,].
+		first _ false.
+		self writeString: key asString.
+		stream nextPut: $:.
+		self writeValue: value].
+	stream nextPut: $}!
+writeArray: aCollection
+	"Write collection as JSON array."
+	| first |
+	stream nextPut: $[.
+	first _ true.
+	aCollection do: [:item |
+		first ifFalse: [stream nextPut: $,].
+		first _ false.
+		self writeValue: item].
+	stream nextPut: $]! !
 
 "Test class for class variable debugging"
 Object subclass: #ClassVarTest

@@ -1,6 +1,6 @@
 # Snapshot Save and Restore Architecture
 
-**Last Updated**: 2025-12-29
+**Last Updated**: 2026-01-05
 
 ## Overview
 
@@ -10,6 +10,27 @@ This enables:
 - Saving work in progress and resuming later
 - Distributing pre-built images without cold start
 - Future removal of all cold start logic (the image becomes self-contained)
+
+## File Locations
+
+Snapshot and source files are stored in Windows well-known folders using the `WindowsPath` class (Primitive 160):
+
+| File | Location | Purpose |
+|------|----------|---------|
+| `snapshot.im` | `%APPDATA%\Smalltalk-80\snapshot.im` | Saved image file |
+| `Smalltalk-80.sources` | `%APPDATA%\Smalltalk-80\` | Source code file |
+| `Smalltalk-80.changes` | `%APPDATA%\Smalltalk-80\` | Changes log file |
+
+**Typical paths on Windows**:
+- `C:\Users\<username>\AppData\Roaming\Smalltalk-80\snapshot.im`
+- `C:\ProgramData\Smalltalk-80\coldstart.json` (system-wide read-only files)
+
+**Implementation**: The Smalltalk code in `SystemDictionary>>snapshotAs:thenQuit:` uses `WindowsPath applicationPath:` to construct the full path:
+
+```smalltalk
+appDataPath _ WindowsPath applicationPath: 'Smalltalk-80'.
+snapshotPath _ appDataPath asString, '\', imageFilePrefix, '.im'.
+```
 
 ## Smalltalk-Level API
 

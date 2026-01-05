@@ -68,16 +68,9 @@ public static class Program
             if (config.RestoreImageFile != null)
             {
                 // === RESTORE FROM IMAGE ===
+                // Note: File existence already validated by CommandLineParser
                 restoreTimer = Stopwatch.StartNew();
                 Console.WriteLine($"Restoring from image: {config.RestoreImageFile}");
-
-                // Check if image file exists
-                if (!File.Exists(config.RestoreImageFile))
-                {
-                    Console.Error.WriteLine($"Error: Image file not found: {config.RestoreImageFile}");
-                    Environment.Exit(1);
-                    return;
-                }
 
                 // Create fresh heap manager
                 heapManager = new SmalltalkHeapManager(diagnostics);
@@ -122,14 +115,7 @@ public static class Program
             else
             {
                 // === COLD START ===
-                if (!File.Exists(config.ColdStartFile))
-                {
-                    Console.Error.WriteLine($"Error: Cold start file not found: {config.ColdStartFile}");
-                    CommandLineParser.PrintUsage();
-                    Environment.Exit(1);
-                    return;
-                }
-
+                // Note: File existence already validated by CommandLineParser
                 Console.WriteLine($"Loading cold start bundle: {coldStartFile}");
 
                 // Load the cold start bundle from JSON
@@ -171,39 +157,12 @@ public static class Program
                     ?? throw new InvalidOperationException("VMMetadata is null after cold start");
             }
 
-            // Use default display dimensions for both cold start and restore
-            // Note: During snapshot, Smalltalk shrinks Display to minimize bitmap size
-            // (see snapshotAs:thenQuit: which calls DisplayScreen displayHeight: (height min: 100))
-            // After restore, the Smalltalk post-snapshot code will resize Display back to original
-            int displayWidth = InterpreterConstants.DefaultDisplayWidth;
-            int displayHeight = InterpreterConstants.DefaultDisplayHeight;
-
-            // Display mode: 1bpp (classic Smalltalk-80 monochrome)
-            // The 32bpp experimental mode was removed - we now support only full 1bpp or full 32bpp,
-            // with no runtime conversion between them. Full 32bpp requires Smalltalk-side changes.
-            var pixelDepth = Core.VM.Platform.PixelDepth.OneBit;
-            Console.WriteLine($"  Display mode: {(int)pixelDepth}bpp");
-
-            // Create display window (UI thread object - has heap access for Display bitmap rendering)
-            Console.WriteLine("\n=== Creating Display Window ===");
-            Console.WriteLine($"  Window size: {displayWidth}x{displayHeight} ({(int)pixelDepth}bpp)");
-            var display = new WinFormsDisplay(
-                displayWidth,
-                displayHeight,
-                "Smalltalk-2026",
-                heapManager,
-                vmMetadata,
-                pixelDepth);
-            Console.WriteLine("Display window created (not shown yet)...");
-
             // Run GC immediately after cold start to verify heap integrity
             Console.WriteLine("\n=== Running GC after cold start ===");
             var gcStatsBefore = heapManager.GC.GarbageCollect();
             Console.WriteLine($"  {gcStatsBefore.GetSummary()}");
 
             // Enable allocation-triggered GC now that cold start is complete and roots are established
-            // During cold start, objects are built but not yet rooted, so AutoGC was disabled
-            // --no-gc flag disables GC entirely (useful for benchmarking)
             if (config.DisableGC)
             {
                 Console.WriteLine("  Auto-GC DISABLED (--no-gc flag)");
@@ -214,73 +173,86 @@ public static class Program
                 Console.WriteLine("  Auto-GC enabled for runtime");
             }
 
+            // Display is created lazily when Smalltalk calls BeDisplay
+            WinFormsDisplay? display = null;
+
             // Create Smalltalk thread context
             var threadContext = new SmalltalkThreadContext
             {
                 HeapManager = heapManager,
                 VMMetadata = vmMetadata,
                 Bundle = bundle,
-                Display = display,  // Smalltalk thread calls methods on UI object
+                Display = null,
                 Diagnostics = diagnostics,
                 Config = config,
                 RestoreTimer = restoreTimer
             };
 
-            // Create and start Smalltalk thread
+            // Set display factory after construction (lambda captures threadContext)
+            threadContext.DisplayFactory = (width, height, heap, metadata) =>
+            {
+                // Called from Smalltalk thread when BeDisplay is invoked
+                threadContext.RequestedDisplayWidth = width;
+                threadContext.RequestedDisplayHeight = height;
+                threadContext.DisplayNeeded.Set();
+                threadContext.DisplayCreated.Wait();
+                return threadContext.Display!;
+            };
+
+            // Start Smalltalk thread (runs init expressions and process scheduling)
             Console.WriteLine("\n=== Starting Smalltalk Thread ===");
             var interpreterThread = new SmalltalkInterpreterThread(threadContext);
 
             var smalltalkThread = new Thread(interpreterThread.Run);
             smalltalkThread.SetApartmentState(ApartmentState.MTA);
-            smalltalkThread.IsBackground = false; // Foreground thread
+            smalltalkThread.IsBackground = false;
             smalltalkThread.Name = "Smalltalk Interpreter";
             smalltalkThread.Start();
 
-            // Monitor Smalltalk thread and close window when it completes (for --execute mode)
-            // This ensures the window closes when the expression finishes executing
+            // Wait for Smalltalk to request display creation (BeDisplay primitive)
+            Console.WriteLine("\n=== Waiting for Smalltalk to request display ===");
+            threadContext.DisplayNeeded.Wait();
+
+            int displayWidth = threadContext.RequestedDisplayWidth;
+            int displayHeight = threadContext.RequestedDisplayHeight;
+            Console.WriteLine($"  Display requested: {displayWidth}x{displayHeight}");
+
+            // Create display window on main thread
+            Console.WriteLine("\n=== Creating Display Window ===");
+            display = new WinFormsDisplay(
+                displayWidth,
+                displayHeight,
+                "Smalltalk-2026",
+                heapManager,
+                vmMetadata,
+                Core.VM.Platform.PixelDepth.ThirtyTwoBit);
+            Console.WriteLine($"  Window created: {displayWidth}x{displayHeight}");
+
+            // Store display and signal Smalltalk thread
+            threadContext.Display = display;
+            threadContext.DisplayCreated.Set();
+
+            // Monitor thread to close window when Smalltalk completes
             var monitorThread = new Thread(() =>
             {
                 smalltalkThread.Join();
-                // Only close window if it's still open (not already closed by user)
-                // Use try-catch to handle race condition where window may be disposed between check and Invoke
                 try
                 {
-                    if (!display.IsDisposed && display.IsHandleCreated)
+                    if (display != null && !display.IsDisposed && display.IsHandleCreated)
                     {
                         Console.WriteLine("[Monitor] Smalltalk thread completed, closing window...");
                         display.Invoke((Action)(() => display.Close()));
                     }
                 }
-                catch (ObjectDisposedException)
-                {
-                    // Window was disposed between check and Invoke - expected during shutdown
-                }
-                catch (InvalidOperationException ex) when (ex.Message.Contains("cross-thread") || ex.Message.Contains("disposed"))
-                {
-                    // Window handle invalidated - expected during shutdown
-                }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
             });
             monitorThread.IsBackground = true;
             monitorThread.Start();
 
-            // Phase 2: Wait for event callbacks to be registered before showing window
-            // This prevents race condition where UI events arrive before VM is ready to handle them
-            Console.WriteLine("\n=== Waiting for event architecture to initialize ===");
-            threadContext.EventCallbacksReady.Wait();
-            Console.WriteLine("  Event callbacks registered - safe to show window");
-
-            // Show display window
-            Console.WriteLine("\n=== Showing Display Window ===");
-            display.Show();
-
-            // Signal Smalltalk thread that window is displayed
-            // This replaces the old Thread.Sleep with proper synchronization
-            threadContext.WindowDisplayed.Set();
-            Console.WriteLine("  Window displayed signal sent");
-
-            // Run WinForms event loop (blocks until window closes)
+            // Run WinForms event loop
             Console.WriteLine("\n=== Entering GUI Event Loop ===");
-            Console.WriteLine("Display window is visible. Close window to exit.\n");
+            display.Show();
             Application.Run(display);
 
             // When window closes, signal Smalltalk thread to shutdown

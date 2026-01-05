@@ -235,8 +235,9 @@ public static class GraphicsOperations
             int width = context.HeapManager.GetInstanceVariable(context.Receiver, 1).AsSmallInteger();
             int height = context.HeapManager.GetInstanceVariable(context.Receiver, 2).AsSmallInteger();
 
-            // Notify display of new Display dimensions
-            context.Display?.DisplayResized(width, height);
+            // Get or create display with these dimensions
+            // This may trigger lazy display creation if no display exists yet
+            context.LegacyContext?.GetOrCreateDisplay(width, height);
 
             return PrimitiveResult.Ok(context.Receiver);
         }

@@ -18,9 +18,19 @@ public interface IPrimitiveContext
 
     /// <summary>
     /// Gets the display for graphics and input operations.
-    /// May be null if running in headless/test mode.
+    /// May be null if running in headless/test mode or before BeDisplay is called.
     /// </summary>
     IDisplay? Display { get; }
+
+    /// <summary>
+    /// Creates or gets the display with the specified dimensions.
+    /// Called by BeDisplay primitive to lazily create the display window.
+    /// Returns existing display if already created, or creates a new one via the factory.
+    /// </summary>
+    /// <param name="width">Display width in pixels.</param>
+    /// <param name="height">Display height in pixels.</param>
+    /// <returns>The display instance, or null if no factory is available.</returns>
+    IDisplay? GetOrCreateDisplay(int width, int height);
 
     /// <summary>
     /// Gets or sets the primitive success flag.

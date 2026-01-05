@@ -10,6 +10,15 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- Well-known folder paths for deployment -->
+  <PropertyGroup>
+    <AppName>Smalltalk-80</AppName>
+    <!-- %COMMONAPPDATA% = C:\ProgramData -->
+    <CommonAppDataPath>$(ALLUSERSPROFILE)\$(AppName)</CommonAppDataPath>
+    <!-- %APPDATA% = C:\Users\{user}\AppData\Roaming -->
+    <UserAppDataPath>$(APPDATA)\$(AppName)</UserAppDataPath>
+  </PropertyGroup>
+
   <!-- Reference to Engine (which references Core) -->
   <ItemGroup>
     <ProjectReference Include="Engine\Smalltalk80.Interpreter.Engine.csproj" />
@@ -27,7 +36,7 @@
   <ItemGroup>
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
   </ItemGroup>
-  
+
   <!-- Preserve existing compiler integration -->
   <ItemGroup>
     <ProjectReference Include="..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj">
@@ -35,22 +44,71 @@
       <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
     </ProjectReference>
   </ItemGroup>
-  
-  <!-- Copy coldstart.json to output Data folder after build -->
-  <!-- Note: Compiler now outputs .sources and .changes directly to Interpreter output directory -->
-  <Target Name="CopyDataFilesToOutput" AfterTargets="Build">
+
+  <!--
+    Deploy target: Copy files to Windows well-known folders.
+    Runs automatically after build. Can also run manually: dotnet msbuild /t:Deploy
+
+    Source locations:
+    - coldstart.json, .sources, .changes: Smalltalk80.Compiler/bin/{Config}/net9.0/
+    - *.form files: Forms/ folder in repository root
+
+    Destination locations:
+    - coldstart.json, *.form: %COMMONAPPDATA%\Smalltalk-80\ (system-wide, shared)
+    - .sources/.changes: %APPDATA%\Smalltalk-80\ (per-user)
+  -->
+  <Target Name="Deploy" AfterTargets="Build">
     <PropertyGroup>
+      <!-- Source files in Compiler's output folder -->
       <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
-      <DataOutputDir>$(TargetDir)Data\</DataOutputDir>
+      <!-- Form files in repository Forms folder -->
+      <FormsDir>$(MSBuildProjectDirectory)\..\Forms\</FormsDir>
+      <!-- Full paths for source files -->
+      <ColdstartSource>$(CompilerOutputDir)coldstart.json</ColdstartSource>
+      <SourcesSource>$(CompilerOutputDir)Smalltalk-80.sources</SourcesSource>
+      <ChangesSource>$(CompilerOutputDir)Smalltalk-80.changes</ChangesSource>
     </PropertyGroup>
 
-    <!-- Create Data directory if it doesn't exist -->
-    <MakeDir Directories="$(DataOutputDir)" Condition="!Exists('$(DataOutputDir)')" />
+    <!-- Collect all .form files from Forms folder -->
+    <ItemGroup>
+      <FormFiles Include="$(FormsDir)*.form" />
+    </ItemGroup>
 
-    <!-- Copy coldstart.json from Compiler output Data folder (if freshly compiled) -->
-    <Copy SourceFiles="$(CompilerOutputDir)Data\coldstart.json" DestinationFolder="$(DataOutputDir)" SkipUnchangedFiles="true" Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
-    <Message Text="✓ Copied freshly compiled coldstart.json to $(DataOutputDir)" Importance="high" Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
+    <!-- Create target directories if they don't exist -->
+    <MakeDir Directories="$(CommonAppDataPath)" Condition="!Exists('$(CommonAppDataPath)')" />
+    <MakeDir Directories="$(UserAppDataPath)" Condition="!Exists('$(UserAppDataPath)')" />
+
+    <Exec Command="echo Deploying Smalltalk-80 files:" />
+
+    <!-- Deploy coldstart.json -->
+    <Copy SourceFiles="$(ColdstartSource)"
+          DestinationFolder="$(CommonAppDataPath)"
+          SkipUnchangedFiles="false"
+          Condition="Exists('$(ColdstartSource)')" />
+    <Exec Command="echo   coldstart.json -^&gt; $(CommonAppDataPath)\coldstart.json" Condition="Exists('$(ColdstartSource)')" />
+    <Exec Command="echo   coldstart.json: FAILED - not found at $(ColdstartSource)" Condition="!Exists('$(ColdstartSource)')" />
+
+    <!-- Deploy .sources -->
+    <Copy SourceFiles="$(SourcesSource)"
+          DestinationFolder="$(UserAppDataPath)"
+          SkipUnchangedFiles="false"
+          Condition="Exists('$(SourcesSource)')" />
+    <Exec Command="echo   Smalltalk-80.sources -^&gt; $(UserAppDataPath)\Smalltalk-80.sources" Condition="Exists('$(SourcesSource)')" />
+    <Exec Command="echo   Smalltalk-80.sources: FAILED - not found at $(SourcesSource)" Condition="!Exists('$(SourcesSource)')" />
+
+    <!-- Deploy .changes -->
+    <Copy SourceFiles="$(ChangesSource)"
+          DestinationFolder="$(UserAppDataPath)"
+          SkipUnchangedFiles="false"
+          Condition="Exists('$(ChangesSource)')" />
+    <Exec Command="echo   Smalltalk-80.changes -^&gt; $(UserAppDataPath)\Smalltalk-80.changes" Condition="Exists('$(ChangesSource)')" />
+    <Exec Command="echo   Smalltalk-80.changes: FAILED - not found at $(ChangesSource)" Condition="!Exists('$(ChangesSource)')" />
+
+    <!-- Deploy .form files -->
+    <Copy SourceFiles="@(FormFiles)"
+          DestinationFolder="$(CommonAppDataPath)"
+          SkipUnchangedFiles="false" />
+    <Exec Command="echo   *.form files (@(FormFiles-&gt;Count())) -^&gt; $(CommonAppDataPath)\" />
   </Target>
-
 
 </Project>

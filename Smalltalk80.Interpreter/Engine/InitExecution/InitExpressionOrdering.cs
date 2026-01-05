@@ -24,6 +24,7 @@ public static class InitExpressionOrdering
             "Decompiler initialize",
             "Explainer initialize",
             "Form initialize",
+            "DisplayScreen initialize",  // Activates Display primitive to create window
             "InputSensor initialize",
             "InputState initialize",
             "InstructionStream initialize",
@@ -36,6 +37,7 @@ public static class InitExpressionOrdering
             "Scanner initialize",
             "StringHolder initialize",
             "Symbol initialize",
+            "WindowsPath initialize",  // Must run before SystemDictionary (uses applicationPath:)
             "SystemDictionary initialize",
             "SystemTracer initialize",
             "Text initialize",
@@ -79,6 +81,9 @@ public static class InitExpressionOrdering
 
             // BlockContext Test Runner (runs all 120 tests, expected result: 1191)
             "BlockContextTestRunner initialize"
+
+            // NOTE: JsonTest runAll is NOT run during init - run manually from Workspace:
+            //   JsonTest runAll
         };
     }
 }

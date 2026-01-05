@@ -1,8 +1,8 @@
-# Session Handoff: 32bpp Graphics Pipeline Complete
+# Session Handoff: Lazy Display Creation & File Locations
 
-**Date**: 2026-01-02
-**Status**: 32bpp graphics pipeline functional with anti-aliased text support
-**Branch**: `claude/review-graphics-architecture-FssRQ`
+**Date**: 2026-01-05
+**Status**: Lazy display creation implemented, file location relocation complete
+**Branch**: `claude/session-handoff-continuation-pblzi`
 **Priority**: Enhancement
 **Master Plan**: `docs/32-BIT-IMPLEMENTATION-PLAN.md`
 
@@ -10,14 +10,24 @@
 
 ## Quick Summary
 
-This session completed the 32bpp graphics pipeline with full color preservation and anti-aliased text rendering. Key achievements:
+This session implemented **lazy/deferred window creation** so the WinForms display window is only created when Smalltalk calls `BeDisplay` (primitive 102), rather than at interpreter startup. Also includes file location relocation to Windows well-known folders.
 
-1. **Scroll Overlap Fix**: BitBlt32Engine now handles overlapping memory copies correctly
-2. **XOR Caret Fix**: Inverted source for XOR operations to preserve 1bpp semantics
-3. **Font Baseline Alignment**: Fixed-pitch fonts now use uniform cell width
-4. **Paint Mode (Rule 16)**: Implemented multiply blend for anti-aliased text
-5. **Color Verification**: Blue text test confirmed colors flow through entire pipeline
-6. **Window Title**: Updated to "Smalltalk-2026"
+**Key Changes**:
+1. **JSON Reader/Writer** - Pure Smalltalk JSON parsing and generation with full Unicode support
+2. **WindowsPath Class** - Access to Windows special folders via Primitive 160 (`%APPDATA%`, `%COMMONAPPDATA%`, etc.)
+3. **Lazy Display Creation** - Window created only when `DisplayScreen initialize` runs
+4. **Display Factory Pattern** - Thread-safe coordination between Smalltalk and UI threads
+5. **Input Event Fix** - `InitializeEventArchitecture()` called after display creation
+6. **Snapshot to AppData** - Snapshots saved to `%APPDATA%\Smalltalk-80\`
+
+### File Location Summary
+
+| File Type | Location |
+|-----------|----------|
+| coldstart.json | `%COMMONAPPDATA%\Smalltalk-80\coldstart.json` |
+| *.form files | `%COMMONAPPDATA%\Smalltalk-80\` |
+| snapshot.im | `%APPDATA%\Smalltalk-80\snapshot.im` |
+| .sources/.changes | `%APPDATA%\Smalltalk-80\` |
 
 ---
 
@@ -27,76 +37,97 @@ This session completed the 32bpp graphics pipeline with full color preservation 
 - ✅ Build: 0 errors, 0 warnings
 - ✅ Cold start: All 6 phases succeed
 - ✅ Init expressions: 286/286 succeed (100%)
-- ✅ System Browser: Fully functional with source code display
-- ✅ All 16 BitBlt combination rules working
-- ✅ **Rule 16 (Paint)**: Now handled in C# with multiply blend (was falling back to Smalltalk)
-- ✅ **32bpp font rendering**: Anti-aliased with explicit Format32bppArgb
-- ✅ **Color preservation**: Verified with blue text rendering
-- ✅ **Scroll operations**: Overlap handling prevents duplication artifacts
-- ✅ **XOR operations**: Caret/cursor displays correctly (inverted source fix)
+- ✅ System Browser: Fully functional with syntax highlighting (~1.0s display)
+- ✅ Syntax highlighting: 4.5x speedup (Phase 7 complete)
+- ✅ **JsonReader class**: Added to `Smalltalk-80.st` (tested and working)
+- ✅ **JsonWriter class**: Added to `Smalltalk-80.st` (tested and working)
+- ✅ **WindowsPath class**: Primitive 160 for Windows special folders
+- ✅ **Lazy display creation**: Window created when BeDisplay called
+- ✅ **Mouse/keyboard input**: Working with lazy display creation
+- ✅ **CommandLineParser**: Updated for well-known path search
+- ✅ **SystemDictionary>>initialize**: Updated for well-known path search
 
-### Recent Commits (this session)
+### Pending
+- ⏳ **Regenerate coldstart bundle**: Required after Smalltalk changes
+- ⏳ **Test file location changes**: After coldstart regeneration
+
+### Recent Changes (this session)
+
+**JSON Reader/Writer (Pure Smalltalk)**:
+- Added `JsonReader` class for parsing JSON strings
+- Added `JsonWriter` class for generating JSON output
+- Full Unicode escape support (`\uXXXX`)
+- Handles strings, numbers, booleans, null, arrays, dictionaries
+- 29 comprehensive tests pass
+
+**Lazy Display Creation**:
+- `SmalltalkThreadContext.DisplayFactory` - Factory function for lazy window creation
+- `IPrimitiveContext.GetOrCreateDisplay()` - Called by BeDisplay primitive (102)
+- `VirtualMachine.SetDisplayFactory()` - Registers factory during VM creation
+- `InitializeEventArchitecture()` - Now called after display creation (fixes input events)
+- `DisplayScreen initialize` added to init expression ordering
+- Window created when Smalltalk calls `Display beDisplay`, not at startup
+
+**File Location Relocation**:
 ```
-8291a14 Update window title to Smalltalk-2026
-51070cb TEST: Render font glyphs in blue to verify color preservation
-ad4cb48 Fix anti-aliasing: use multiply blend and explicit 32bpp format
-cd0ecb1 Implement grayscale alpha blending for paint mode (rule 16)
-f44ed0f Fix build: revert to GDI+ (TextRenderer requires net9.0-windows)
-8e31a2e Use TextRenderer (GDI) for consistent font baseline alignment
-5ac24c7 Fix fixed-pitch font alignment with uniform cell width
-6f44b8f Fix row iteration order for vertical overlap in CopyBitsOptimized
+- Updated CommandLineParser.cs:
+  - --coldstart uses only %COMMONAPPDATA%\Smalltalk-80\coldstart.json
+  - --restore uses only %APPDATA%\Smalltalk-80\snapshot.im
+  - Explicit paths fail with clear error if file not found
+  - No fallback locations (development uses production paths)
+- Updated SystemDictionary>>initialize:
+  - Source files opened only from %APPDATA%\Smalltalk-80\
+  - No fallback to current working directory
+  - Defensive nil check for appDataPath
+- Updated Interpreter.csproj:
+  - Removed CopyDataFilesToOutput target (no local Data folder)
+  - Deploy target runs automatically after build (AfterTargets="Build")
+- Updated Compiler/Program.cs:
+  - Output files (coldstart.json, .sources, .changes) go to bin folder directly
+  - No Data subfolder
+- Updated InitExpressionOrdering.cs:
+  - Added WindowsPath initialize BEFORE SystemDictionary initialize
+  - Fixes dependency: SystemDictionary uses WindowsPath applicationPath:
+- Updated .gitignore:
+  - Removed Interpreter bin/Data files from tracking
+  - Added Compiler bin files (coldstart.json, .sources, .changes) for tracking
+- Updated Form class>>readFrom: to load from %COMMONAPPDATA%\Smalltalk-80\
+- Deploy target now copies *.form files from Forms/ folder to %COMMONAPPDATA%\Smalltalk-80\
+- Updated snapshotAs:thenQuit: to save snapshot to %APPDATA%\Smalltalk-80\
+- Fixed DisplayScreen class>>displayExtent: for 32bpp:
+  - Changed bitmap allocation from w // 16 * h (1bpp) to w * h (32bpp)
+  - This fixes black bar display issue when restoring from snapshot
 ```
 
 ---
 
-## Key Technical Changes
+## Key Technical Details
 
-### 1. BitBlt32Engine Overlap Handling
+### File Search Behavior
 
-**Problem**: Scrolling list panes showed duplicate entries due to overlapping source/dest regions.
+**--coldstart behavior:**
+1. With explicit path (`--coldstart /path/to/file.json`): Fail if file not found
+2. Without path: Uses `%COMMONAPPDATA%\Smalltalk-80\coldstart.json` only
 
-**Solution**: Detect scroll direction and iterate rows accordingly:
-```csharp
-bool copyBottomToTop = destY > sourceY;
-if (copyBottomToTop) {
-    for (int y = height - 1; y >= 0; y--) { ... }
-} else {
-    for (int y = 0; y < height; y++) { ... }
-}
+**--restore behavior:**
+1. With explicit path (`--restore /path/to/image.im`): Fail if file not found
+2. Without path: Uses `%APPDATA%\Smalltalk-80\snapshot.im` only
+
+**Source files (.sources/.changes):**
+- Opens from `%APPDATA%\Smalltalk-80\` only
+- Uses WindowsPath class (Primitive 160) for path resolution
+
+### WindowsPath Class
+
+The existing WindowsPath class with Primitive 160 provides access to Windows special folders:
+
+```smalltalk
+WindowsPath applicationPath: 'Smalltalk-80'
+    => WindowsPath for 'C:\Users\johndoe\AppData\Roaming\Smalltalk-80'
+
+WindowsPath commonAppDataPath
+    => WindowsPath for 'C:\ProgramData'
 ```
-
-### 2. Paint Mode Multiply Blend
-
-**Problem**: Original paint mode (rule 16) used OR operations designed for 1bpp. In 32bpp, black=0x000000 so OR-ing produces wrong results.
-
-**Solution**: Implement multiply blend which is the correct operation for anti-aliased content on white background:
-```csharp
-// BlendPaint: result = src * dest / 255 (per channel)
-// - White source (255) = transparent (dest unchanged)
-// - Black source (0) = opaque (result = 0)
-// - Gray source = proportional darkening
-int outR = (srcR * dstR) / 255;
-int outG = (srcG * dstG) / 255;
-int outB = (srcB * dstB) / 255;
-```
-
-### 3. XOR Source Inversion
-
-**Problem**: In 1bpp, black=1 (all bits set). XOR with 1 inverts destination. In 32bpp, black=0x000000. XOR with 0 does nothing.
-
-**Solution**: Invert source before XOR:
-```csharp
-destPixels[offset] ^= ~sourcePixels[offset];
-```
-
-### 4. Fixed-Pitch Font Rendering
-
-**Problem**: Individual character measurements with MeasureString returned varying widths, causing baseline misalignment.
-
-**Solution**:
-- Use uniform cell width from representative character ('M')
-- Build xTable as `i * cellWidth` for all characters
-- Use `TextRenderingHint.AntiAlias` and `Format32bppArgb` for proper grayscale output
 
 ---
 
@@ -104,22 +135,51 @@ destPixels[offset] ^= ~sourcePixels[offset];
 
 | File | Changes |
 |------|---------|
-| `BitBlt32Engine.cs` | Overlap handling for all fast paths, multiply blend for rule 16 |
-| `CombinationRule.cs` | Added `Paint = 16` enum value |
-| `GraphicsPrimitives.cs` | Accept rule 16 in primitive (was failing at >15) |
-| `WinFormsFontBridge.cs` | Uniform cell width, Format32bppArgb, AntiAlias hint |
-| `Program.cs` | Window title changed to "Smalltalk-2026" |
+| `Smalltalk80.Interpreter/CommandLineParser.cs` | Added well-known path search for coldstart and restore |
+| `Smalltalk80.Interpreter/Program.cs` | Removed redundant file existence checks (now in CommandLineParser) |
+| `Smalltalk80.Interpreter/Smalltalk80.Interpreter.csproj` | Added Deploy MSBuild target for production deployment |
+| `Smalltalk80.Interpreter/Engine/InitExecution/InitExpressionOrdering.cs` | Added WindowsPath before SystemDictionary |
+| `Smalltalk80.Compiler/Program.cs` | Output files to bin folder directly (no Data subfolder) |
+| `Smalltalk-80 Source/Smalltalk-80.st` | Updated SystemDictionary>>initialize for well-known paths |
+| `.gitignore` | Track Compiler bin files, ignore Interpreter bin files |
+| `docs/SESSION-HANDOFF.md` | Updated documentation |
 
 ---
 
-## Remaining Work
+## Roadmap: Full Theme Support
 
-### Immediate
-1. **Change font color back to black** - Currently blue for testing
-2. **Selection highlight polish** - Yellow-on-blue looks odd with multiply blend
+### Phase 1: JSON Processing ✅ COMPLETE
+**Document**: `docs/JSON-PROCESSING-IN-SMALLTALK.md`
 
-### Future (32-bit Word Migration)
-The 32-bit word migration (HeapManager `ushort[]` → `uint[]`) is still planned but not started. See `docs/32-BIT-IMPLEMENTATION-PLAN.md` for the phased approach.
+- [x] Add `JsonReader` class
+- [x] Add `JsonWriter` class
+- [x] Unicode escape support (UTF-8 encoding)
+- [x] Test with various JSON inputs (29 tests pass)
+
+### Phase 2: Windows Special Folders ✅ COMPLETE
+**Document**: `docs/WINDOWS-SPECIAL-FOLDERS-IMPLEMENTATION.md`
+
+- [x] Primitive 160 (GetSpecialFolder) in `FileInfoPrimitives.cs`
+- [x] Registered in `PrimitiveRegistry.cs`
+- [x] `WindowsPath` class with `specialFolder:`, convenience methods
+
+### Phase 2.5: File Location Relocation ✅ IMPLEMENTED
+- [x] CommandLineParser updated for well-known path search
+- [x] SystemDictionary>>initialize updated for source file paths
+- [x] Deploy MSBuild target runs automatically after build
+- [ ] Regenerate coldstart bundle
+- [ ] Test file location changes
+
+### Phase 3: VS Code Theme Loading
+**Document**: `docs/WELL-KNOWN-PATHS-DESIGN.md`
+
+- [ ] Theme directory: `%APPDATA%\Smalltalk-80\themes\`
+- [ ] Parse VS Code JSON theme format
+- [ ] `SyntaxStyler>>loadThemeNamed:` and `useThemeNamed:`
+
+### Phase 4: Runtime Theme Switching
+- [ ] `SyntaxStyler>>availableThemes`
+- [ ] Theme selection in Preferences menu
 
 ---
 
@@ -130,27 +190,25 @@ The 32-bit word migration (HeapManager `ushort[]` → `uint[]`) is still planned
 **Workaround**: Wait 2-3 seconds before moving mouse.
 **Status**: Under investigation.
 
-### Anti-aliasing Subtlety
-Anti-aliased edges are present but subtle at normal font sizes (10-14px). Visible when zoomed. This is expected behavior for small fonts.
-
 ---
 
 ## Build and Test Commands
 
 ```bash
-# Build and run
+# Build and run (deploy happens automatically after build)
 cd Smalltalk80.Interpreter
-dotnet build
+dotnet build   # Deploys files to well-known locations automatically
 dotnet run
 
 # Regenerate coldstart after Smalltalk changes
 cd "Smalltalk-80 Source"
 dotnet run --project ../Smalltalk80.Compiler/Smalltalk80.Compiler.csproj -- "Smalltalk-80.st"
-cp ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/* ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
+cd ../Smalltalk80.Interpreter
+dotnet build   # Redeploys updated files automatically
 
-# Run regression tests
+# Run regression tests (using explicit path)
 cd Smalltalk80.Interpreter
-dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/coldstart_with_runner.json
+dotnet run -- --coldstart ../Smalltalk80.Compiler/bin/Debug/net9.0/Data/coldstart_with_runner.json
 # Expected: Returns 1191 (120 tests pass)
 ```
 
@@ -158,16 +216,30 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 
 ## For Next Session
 
-### If continuing graphics work:
-1. Change font color back to black in `WinFormsFontBridge.cs`
-2. Investigate selection highlight appearance
+### If continuing theme support roadmap:
+1. Regenerate coldstart bundle (includes SystemDictionary>>initialize changes)
+2. Test file location changes with well-known paths
+3. Implement VS Code theme loading (Phase 3)
 
-### If starting 32-bit word migration:
-1. Start with `docs/32-BIT-IMPLEMENTATION-PLAN.md` Phase 1.1
-2. Change `ushort[]` to `uint[]` in HeapManager
-3. Run regression tests after each phase
+### If working on other features:
+1. Check `CLAUDE.md` for project status
+2. Check `docs/32-BIT-IMPLEMENTATION-PLAN.md` for word migration plan
 
 ### Key Documentation:
 - `CLAUDE.md` - Project status and development guidelines
-- `docs/32-BIT-IMPLEMENTATION-PLAN.md` - Master plan for word migration
-- `docs/Graphics-Architecture.md` - Graphics system design
+- `docs/JSON-PROCESSING-IN-SMALLTALK.md` - JSON implementation spec
+- `docs/WINDOWS-SPECIAL-FOLDERS-IMPLEMENTATION.md` - Special folder primitive
+- `docs/WELL-KNOWN-PATHS-DESIGN.md` - Theme file loading design
+
+### File Deployment:
+Deploy runs automatically after build. Manual invocation if needed:
+```bash
+cd Smalltalk80.Interpreter
+dotnet msbuild /t:Deploy
+
+# Deployed file locations:
+#   %COMMONAPPDATA%\Smalltalk-80\coldstart.json
+#   %COMMONAPPDATA%\Smalltalk-80\*.form (24 form files)
+#   %APPDATA%\Smalltalk-80\Smalltalk-80.sources
+#   %APPDATA%\Smalltalk-80\Smalltalk-80.changes
+```

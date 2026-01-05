@@ -638,7 +638,7 @@ public class SmalltalkEventQueue
 
 ## Implementation Checklist
 
-**Status: ✅ PHASES 1-5 COMPLETE (Fiber support deferred)**
+**Status: ✅ PHASES 1-6 COMPLETE (Includes lazy display creation)**
 
 ### Phase 1: Basic Thread Separation ✅ COMPLETE
 - [x] Create `SmalltalkThreadContext.cs`
@@ -672,6 +672,31 @@ public class SmalltalkEventQueue
 - [x] Test with --execute
 - [x] Test with --diagnostics
 - [x] Verify BlockContext regression tests still pass (120/120 passing)
+
+### Phase 6: Lazy Display Creation ✅ COMPLETE (2026-01-05)
+
+**Goal**: Defer WinForms window creation until Smalltalk actually needs it (when `BeDisplay` primitive 102 is called).
+
+**Implementation**:
+- [x] Add `DisplayFactory` property to `SmalltalkThreadContext` - factory function for lazy window creation
+- [x] Add `GetOrCreateDisplay(width, height)` to `IPrimitiveContext` - called by BeDisplay primitive
+- [x] Add `SetDisplayFactory()` to `VirtualMachine` - registers factory during VM creation
+- [x] Modify `BeDisplay` primitive (102) in `GraphicsPrimitives.cs` to call `GetOrCreateDisplay`
+- [x] Add `DisplayScreen initialize` to `InitExpressionOrdering.cs` - triggers window creation
+- [x] Call `InitializeEventArchitecture()` in factory after display creation - fixes input events
+- [x] Add `Focus()` call after `Show()` in `WinFormsDisplay.cs` - ensures keyboard focus
+
+**Key Files Modified**:
+- `SmalltalkThreadContext.cs` - Added `DisplayFactory`, `DisplayNeeded`, `DisplayCreated` for thread coordination
+- `IPrimitiveContext.cs` - Added `GetOrCreateDisplay(int width, int height)` method
+- `GraphicsPrimitives.cs` - BeDisplay calls `context.LegacyContext?.GetOrCreateDisplay(width, height)`
+- `SmalltalkInterpreterThread.cs` - Display factory calls `InitializeEventArchitecture()` after creation
+- `WinFormsDisplay.cs` - Added `Focus()` for keyboard focus
+
+**Why This Works**:
+Original Smalltalk-80 treated the display as "always present" hardware - there was no window creation concept because Smalltalk owned the entire physical screen. The `beDisplay` primitive simply activates a bitmap as the display buffer. We preserve this semantic while deferring actual WinForms window creation until first use.
+
+**Critical Fix**: `InitializeEventArchitecture()` MUST be called after display creation. This sets up the callback that signals `_inputEventPending` when input events arrive. Without this, InputSemaphore is never signaled and InputProcess never runs, causing input buffer overflow and unresponsive keyboard/mouse.
 
 ---
 
