@@ -23,19 +23,16 @@ bld/
 [Ll]og/
 [Ll]ogs/
 
-# Exception: Allow Data folder contents in Interpreter output directory
-!Smalltalk80.Interpreter/bin/
-Smalltalk80.Interpreter/bin/*
-!Smalltalk80.Interpreter/bin/Debug/
-Smalltalk80.Interpreter/bin/Debug/*
-!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/
-Smalltalk80.Interpreter/bin/Debug/net9.0-windows/*
-!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/
-!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*
-!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*.json
-!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*.sources
-!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*.changes
-!Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Data/*.form
+# Exception: Allow coldstart bundle and source files in Compiler output directory
+!Smalltalk80.Compiler/bin/
+Smalltalk80.Compiler/bin/*
+!Smalltalk80.Compiler/bin/Debug/
+Smalltalk80.Compiler/bin/Debug/*
+!Smalltalk80.Compiler/bin/Debug/net9.0/
+Smalltalk80.Compiler/bin/Debug/net9.0/*
+!Smalltalk80.Compiler/bin/Debug/net9.0/coldstart.json
+!Smalltalk80.Compiler/bin/Debug/net9.0/Smalltalk-80.sources
+!Smalltalk80.Compiler/bin/Debug/net9.0/Smalltalk-80.changes
 
 # .NET Core
 project.lock.json

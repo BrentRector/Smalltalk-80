@@ -36,6 +36,7 @@ public static class InitExpressionOrdering
             "Scanner initialize",
             "StringHolder initialize",
             "Symbol initialize",
+            "WindowsPath initialize",  // Must run before SystemDictionary (uses applicationPath:)
             "SystemDictionary initialize",
             "SystemTracer initialize",
             "Text initialize",
