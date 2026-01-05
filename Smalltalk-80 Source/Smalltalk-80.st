@@ -17185,18 +17185,18 @@ displayExtent: extent
 	| w h |
 	w _ extent x truncateTo: 32.
 	h _ extent y truncateTo: 2.
-	DisplayScreen currentDisplay: 
+	DisplayScreen currentDisplay:
 		(DisplayScreen new
 			extent: w @ 16
 			offset: 0 @ 0
-			bits: (DisplayBitmap new: w // 16 * 16)).
-	"shrink to 16 to release old bitmap"
-	DisplayScreen currentDisplay: 
+			bits: (DisplayBitmap new: w * 16)).
+	"shrink to 16 to release old bitmap (32bpp: w * h words)"
+	DisplayScreen currentDisplay:
 		(DisplayScreen new
 			extent: w @ h
 			offset: 0 @ 0
-			bits: (DisplayBitmap new: w // 16 * h)).
-	"now grow to new size"
+			bits: (DisplayBitmap new: w * h)).
+	"now grow to new size (32bpp: w * h words)"
 	ScheduledControllers restore!
 displayHeight: height 
 	"Make the height of the current display screen form be the argument, height."

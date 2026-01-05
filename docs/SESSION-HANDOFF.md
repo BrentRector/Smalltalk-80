@@ -67,6 +67,10 @@ This session implemented file location relocation to Windows well-known folders.
   - Added Compiler bin files (coldstart.json, .sources, .changes) for tracking
 - Updated Form class>>readFrom: to load from %COMMONAPPDATA%\Smalltalk-80\
 - Deploy target now copies *.form files from Forms/ folder to %COMMONAPPDATA%\Smalltalk-80\
+- Updated snapshotAs:thenQuit: to save snapshot to %APPDATA%\Smalltalk-80\
+- Fixed DisplayScreen class>>displayExtent: for 32bpp:
+  - Changed bitmap allocation from w // 16 * h (1bpp) to w * h (32bpp)
+  - This fixes black bar display issue when restoring from snapshot
 ```
 
 ---
