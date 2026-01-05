@@ -42,7 +42,6 @@ This session implemented file location relocation to Windows well-known folders.
 ### Pending
 - ⏳ **Regenerate coldstart bundle**: Required after Smalltalk changes
 - ⏳ **Test file location changes**: After coldstart regeneration
-- ⏳ **Create deployment script**: For copying files to well-known locations
 
 ### Recent Changes (this session)
 ```
@@ -54,6 +53,9 @@ This session implemented file location relocation to Windows well-known folders.
 - Updated SystemDictionary>>initialize:
   - Source files now searched in %APPDATA%\Smalltalk-80\ first
   - Falls back to current working directory
+- Added Deploy MSBuild target to Interpreter.csproj:
+  - Run with: dotnet msbuild /t:Deploy
+  - Copies files to well-known Windows folders
 ```
 
 ---
@@ -95,6 +97,7 @@ WindowsPath commonAppDataPath
 |------|---------|
 | `Smalltalk80.Interpreter/CommandLineParser.cs` | Added well-known path search for coldstart and restore |
 | `Smalltalk80.Interpreter/Program.cs` | Removed redundant file existence checks (now in CommandLineParser) |
+| `Smalltalk80.Interpreter/Smalltalk80.Interpreter.csproj` | Added Deploy MSBuild target for production deployment |
 | `Smalltalk-80 Source/Smalltalk-80.st` | Updated SystemDictionary>>initialize for well-known paths |
 | `docs/SESSION-HANDOFF.md` | Updated documentation |
 
@@ -120,9 +123,9 @@ WindowsPath commonAppDataPath
 ### Phase 2.5: File Location Relocation ✅ IMPLEMENTED
 - [x] CommandLineParser updated for well-known path search
 - [x] SystemDictionary>>initialize updated for source file paths
+- [x] Deploy MSBuild target added (`dotnet msbuild /t:Deploy`)
 - [ ] Regenerate coldstart bundle
 - [ ] Test file location changes
-- [ ] Create deployment script (copies files to well-known locations)
 
 ### Phase 3: VS Code Theme Loading
 **Document**: `docs/WELL-KNOWN-PATHS-DESIGN.md`
@@ -172,8 +175,7 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 ### If continuing theme support roadmap:
 1. Regenerate coldstart bundle (includes SystemDictionary>>initialize changes)
 2. Test file location changes with well-known paths
-3. Create deployment script to copy files to well-known locations
-4. Implement VS Code theme loading (Phase 3)
+3. Implement VS Code theme loading (Phase 3)
 
 ### If working on other features:
 1. Check `CLAUDE.md` for project status
@@ -185,10 +187,16 @@ dotnet run -- --coldstart ../Smalltalk80.Interpreter/bin/Debug/net9.0-windows/Da
 - `docs/WINDOWS-SPECIAL-FOLDERS-IMPLEMENTATION.md` - Special folder primitive
 - `docs/WELL-KNOWN-PATHS-DESIGN.md` - Theme file loading design
 
-### File Deployment Note:
-The interpreter now looks for files in well-known Windows locations. For development:
-1. Files in `Data\` relative to exe still work as fallback
-2. For production deployment, copy files to:
-   - `%COMMONAPPDATA%\Smalltalk-80\coldstart.json`
-   - `%APPDATA%\Smalltalk-80\Smalltalk-80.sources`
-   - `%APPDATA%\Smalltalk-80\Smalltalk-80.changes`
+### File Deployment Commands:
+```bash
+# Development: Files in Data\ relative to exe work as fallback (no deployment needed)
+
+# Production deployment: Run the Deploy target
+cd Smalltalk80.Interpreter
+dotnet msbuild /t:Deploy
+
+# This copies files to well-known locations:
+#   %COMMONAPPDATA%\Smalltalk-80\coldstart.json
+#   %APPDATA%\Smalltalk-80\Smalltalk-80.sources
+#   %APPDATA%\Smalltalk-80\Smalltalk-80.changes
+```

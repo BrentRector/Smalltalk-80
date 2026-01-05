@@ -10,6 +10,15 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <!-- Well-known folder paths for deployment -->
+  <PropertyGroup>
+    <AppName>Smalltalk-80</AppName>
+    <!-- %COMMONAPPDATA% = C:\ProgramData -->
+    <CommonAppDataPath>$(ALLUSERSPROFILE)\$(AppName)</CommonAppDataPath>
+    <!-- %APPDATA% = C:\Users\{user}\AppData\Roaming -->
+    <UserAppDataPath>$(APPDATA)\$(AppName)</UserAppDataPath>
+  </PropertyGroup>
+
   <!-- Reference to Engine (which references Core) -->
   <ItemGroup>
     <ProjectReference Include="Engine\Smalltalk80.Interpreter.Engine.csproj" />
@@ -27,7 +36,7 @@
   <ItemGroup>
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
   </ItemGroup>
-  
+
   <!-- Preserve existing compiler integration -->
   <ItemGroup>
     <ProjectReference Include="..\Smalltalk80.Compiler\Smalltalk80.Compiler.csproj">
@@ -35,8 +44,8 @@
       <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
     </ProjectReference>
   </ItemGroup>
-  
-  <!-- Copy coldstart.json to output Data folder after build -->
+
+  <!-- Copy coldstart.json to output Data folder after build (development fallback) -->
   <!-- Note: Compiler now outputs .sources and .changes directly to Interpreter output directory -->
   <Target Name="CopyDataFilesToOutput" AfterTargets="Build">
     <PropertyGroup>
@@ -52,5 +61,67 @@
     <Message Text="✓ Copied freshly compiled coldstart.json to $(DataOutputDir)" Importance="high" Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
   </Target>
 
+  <!--
+    Deploy target: Copy files to Windows well-known folders for production use.
+    Run manually with: dotnet msbuild /t:Deploy
+
+    This copies:
+    - coldstart.json to %COMMONAPPDATA%\Smalltalk-80\ (system-wide, shared)
+    - .sources and .changes to %APPDATA%\Smalltalk-80\ (per-user)
+
+    Note: Compiler writes .sources/.changes to Interpreter PROJECT directory (not bin output)
+  -->
+  <Target Name="Deploy">
+    <PropertyGroup>
+      <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
+      <!-- Source files are in Interpreter project directory, not bin output -->
+      <InterpreterProjectDir>$(MSBuildProjectDirectory)</InterpreterProjectDir>
+    </PropertyGroup>
+
+    <Message Text="========================================" Importance="high" />
+    <Message Text="Deploying Smalltalk-80 files to well-known folders" Importance="high" />
+    <Message Text="========================================" Importance="high" />
+
+    <!-- Create target directories if they don't exist -->
+    <MakeDir Directories="$(CommonAppDataPath)" Condition="!Exists('$(CommonAppDataPath)')" />
+    <MakeDir Directories="$(UserAppDataPath)" Condition="!Exists('$(UserAppDataPath)')" />
+
+    <!-- Deploy coldstart.json to %COMMONAPPDATA%\Smalltalk-80\ -->
+    <Copy SourceFiles="$(CompilerOutputDir)Data\coldstart.json"
+          DestinationFolder="$(CommonAppDataPath)"
+          SkipUnchangedFiles="false"
+          Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
+    <Message Text="✓ Deployed coldstart.json to $(CommonAppDataPath)" Importance="high"
+             Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
+    <Warning Text="coldstart.json not found at $(CompilerOutputDir)Data\coldstart.json - run build first"
+             Condition="!Exists('$(CompilerOutputDir)Data\coldstart.json')" />
+
+    <!-- Deploy .sources to %APPDATA%\Smalltalk-80\ -->
+    <Copy SourceFiles="$(InterpreterProjectDir)\Smalltalk-80.sources"
+          DestinationFolder="$(UserAppDataPath)"
+          SkipUnchangedFiles="false"
+          Condition="Exists('$(InterpreterProjectDir)\Smalltalk-80.sources')" />
+    <Message Text="✓ Deployed Smalltalk-80.sources to $(UserAppDataPath)" Importance="high"
+             Condition="Exists('$(InterpreterProjectDir)\Smalltalk-80.sources')" />
+    <Warning Text="Smalltalk-80.sources not found at $(InterpreterProjectDir) - run compiler first"
+             Condition="!Exists('$(InterpreterProjectDir)\Smalltalk-80.sources')" />
+
+    <!-- Deploy .changes to %APPDATA%\Smalltalk-80\ -->
+    <Copy SourceFiles="$(InterpreterProjectDir)\Smalltalk-80.changes"
+          DestinationFolder="$(UserAppDataPath)"
+          SkipUnchangedFiles="false"
+          Condition="Exists('$(InterpreterProjectDir)\Smalltalk-80.changes')" />
+    <Message Text="✓ Deployed Smalltalk-80.changes to $(UserAppDataPath)" Importance="high"
+             Condition="Exists('$(InterpreterProjectDir)\Smalltalk-80.changes')" />
+    <Warning Text="Smalltalk-80.changes not found at $(InterpreterProjectDir) - run compiler first"
+             Condition="!Exists('$(InterpreterProjectDir)\Smalltalk-80.changes')" />
+
+    <Message Text="========================================" Importance="high" />
+    <Message Text="Deployment complete!" Importance="high" />
+    <Message Text="  Coldstart: $(CommonAppDataPath)\coldstart.json" Importance="high" />
+    <Message Text="  Sources:   $(UserAppDataPath)\Smalltalk-80.sources" Importance="high" />
+    <Message Text="  Changes:   $(UserAppDataPath)\Smalltalk-80.changes" Importance="high" />
+    <Message Text="========================================" Importance="high" />
+  </Target>
 
 </Project>
