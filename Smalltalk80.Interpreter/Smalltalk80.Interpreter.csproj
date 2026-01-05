@@ -51,62 +51,73 @@
 
     Run with: dotnet msbuild /t:Deploy
 
-    This copies:
-    - coldstart.json to %COMMONAPPDATA%\Smalltalk-80\ (system-wide, shared)
-    - .sources and .changes to %APPDATA%\Smalltalk-80\ (per-user)
+    Source locations:
+    - coldstart.json: Compiler output (bin/Debug/net9.0/Data/)
+    - .sources/.changes: Interpreter project directory (written by Compiler)
 
-    Note: Compiler writes .sources/.changes to Interpreter PROJECT directory (not bin output)
+    Destination locations:
+    - coldstart.json: %COMMONAPPDATA%\Smalltalk-80\ (system-wide, shared)
+    - .sources/.changes: %APPDATA%\Smalltalk-80\ (per-user)
   -->
   <Target Name="Deploy">
     <PropertyGroup>
       <CompilerOutputDir>$(MSBuildProjectDirectory)\..\Smalltalk80.Compiler\bin\$(Configuration)\net9.0\</CompilerOutputDir>
-      <!-- Source files are in Interpreter project directory, not bin output -->
+      <!-- Source files are written by Compiler to Interpreter project directory -->
       <InterpreterProjectDir>$(MSBuildProjectDirectory)</InterpreterProjectDir>
+      <!-- Full paths for source files -->
+      <ColdstartSource>$(CompilerOutputDir)Data\coldstart.json</ColdstartSource>
+      <SourcesSource>$(InterpreterProjectDir)\Smalltalk-80.sources</SourcesSource>
+      <ChangesSource>$(InterpreterProjectDir)\Smalltalk-80.changes</ChangesSource>
     </PropertyGroup>
 
+    <Message Text="" Importance="high" />
     <Message Text="========================================" Importance="high" />
-    <Message Text="Deploying Smalltalk-80 files to well-known folders" Importance="high" />
+    <Message Text="Deploying Smalltalk-80 files" Importance="high" />
     <Message Text="========================================" Importance="high" />
+    <Message Text="" Importance="high" />
+    <Message Text="Source locations:" Importance="high" />
+    <Message Text="  coldstart.json:       $(ColdstartSource)" Importance="high" />
+    <Message Text="  Smalltalk-80.sources: $(SourcesSource)" Importance="high" />
+    <Message Text="  Smalltalk-80.changes: $(ChangesSource)" Importance="high" />
+    <Message Text="" Importance="high" />
+    <Message Text="Destination locations:" Importance="high" />
+    <Message Text="  coldstart.json:       $(CommonAppDataPath)\" Importance="high" />
+    <Message Text="  Smalltalk-80.sources: $(UserAppDataPath)\" Importance="high" />
+    <Message Text="  Smalltalk-80.changes: $(UserAppDataPath)\" Importance="high" />
+    <Message Text="" Importance="high" />
 
     <!-- Create target directories if they don't exist -->
     <MakeDir Directories="$(CommonAppDataPath)" Condition="!Exists('$(CommonAppDataPath)')" />
     <MakeDir Directories="$(UserAppDataPath)" Condition="!Exists('$(UserAppDataPath)')" />
 
-    <!-- Deploy coldstart.json to %COMMONAPPDATA%\Smalltalk-80\ -->
-    <Copy SourceFiles="$(CompilerOutputDir)Data\coldstart.json"
+    <!-- Deploy coldstart.json -->
+    <Message Text="Deploying coldstart.json..." Importance="high" />
+    <Copy SourceFiles="$(ColdstartSource)"
           DestinationFolder="$(CommonAppDataPath)"
           SkipUnchangedFiles="false"
-          Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
-    <Message Text="✓ Deployed coldstart.json to $(CommonAppDataPath)" Importance="high"
-             Condition="Exists('$(CompilerOutputDir)Data\coldstart.json')" />
-    <Warning Text="coldstart.json not found at $(CompilerOutputDir)Data\coldstart.json - run build first"
-             Condition="!Exists('$(CompilerOutputDir)Data\coldstart.json')" />
+          Condition="Exists('$(ColdstartSource)')" />
+    <Message Text="  ✓ SUCCESS" Importance="high" Condition="Exists('$(ColdstartSource)')" />
+    <Warning Text="  ✗ FAILED: File not found at $(ColdstartSource)" Condition="!Exists('$(ColdstartSource)')" />
 
-    <!-- Deploy .sources to %APPDATA%\Smalltalk-80\ -->
-    <Copy SourceFiles="$(InterpreterProjectDir)\Smalltalk-80.sources"
+    <!-- Deploy .sources -->
+    <Message Text="Deploying Smalltalk-80.sources..." Importance="high" />
+    <Copy SourceFiles="$(SourcesSource)"
           DestinationFolder="$(UserAppDataPath)"
           SkipUnchangedFiles="false"
-          Condition="Exists('$(InterpreterProjectDir)\Smalltalk-80.sources')" />
-    <Message Text="✓ Deployed Smalltalk-80.sources to $(UserAppDataPath)" Importance="high"
-             Condition="Exists('$(InterpreterProjectDir)\Smalltalk-80.sources')" />
-    <Warning Text="Smalltalk-80.sources not found at $(InterpreterProjectDir) - run compiler first"
-             Condition="!Exists('$(InterpreterProjectDir)\Smalltalk-80.sources')" />
+          Condition="Exists('$(SourcesSource)')" />
+    <Message Text="  ✓ SUCCESS" Importance="high" Condition="Exists('$(SourcesSource)')" />
+    <Warning Text="  ✗ FAILED: File not found at $(SourcesSource)" Condition="!Exists('$(SourcesSource)')" />
 
-    <!-- Deploy .changes to %APPDATA%\Smalltalk-80\ -->
-    <Copy SourceFiles="$(InterpreterProjectDir)\Smalltalk-80.changes"
+    <!-- Deploy .changes -->
+    <Message Text="Deploying Smalltalk-80.changes..." Importance="high" />
+    <Copy SourceFiles="$(ChangesSource)"
           DestinationFolder="$(UserAppDataPath)"
           SkipUnchangedFiles="false"
-          Condition="Exists('$(InterpreterProjectDir)\Smalltalk-80.changes')" />
-    <Message Text="✓ Deployed Smalltalk-80.changes to $(UserAppDataPath)" Importance="high"
-             Condition="Exists('$(InterpreterProjectDir)\Smalltalk-80.changes')" />
-    <Warning Text="Smalltalk-80.changes not found at $(InterpreterProjectDir) - run compiler first"
-             Condition="!Exists('$(InterpreterProjectDir)\Smalltalk-80.changes')" />
+          Condition="Exists('$(ChangesSource)')" />
+    <Message Text="  ✓ SUCCESS" Importance="high" Condition="Exists('$(ChangesSource)')" />
+    <Warning Text="  ✗ FAILED: File not found at $(ChangesSource)" Condition="!Exists('$(ChangesSource)')" />
 
-    <Message Text="========================================" Importance="high" />
-    <Message Text="Deployment complete!" Importance="high" />
-    <Message Text="  Coldstart: $(CommonAppDataPath)\coldstart.json" Importance="high" />
-    <Message Text="  Sources:   $(UserAppDataPath)\Smalltalk-80.sources" Importance="high" />
-    <Message Text="  Changes:   $(UserAppDataPath)\Smalltalk-80.changes" Importance="high" />
+    <Message Text="" Importance="high" />
     <Message Text="========================================" Importance="high" />
   </Target>
 
