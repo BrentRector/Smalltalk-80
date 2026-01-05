@@ -557,7 +557,7 @@ public class WinFormsDisplay : Form, IDisplay
             // Using Format32bppRgb so high byte is ignored as padding
             // Standard RGB: 0x000000=black, 0xFFFFFF=white
             var heapSpan = _heap.GetWordSpan(bitsOOP);
-            if (heapSpan.Length > 0)
+            if (heapSpan.Length > 0 && _displayBuffer != null)
             {
                 int copySize = Math.Min(heapSpan.Length, _displayBuffer.Length);
                 heapSpan.Slice(0, copySize).CopyTo(_displayBuffer.AsSpan(0, copySize));
@@ -599,6 +599,9 @@ public class WinFormsDisplay : Form, IDisplay
 
     private void CopyBufferToBitmap()
     {
+        // Guard: caller (OnPaint) checks these, but compiler needs explicit check
+        if (_backBuffer == null || _displayBuffer == null) return;
+
         // Direct 32bpp copy from display buffer to bitmap
         BitmapData bmpData = _backBuffer.LockBits(
             new Rectangle(0, 0, Width, Height),
@@ -617,6 +620,9 @@ public class WinFormsDisplay : Form, IDisplay
 
     private void CopyBufferToBitmap32bpp(BitmapData bmpData)
     {
+        // Guard: caller checks _displayBuffer != null, but compiler needs explicit check
+        if (_displayBuffer == null) return;
+
         unsafe
         {
             int* ptr = (int*)bmpData.Scan0;
