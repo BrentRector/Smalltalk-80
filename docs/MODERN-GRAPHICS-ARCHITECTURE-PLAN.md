@@ -1,8 +1,8 @@
 # Modern Graphics Architecture Plan
 
-**Document Version**: 2.0
+**Document Version**: 2.1
 **Date**: 2026-01-05
-**Status**: Draft - Clean-Slate Approach (No Backward Compatibility)
+**Status**: Draft - Clean-Slate Approach with Unicode Support
 
 ---
 
@@ -756,7 +756,7 @@ ListView>>drawOn: canvas
 
 ### Create List
 
-**C# Files** (~1,500 lines estimated):
+**C# Files - Graphics** (~1,500 lines estimated):
 - [ ] `SDL2Display.cs`
 - [ ] `SDL2Input.cs`
 - [ ] `SkiaGpuContext.cs`
@@ -767,7 +767,12 @@ ListView>>drawOn: canvas
 - [ ] `SkiaPaint.cs`
 - [ ] `CanvasPrimitives.cs`
 
-**Smalltalk Classes**:
+**C# Files - Unicode** (~500 lines estimated):
+- [ ] `UnicodePrimitives.cs`
+- [ ] `Utf8String.cs`
+- [ ] `UnicodeData.cs`
+
+**Smalltalk Classes - Graphics**:
 - [ ] `Canvas`
 - [ ] `Surface`
 - [ ] `DisplaySurface`
@@ -779,7 +784,7 @@ ListView>>drawOn: canvas
 
 ### Update List
 
-**Smalltalk Classes** (major updates):
+**Smalltalk Classes - Graphics** (major updates):
 - [ ] `View` and all subclasses
 - [ ] `DisplayScreen`
 - [ ] `Color` (add alpha)
@@ -787,6 +792,552 @@ ListView>>drawOn: canvas
 - [ ] `Cursor`
 - [ ] `Window`
 - [ ] All tools (Browser, Inspector, etc.)
+
+**Smalltalk Classes - Unicode** (major updates):
+- [ ] `Character` (full codepoint support)
+- [ ] `String` (UTF-8 encoding)
+- [ ] `Symbol` (UTF-8 encoding)
+- [ ] `ReadStream` / `WriteStream` (codepoint iteration)
+- [ ] `FileStream` (UTF-8 encoding)
+- [ ] `Scanner` (UTF-8 source, Unicode escapes)
+- [ ] `Parser` (Unicode identifiers)
+- [ ] `InputSensor` (Unicode text input)
+
+---
+
+## Part 8: Unicode Support
+
+### 8.1 Overview
+
+The original Smalltalk-80 text system is ASCII/Latin-1 based:
+- `Character` holds values 0-255 only
+- `String` is a byte array (one byte per character)
+- `Symbol` is similarly byte-based
+- Source files are ASCII
+
+We will implement **full Unicode support** throughout:
+- `Character` supports all Unicode codepoints (0 to 0x10FFFF)
+- `String` uses UTF-8 internal encoding
+- Source files are UTF-8
+- Keyboard input supports Unicode (via SDL2 text input)
+- Text rendering supports all scripts (via Skia + HarfBuzz)
+
+### 8.2 Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **String encoding** | UTF-8 | Industry standard, compact for ASCII, web-compatible |
+| **Character representation** | Full codepoint | No surrogate pair complexity in Smalltalk |
+| **Indexing semantics** | Codepoint-based | `at: 1` returns first codepoint, not byte |
+| **Iteration** | Codepoint iterator | `do:` iterates codepoints |
+| **Byte access** | Separate API | `utf8Bytes` for raw access |
+| **Complex scripts** | HarfBuzz | Proper shaping for Arabic, Thai, etc. |
+
+### 8.3 Character Class (Redesigned)
+
+**Current** (ASCII-only):
+```smalltalk
+Character
+  value   "0-255 only"
+
+Character value: 8364  "ERROR - can't represent €"
+```
+
+**New** (Full Unicode):
+```smalltalk
+Character class
+  "Creation"
+  codePoint: anInteger        "0 to 16r10FFFF"
+  fromUtf8: aByteArray        "Decode single codepoint"
+
+  "ASCII convenience (unchanged API)"
+  value: anInteger            "Same as codePoint: for 0-127"
+  cr lf tab space             "Common characters"
+
+  "Unicode categories"
+  isLetter                    "Unicode Letter category"
+  isDigit                     "Unicode Digit category"
+  isWhitespace                "Unicode whitespace"
+  isPunctuation               "Unicode punctuation"
+
+Character instance
+  "Accessing"
+  codePoint                   "Integer 0 to 16r10FFFF"
+  asInteger                   "Synonym for codePoint"
+
+  "Conversion"
+  asString                    "Single-character String"
+  asUtf8Bytes                 "ByteArray of 1-4 bytes"
+  asUppercase                 "Unicode uppercase"
+  asLowercase                 "Unicode lowercase"
+
+  "Testing"
+  isAscii                     "codePoint < 128"
+  isLatin1                    "codePoint < 256"
+  isSurrogate                 "D800-DFFF (invalid as character)"
+
+  "Display"
+  unicodeName                 "'LATIN CAPITAL LETTER A' etc."
+```
+
+**Key Implementation Notes**:
+- `CharacterTable` expanded or replaced with sparse lookup
+- Equality based on codepoint value
+- Hashing based on codepoint value
+- Literal syntax: `$A` (ASCII), `$\u20AC` (€ via escape), `$€` (direct UTF-8 in source)
+
+### 8.4 String Class (Redesigned)
+
+**Current** (byte array):
+```smalltalk
+String
+  "Inherits from ArrayedCollection"
+  "One byte per element"
+
+'hello' size      "→ 5"
+'hello' at: 1     "→ $h"
+'café' size       "→ 5 (WRONG - counts bytes, not characters)"
+```
+
+**New** (UTF-8 with codepoint semantics):
+```smalltalk
+String class
+  "Creation"
+  new: size                   "Empty string with capacity for size codepoints"
+  fromUtf8: aByteArray        "Decode UTF-8 bytes"
+  fromCodePoints: anArray     "Array of integers"
+
+  "Encoding"
+  encoding                    "→ #utf8"
+
+String instance
+  "Accessing (codepoint-based)"
+  size                        "Number of codepoints"
+  at: index                   "Character at codepoint index (1-based)"
+  at: index put: aCharacter   "Replace codepoint at index"
+
+  "Byte access"
+  utf8Bytes                   "ByteArray of raw UTF-8"
+  utf8Size                    "Number of bytes"
+
+  "Enumeration"
+  do: aBlock                  "Iterate codepoints as Characters"
+  codePointsDo: aBlock        "Iterate codepoints as integers"
+  bytesDo: aBlock             "Iterate raw bytes"
+
+  "Searching"
+  indexOf: aCharacter         "Codepoint index of character"
+  includesString: aString     "Substring search"
+
+  "Slicing"
+  copyFrom: start to: end     "Substring by codepoint indices"
+  first: n                    "First n codepoints"
+  last: n                     "Last n codepoints"
+
+  "Comparison"
+  = aString                   "Codepoint equality"
+  < aString                   "Unicode collation (basic)"
+  compareWith: aString        "Full Unicode collation"
+
+  "Conversion"
+  asUppercase                 "Unicode uppercase"
+  asLowercase                 "Unicode lowercase"
+  asSymbol                    "Intern as Symbol"
+  asNumber                    "Parse as number"
+
+  "Concatenation"
+  , aString                   "Concatenate"
+
+  "Testing"
+  isEmpty
+  isAscii                     "All codepoints < 128"
+
+  "Printing"
+  printOn: aStream
+```
+
+**Key Implementation Notes**:
+- Internal storage is `ByteArray` with UTF-8 encoding
+- Codepoint indexing requires scanning (O(n) for random access)
+- Cached codepoint count for O(1) `size`
+- For performance-critical code, use `bytesDo:` or convert to codepoint array
+
+### 8.5 Symbol Class (Updated)
+
+Symbols follow same UTF-8 model:
+
+```smalltalk
+Symbol class
+  intern: aString             "Intern UTF-8 string as Symbol"
+
+Symbol instance
+  "Same API as String for access"
+  size                        "Codepoint count"
+  at: index                   "Character at index"
+  utf8Bytes                   "Raw bytes for interning lookup"
+```
+
+**Symbol Table**:
+- Keyed by UTF-8 byte sequence
+- Hash computed from bytes (not codepoints)
+- `#café` is valid Symbol literal (if source is UTF-8)
+
+### 8.6 Stream Classes (Updated)
+
+**ReadStream / WriteStream** - work with codepoints:
+
+```smalltalk
+ReadStream>>next               "→ Character (codepoint)"
+ReadStream>>nextByte           "→ Integer (raw byte)"
+ReadStream>>upToEnd            "→ String"
+
+WriteStream>>nextPut: aChar    "Write codepoint"
+WriteStream>>nextPutByte: int  "Write raw byte"
+WriteStream>>nextPutAll: str   "Write string"
+```
+
+**FileStream** - UTF-8 by default:
+
+```smalltalk
+FileStream class
+  open: path mode: mode encoding: #utf8    "Default"
+  open: path mode: mode encoding: #binary  "Raw bytes"
+
+FileStream instance
+  "Text mode (default)"
+  nextLine                    "→ String (decoded)"
+  contents                    "→ String (full file)"
+
+  "Binary mode"
+  nextBytes: n                "→ ByteArray"
+  position                    "Byte position"
+  position: byteIndex         "Seek to byte"
+```
+
+### 8.7 New Primitives for Unicode
+
+Add primitives **300-329** for Unicode string operations:
+
+| Primitive | Operation | Notes |
+|-----------|-----------|-------|
+| 300 | String: codePointCount | O(n) scan, cached |
+| 301 | String: codePointAt: index | O(n) to reach index |
+| 302 | String: codePointAtPut: index value: cp | Resize if needed |
+| 303 | String: utf8Bytes | Return ByteArray |
+| 304 | String: fromUtf8Bytes: | Create String from bytes |
+| 305 | String: utf8ByteCount | O(1) byte length |
+| 306 | String: indexOfCodePoint: cp startingAt: idx | Search |
+| 307 | String: copyCodePointsFrom: to: | Substring |
+| 308 | String: concatenate: | Efficient join |
+| 309 | String: compareUnicode: | Full collation |
+| 310 | Character: codePoint | Get codepoint value |
+| 311 | Character: fromCodePoint: | Create Character |
+| 312 | Character: utf8Bytes | 1-4 byte array |
+| 313 | Character: isUnicodeLetter | Category test |
+| 314 | Character: isUnicodeDigit | Category test |
+| 315 | Character: toUppercase | Case mapping |
+| 316 | Character: toLowercase | Case mapping |
+| 320 | Symbol: internUtf8: | Intern from bytes |
+| 321 | Symbol: utf8Bytes | Get interned bytes |
+
+### 8.8 Scanner/Parser Updates
+
+**Source File Encoding**:
+- All `.st` source files are UTF-8
+- BOM (0xEF 0xBB 0xBF) optional, skipped if present
+- Invalid UTF-8 sequences are errors
+
+**Lexer Changes**:
+
+```smalltalk
+Scanner>>scanToken
+    "Handle Unicode identifiers and literals"
+    self currentChar isUnicodeLetter ifTrue: [
+        ^self scanIdentifier  "Unicode letters in identifiers"
+    ].
+    self currentChar = $$ ifTrue: [
+        ^self scanCharacterLiteral  "Handles $\uXXXX escapes"
+    ].
+    ...
+```
+
+**New Character Literal Syntax**:
+
+| Syntax | Meaning |
+|--------|---------|
+| `$A` | ASCII character (unchanged) |
+| `$$` | Dollar sign (unchanged) |
+| `$€` | Direct Unicode (source is UTF-8) |
+| `$\u20AC` | Unicode escape (€) |
+| `$\U0001F600` | Extended Unicode escape (😀) |
+
+**String Literal Syntax**:
+
+| Syntax | Meaning |
+|--------|---------|
+| `'hello'` | ASCII string (unchanged) |
+| `'café'` | UTF-8 string (source is UTF-8) |
+| `'price: \u20AC100'` | With Unicode escape |
+| `'emoji: \U0001F600'` | Extended escape |
+
+**Identifier Rules**:
+- First character: Unicode letter or `_`
+- Subsequent: Unicode letter, digit, or `_`
+- Examples: `日本語Variable`, `überschrift`, `переменная`
+
+### 8.9 Keyboard Input (SDL2)
+
+SDL2 provides proper Unicode text input:
+
+```csharp
+// SDL2 text input event
+case SDL.SDL_EventType.SDL_TEXTINPUT:
+    string text = SDL.SDL_GetTextInput(e.text);
+    foreach (var rune in text.EnumerateRunes())
+    {
+        EnqueueTextInput(rune.Value);  // Full codepoint
+    }
+    break;
+
+// Input method (IME) support
+SDL.SDL_StartTextInput();   // Enable IME
+SDL.SDL_StopTextInput();    // Disable IME
+SDL.SDL_SetTextInputRect(); // Position IME window
+```
+
+**Input Word Format** (extended):
+
+| Type | Meaning |
+|------|---------|
+| 1-6 | Existing (mouse, keys) |
+| 7 | Unicode text input (codepoint in low 21 bits) |
+
+**Smalltalk Side**:
+```smalltalk
+InputSensor>>nextUnicodeCharacter
+    "Return next text input as Character"
+    | word |
+    word := self primNextInputWord.
+    (word >> 12) = 7 ifTrue: [
+        ^Character codePoint: (word bitAnd: 16r1FFFFF)
+    ].
+    ^nil
+```
+
+### 8.10 Text Rendering (Skia + HarfBuzz)
+
+**Complex Script Support**:
+
+SkiaSharp supports HarfBuzz for text shaping:
+
+```csharp
+// Create shaped text blob
+using var shaper = SKShaper.Create(typeface);
+var result = shaper.Shape(text, paint);
+
+// Draw shaped text
+canvas.DrawShapedText(shaper, text, x, y, paint);
+```
+
+**What HarfBuzz provides**:
+- **Arabic**: Right-to-left, contextual forms (initial/medial/final)
+- **Thai**: Complex cluster boundaries
+- **Devanagari**: Conjunct consonants, vowel signs
+- **Hebrew**: Right-to-left
+- **CJK**: Proper glyph selection for Han unification
+
+**Smalltalk Integration**:
+
+```smalltalk
+Canvas>>drawString: string at: point font: font paint: paint
+    "Uses HarfBuzz shaping automatically"
+    <primitive: 225>
+
+Canvas>>drawShapedText: string at: point font: font paint: paint direction: dir
+    "Explicit text direction (ltr/rtl/auto)"
+    <primitive: 227>
+```
+
+### 8.11 File I/O Updates
+
+**Encoding-Aware File Operations**:
+
+```smalltalk
+FileStream class
+  "Default is UTF-8 text mode"
+  fileNamed: path
+  readOnlyFileNamed: path
+  newFileNamed: path
+
+  "Explicit encoding"
+  fileNamed: path encoding: #utf8
+  fileNamed: path encoding: #binary
+  fileNamed: path encoding: #latin1    "Legacy support"
+
+FileStream instance
+  "Text reading"
+  nextLine      "→ String (decoded from UTF-8)"
+  contents      "→ String (full file)"
+  upTo: char    "→ String"
+
+  "Text writing"
+  nextPutAll: aString   "Encode to UTF-8"
+  cr                    "Write newline"
+
+  "Binary"
+  binary                "Switch to binary mode"
+  text                  "Switch to text mode"
+  nextBytes: n          "→ ByteArray"
+  nextPutBytes: bytes   "Write raw bytes"
+```
+
+**Primitives**:
+
+| Primitive | Operation |
+|-----------|-----------|
+| 330 | File: readUtf8Line: |
+| 331 | File: writeUtf8String: |
+| 332 | File: setEncoding: |
+
+### 8.12 Collation and Sorting
+
+**Basic Unicode Collation**:
+
+```smalltalk
+String>>< aString
+    "Basic codepoint comparison (fast but not locale-aware)"
+    ^self codePoints < aString codePoints
+
+String>>unicodeCompare: aString
+    "Full Unicode Collation Algorithm (via ICU or .NET)"
+    <primitive: 309>
+    ^self primitiveFailed
+```
+
+**Locale-Aware Sorting** (optional, via .NET):
+
+```csharp
+// Primitive 309: Unicode collation
+public static PrimitiveResult UnicodeCompare(PrimitiveContext ctx)
+{
+    var str1 = ctx.GetString(ctx.Receiver);
+    var str2 = ctx.GetString(ctx.Arguments[0]);
+
+    var result = string.Compare(str1, str2,
+        StringComparison.CurrentCulture);
+    return PrimitiveResult.Success(ctx.SmallInteger(result.Sign()));
+}
+```
+
+### 8.13 C# Implementation
+
+**New Files**:
+- `UnicodePrimitives.cs` - Primitives 300-332
+- `Utf8String.cs` - UTF-8 string utilities
+- `UnicodeData.cs` - Character properties (letter, digit, etc.)
+
+**Key C# Helpers**:
+
+```csharp
+public static class Utf8String
+{
+    // Count codepoints in UTF-8 byte array
+    public static int CodePointCount(ReadOnlySpan<byte> utf8)
+    {
+        int count = 0;
+        int i = 0;
+        while (i < utf8.Length)
+        {
+            i += GetCodePointLength(utf8[i]);
+            count++;
+        }
+        return count;
+    }
+
+    // Get codepoint at index (1-based)
+    public static int CodePointAt(ReadOnlySpan<byte> utf8, int index)
+    {
+        int pos = 0;
+        for (int i = 1; i < index; i++)
+        {
+            pos += GetCodePointLength(utf8[pos]);
+        }
+        return DecodeCodePoint(utf8.Slice(pos));
+    }
+
+    // UTF-8 byte length from lead byte
+    public static int GetCodePointLength(byte leadByte)
+    {
+        if (leadByte < 0x80) return 1;
+        if (leadByte < 0xE0) return 2;
+        if (leadByte < 0xF0) return 3;
+        return 4;
+    }
+
+    // Decode single codepoint
+    public static int DecodeCodePoint(ReadOnlySpan<byte> utf8)
+    {
+        if (utf8[0] < 0x80)
+            return utf8[0];
+        if (utf8[0] < 0xE0)
+            return ((utf8[0] & 0x1F) << 6) | (utf8[1] & 0x3F);
+        if (utf8[0] < 0xF0)
+            return ((utf8[0] & 0x0F) << 12) | ((utf8[1] & 0x3F) << 6)
+                   | (utf8[2] & 0x3F);
+        return ((utf8[0] & 0x07) << 18) | ((utf8[1] & 0x3F) << 12)
+               | ((utf8[2] & 0x3F) << 6) | (utf8[3] & 0x3F);
+    }
+
+    // Encode codepoint to UTF-8
+    public static int EncodeCodePoint(int codePoint, Span<byte> dest)
+    {
+        if (codePoint < 0x80)
+        {
+            dest[0] = (byte)codePoint;
+            return 1;
+        }
+        if (codePoint < 0x800)
+        {
+            dest[0] = (byte)(0xC0 | (codePoint >> 6));
+            dest[1] = (byte)(0x80 | (codePoint & 0x3F));
+            return 2;
+        }
+        if (codePoint < 0x10000)
+        {
+            dest[0] = (byte)(0xE0 | (codePoint >> 12));
+            dest[1] = (byte)(0x80 | ((codePoint >> 6) & 0x3F));
+            dest[2] = (byte)(0x80 | (codePoint & 0x3F));
+            return 3;
+        }
+        dest[0] = (byte)(0xF0 | (codePoint >> 18));
+        dest[1] = (byte)(0x80 | ((codePoint >> 12) & 0x3F));
+        dest[2] = (byte)(0x80 | ((codePoint >> 6) & 0x3F));
+        dest[3] = (byte)(0x80 | (codePoint & 0x3F));
+        return 4;
+    }
+}
+```
+
+### 8.14 Updated Implementation Phases
+
+Insert **Phase 7: Unicode Support** after Phase 6:
+
+**Phase 7: Unicode Support (Week 15-16)**
+
+**Goal**: Full Unicode throughout the system
+
+**Tasks**:
+1. Implement Character class with full codepoint support
+2. Implement String class with UTF-8 encoding
+3. Add primitives 300-332 for Unicode operations
+4. Update Symbol class and symbol table
+5. Update Scanner for UTF-8 source and Unicode escapes
+6. Update keyboard input for Unicode text events
+7. Integrate HarfBuzz for complex script rendering
+8. Update file I/O for UTF-8 encoding
+9. Update all string-using code in Smalltalk
+
+**Deliverable**: Unicode text throughout - input, display, files, source code
 
 ---
 
@@ -861,5 +1412,18 @@ This clean-slate approach results in:
 5. **Modern graphics features** (alpha, gradients, paths, transforms)
 6. **Industry-standard compositing** (Porter-Duff)
 7. **High-quality text** (TrueType, anti-aliasing, kerning)
+8. **Full Unicode support** (UTF-8 strings, all scripts, emoji)
 
-The migration requires updating all Smalltalk graphics code, but the result is dramatically simpler and more powerful.
+The migration requires updating all Smalltalk graphics and text code, but the result is dramatically simpler and more powerful.
+
+### Total Timeline: 16 Weeks
+
+| Phase | Weeks | Focus |
+|-------|-------|-------|
+| 1. Platform | 1-2 | SDL2 + Skia window |
+| 2. Canvas | 3-4 | Drawing primitives |
+| 3. Text | 5-6 | TrueType fonts |
+| 4. Paths | 7-8 | Vector graphics |
+| 5. Migration | 9-12 | Update Smalltalk |
+| 6. Polish | 13-14 | Performance |
+| 7. Unicode | 15-16 | Full Unicode support |
