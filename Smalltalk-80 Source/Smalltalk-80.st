@@ -40771,19 +40771,33 @@ SystemDictionary class
 !SystemDictionary class methodsFor: 'class initialization'!
 initialize
 	"Initialize system state including SourceFiles for source code storage"
-	| sourcesFile changesFile appDataPath |
+	| sourcesFile changesFile appDataPath sourcesPath changesPath |
 	Project current noChanges.
 
 	"Initialize SourceFiles array with file streams for .sources and .changes.
 	 Files are opened from the user's application data folder: %APPDATA%\Smalltalk-80\"
 	SourceFiles _ Array new: 2.
 
-	appDataPath _ (WindowsPath applicationPath: 'Smalltalk-80') asString.
-	sourcesFile _ WindowsFileStream readOn: appDataPath, '\Smalltalk-80.sources'.
-	sourcesFile ifNotNil: [SourceFiles at: 1 put: sourcesFile].
+	"Get the application data path - this requires WindowsPath to be initialized"
+	appDataPath _ WindowsPath applicationPath: 'Smalltalk-80'.
+	appDataPath ifNil: [
+		Transcript cr; show: 'WARNING: Cannot determine application data path'.
+		^self].
+	appDataPath _ appDataPath asString.
 
-	changesFile _ WindowsFileStream readWriteOn: appDataPath, '\Smalltalk-80.changes'.
-	changesFile ifNotNil: [SourceFiles at: 2 put: changesFile]
+	"Try to open .sources file (read-only)"
+	sourcesPath _ appDataPath, '\Smalltalk-80.sources'.
+	sourcesFile _ WindowsFileStream readOn: sourcesPath.
+	sourcesFile
+		ifNil: [Transcript cr; show: 'WARNING: Source file not found: ', sourcesPath]
+		ifNotNil: [SourceFiles at: 1 put: sourcesFile].
+
+	"Try to open .changes file (read-write)"
+	changesPath _ appDataPath, '\Smalltalk-80.changes'.
+	changesFile _ WindowsFileStream readWriteOn: changesPath.
+	changesFile
+		ifNil: [Transcript cr; show: 'WARNING: Changes file not found: ', changesPath]
+		ifNotNil: [SourceFiles at: 2 put: changesFile]
 	"SystemDictionary initialize"! !
 
 SystemDictionary initialize!
