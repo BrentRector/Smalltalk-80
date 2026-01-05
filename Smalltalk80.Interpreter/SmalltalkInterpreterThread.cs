@@ -110,6 +110,12 @@ public class SmalltalkInterpreterThread
             {
                 var display = _context.DisplayFactory(width, height, _context.HeapManager, _context.VMMetadata);
                 vm.SetDisplay(display);  // Cache in VM for subsequent calls
+
+                // Initialize event architecture now that display exists
+                // This sets up the callback that signals _inputEventPending when events arrive
+                vm.InitializeEventArchitecture();
+                Console.WriteLine("[Smalltalk Thread] Event architecture initialized after display creation");
+
                 return display;
             });
         }

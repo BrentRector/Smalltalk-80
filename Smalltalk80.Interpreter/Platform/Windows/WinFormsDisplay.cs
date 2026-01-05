@@ -195,6 +195,7 @@ public class WinFormsDisplay : Form, IDisplay
             return;
         }
         base.Show();
+        Focus();  // Ensure keyboard focus for key events
         Application.DoEvents();
     }
 
