@@ -40779,41 +40779,26 @@ SystemDictionary class
 
 !SystemDictionary class methodsFor: 'class initialization'!
 initialize
-	"Initialize system state including SourceFiles for source code storage"
+	"Initialize system state including SourceFiles for source code storage.
+	 Files are opened from %APPDATA%\Smalltalk-80\"
 	| sourcesFile changesFile appDataPath sourcesPath changesPath |
 	Project current noChanges.
-
-	"Initialize SourceFiles array with file streams for .sources and .changes.
-	 Files are opened from the user's application data folder: %APPDATA%\Smalltalk-80\"
 	SourceFiles _ Array new: 2.
 
-	"Get the application data path - this requires WindowsPath to be initialized"
+	"Get the application data path - requires WindowsPath to be initialized first"
 	appDataPath _ WindowsPath applicationPath: 'Smalltalk-80'.
-	appDataPath ifNil: [
-		Transcript cr; show: 'WARNING: Cannot determine application data path'.
-		^self].
+	appDataPath ifNil: [^self].
 	appDataPath _ appDataPath asString.
-	Transcript cr; show: 'SourceFiles path: ', appDataPath.
 
-	"Try to open .sources file (read-only)"
+	"Open .sources file (read-only)"
 	sourcesPath _ appDataPath, '\Smalltalk-80.sources'.
-	Transcript cr; show: '  Opening .sources: ', sourcesPath.
 	sourcesFile _ WindowsFileStream readOn: sourcesPath.
-	sourcesFile
-		ifNil: [Transcript cr; show: '    WARNING: Source file not found']
-		ifNotNil: [
-			Transcript cr; show: '    OK: Opened .sources'.
-			SourceFiles at: 1 put: sourcesFile].
+	sourcesFile ifNotNil: [SourceFiles at: 1 put: sourcesFile].
 
-	"Try to open .changes file (read-write)"
+	"Open .changes file (read-write)"
 	changesPath _ appDataPath, '\Smalltalk-80.changes'.
-	Transcript cr; show: '  Opening .changes: ', changesPath.
 	changesFile _ WindowsFileStream readWriteOn: changesPath.
-	changesFile
-		ifNil: [Transcript cr; show: '    WARNING: Changes file not found']
-		ifNotNil: [
-			Transcript cr; show: '    OK: Opened .changes'.
-			SourceFiles at: 2 put: changesFile]
+	changesFile ifNotNil: [SourceFiles at: 2 put: changesFile]
 	"SystemDictionary initialize"! !
 
 SystemDictionary initialize!
