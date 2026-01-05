@@ -33,9 +33,39 @@ public class SmalltalkThreadContext
 
     /// <summary>
     /// Display for Smalltalk -> UI communication.
+    /// Initially null - created lazily when Smalltalk calls BeDisplay.
     /// Smalltalk thread calls methods on this object (thread-safe).
     /// </summary>
-    public required IDisplay Display { get; init; }
+    public IDisplay? Display { get; set; }
+
+    /// <summary>
+    /// Factory function to create the display window.
+    /// Called from UI thread when display creation is requested.
+    /// Parameters: (width, height, heap, metadata) -> IDisplay
+    /// </summary>
+    public Func<int, int, ISmalltalkHeap, VMMetadata, IDisplay>? DisplayFactory { get; init; }
+
+    /// <summary>
+    /// Signaled by Smalltalk thread when BeDisplay is called and display needs to be created.
+    /// UI thread waits on this, then creates the display.
+    /// </summary>
+    public ManualResetEventSlim DisplayNeeded { get; } = new(false);
+
+    /// <summary>
+    /// Signaled by UI thread after display has been created.
+    /// Smalltalk thread waits on this before continuing after BeDisplay.
+    /// </summary>
+    public ManualResetEventSlim DisplayCreated { get; } = new(false);
+
+    /// <summary>
+    /// Requested display width (set by Smalltalk thread before signaling DisplayNeeded).
+    /// </summary>
+    public int RequestedDisplayWidth { get; set; }
+
+    /// <summary>
+    /// Requested display height (set by Smalltalk thread before signaling DisplayNeeded).
+    /// </summary>
+    public int RequestedDisplayHeight { get; set; }
 
     /// <summary>
     /// Diagnostic hub for logging and events.

@@ -40,7 +40,8 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
 
     private readonly RuntimeServices _runtimeServices;
     private readonly VMMetadata _metadata;
-    private readonly IDisplay? _display;
+    private IDisplay? _display;  // Mutable: created lazily when Smalltalk calls BeDisplay
+    private Func<int, int, IDisplay>? _displayFactory;  // Factory to create display on demand
     private readonly IDiagnosticHub? _diagnostics;
     private readonly IStackManager _stackManager;
     private readonly IContextManager _contextManager;
@@ -136,6 +137,7 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
         RuntimeSpecialObjects.Instance.Initialize(_runtimeServices);
         _metadata = metadata;
         _display = display;
+        _displayFactory = null;  // Set via SetDisplayFactory if lazy creation needed
         _diagnostics = diagnostics;
 
         // Initialize tracer first as other components may need it
@@ -1701,6 +1703,40 @@ public partial class VirtualMachine : IPrimitiveContext, IBytecodeContext, ICach
     }
 
     IDisplay? IPrimitiveContext.Display => _display;
+
+    /// <summary>
+    /// Sets the display factory for lazy display creation.
+    /// The factory is called from the UI thread when Smalltalk requests a display.
+    /// </summary>
+    public void SetDisplayFactory(Func<int, int, IDisplay>? factory) => _displayFactory = factory;
+
+    /// <summary>
+    /// Sets the display directly (for cases where it's created externally).
+    /// </summary>
+    public void SetDisplay(IDisplay? display) => _display = display;
+
+    IDisplay? IPrimitiveContext.GetOrCreateDisplay(int width, int height)
+    {
+        // If display already exists, just resize it
+        if (_display != null)
+        {
+            _display.DisplayResized(width, height);
+            return _display;
+        }
+
+        // Need to create display - use factory if available
+        if (_displayFactory != null)
+        {
+            Console.WriteLine($"[VM] Creating display via factory: {width}x{height}");
+            _display = _displayFactory(width, height);
+            return _display;
+        }
+
+        // No factory, can't create display
+        Console.WriteLine("[VM] Warning: No display factory available");
+        return null;
+    }
+
     bool IPrimitiveContext.PrimitiveSuccess { get => _primitiveSuccess; set => _primitiveSuccess = value; }
 
     Memory<byte> IPrimitiveContext.GetByteArray(SmalltalkOOP oop)

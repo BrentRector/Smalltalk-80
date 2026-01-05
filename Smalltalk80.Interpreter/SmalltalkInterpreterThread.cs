@@ -118,9 +118,22 @@ public class SmalltalkInterpreterThread
         var vm = new VirtualMachine(
             _context.HeapManager,
             _context.VMMetadata,
-            display: _context.Display,
+            display: _context.Display,  // May be null initially (lazy creation)
             _context.Diagnostics
         );
+
+        // Set up display factory for lazy display creation
+        // When BeDisplay calls GetOrCreateDisplay and no display exists,
+        // this factory coordinates with the UI thread to create the window
+        if (_context.DisplayFactory != null)
+        {
+            vm.SetDisplayFactory((width, height) =>
+            {
+                var display = _context.DisplayFactory(width, height, _context.HeapManager, _context.VMMetadata);
+                vm.SetDisplay(display);  // Cache in VM for subsequent calls
+                return display;
+            });
+        }
 
         vm.VerboseDebug = _context.Config.VerboseDebug;
         vm.ShutdownToken = _context.ShutdownToken;  // Wire up shutdown signal
