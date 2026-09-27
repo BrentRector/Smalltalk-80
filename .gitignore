@@ -70,3 +70,15 @@ Smalltalk80.Interpreter/test_output.txt
 
 # Compiler backup files
 Smalltalk80.Compiler/Generated.sav/
+
+# Third-party reference material kept locally, never published (see THIRD-PARTY-NOTICES.md)
+*.pdf
+docs/Bluebook/
+docs/Bluebook - *
+docs/BlueBook-Chapter-*
+docs/figures/
+docs/C Implementation/
+**/Formal Specification of the Primitive Methods.md
+old_duplicates_backup/
+*.log
+*.zip
